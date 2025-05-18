@@ -1,0 +1,72 @@
+version: '3.8'
+
+services:
+  # Servicio de base de datos PostgreSQL
+  postgres:
+    image: postgres:14-alpine
+    container_name: famisuper-postgres
+    restart: always
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: famisuper
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - famisuper-network
+
+  # Servicio de backend con Nest.js
+  backend:
+    build:
+      context: ../backend
+      dockerfile: ../docker/Dockerfile.backend
+    container_name: famisuper-backend
+    restart: always
+    ports:
+      - "3000:3000"
+    depends_on:
+      - postgres
+    environment:
+      - NODE_ENV=development
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_USERNAME=postgres
+      - DB_PASSWORD=postgres
+      - DB_DATABASE=famisuper
+      - DB_SYNCHRONIZE=true
+      - DB_LOGGING=true
+      - JWT_SECRET=your_jwt_secret_key
+      - JWT_EXPIRES_IN=1d
+    volumes:
+      - ../backend:/app
+      - /app/node_modules
+    networks:
+      - famisuper-network
+
+  # Servicio de frontend con React.js
+  frontend:
+    build:
+      context: ../frontend
+      dockerfile: ../docker/Dockerfile.frontend
+    container_name: famisuper-frontend
+    restart: always
+    ports:
+      - "3001:3000"
+    depends_on:
+      - backend
+    environment:
+      - REACT_APP_API_URL=http://localhost:3000
+    volumes:
+      - ../frontend:/app
+      - /app/node_modules
+    networks:
+      - famisuper-network
+
+networks:
+  famisuper-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
