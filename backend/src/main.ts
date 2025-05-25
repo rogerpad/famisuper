@@ -4,10 +4,17 @@ import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { AppModule } from './app.module';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  try {
+    const app = await NestFactory.create(AppModule, {
+      logger: ['error', 'warn', 'log', 'debug', 'verbose'],
+    });
   
   // Configuración de CORS
-  app.enableCors();
+  app.enableCors({
+    origin: ['http://localhost:3000'],
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
+    credentials: true,
+  });
   
   // Configuración de validación global
   app.useGlobalPipes(
@@ -29,8 +36,12 @@ async function bootstrap() {
   SwaggerModule.setup('api/docs', app, document);
 
   // Puerto de la aplicación
-  const port = process.env.PORT || 3000;
+  const port = 4001; // Cambiamos a puerto 4001 para evitar conflictos
   await app.listen(port);
   console.log(`La aplicación está corriendo en: http://localhost:${port}`);
+  } catch (error) {
+    console.error('Error al iniciar la aplicación:', error);
+    process.exit(1);
+  }
 }
 bootstrap();

@@ -10,10 +10,10 @@ import {
 } from '@mui/material';
 import { useFormik } from 'formik';
 import * as Yup from 'yup';
-import api from '../../api/api';
+import authApi from '../../api/auth/authApi';
 
 interface LoginFormValues {
-  email: string;
+  username: string;
   password: string;
 }
 
@@ -24,13 +24,12 @@ const Login: React.FC = () => {
 
   const formik = useFormik<LoginFormValues>({
     initialValues: {
-      email: '',
+      username: '',
       password: '',
     },
     validationSchema: Yup.object({
-      email: Yup.string()
-        .email('Correo electrónico inválido')
-        .required('El correo electrónico es obligatorio'),
+      username: Yup.string()
+        .required('El nombre de usuario es obligatorio'),
       password: Yup.string()
         .required('La contraseña es obligatoria'),
     }),
@@ -38,10 +37,16 @@ const Login: React.FC = () => {
       try {
         setLoading(true);
         setError('');
-        const response = await api.post('/auth/login', values);
-        localStorage.setItem('token', response.data.access_token);
+        const response = await authApi.login({
+          username: values.username,
+          password: values.password
+        });
+        localStorage.setItem('token', response.access_token);
+        // Guardar información del usuario si es necesario
+        localStorage.setItem('user', JSON.stringify(response.user));
         navigate('/');
       } catch (err: any) {
+        console.error('Error de inicio de sesión:', err);
         setError(
           err.response?.data?.message || 'Error al iniciar sesión. Inténtalo de nuevo.'
         );
@@ -63,16 +68,16 @@ const Login: React.FC = () => {
         margin="normal"
         required
         fullWidth
-        id="email"
-        label="Correo Electrónico"
-        name="email"
-        autoComplete="email"
+        id="username"
+        label="Nombre de Usuario"
+        name="username"
+        autoComplete="username"
         autoFocus
-        value={formik.values.email}
+        value={formik.values.username}
         onChange={formik.handleChange}
         onBlur={formik.handleBlur}
-        error={formik.touched.email && Boolean(formik.errors.email)}
-        helperText={formik.touched.email && formik.errors.email}
+        error={formik.touched.username && Boolean(formik.errors.username)}
+        helperText={formik.touched.username && formik.errors.username}
       />
       
       <TextField

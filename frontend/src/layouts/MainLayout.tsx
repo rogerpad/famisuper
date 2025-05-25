@@ -23,7 +23,11 @@ import {
   Dashboard as DashboardIcon,
   Receipt as ReceiptIcon,
   Assessment as AssessmentIcon,
-  AccountCircle
+  AccountCircle,
+  AdminPanelSettings as RolesIcon,
+  People as UsersIcon,
+  Category as ProviderTypesIcon,
+  LocalShipping as ProvidersIcon
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 
@@ -55,6 +59,10 @@ const MainLayout: React.FC = () => {
     { text: 'Dashboard', icon: <DashboardIcon />, path: '/' },
     { text: 'Transacciones', icon: <ReceiptIcon />, path: '/transactions' },
     { text: 'Reportes', icon: <AssessmentIcon />, path: '/reports' },
+    { text: 'Gestión de Roles', icon: <RolesIcon />, path: '/roles' },
+    { text: 'Gestión de Usuarios', icon: <UsersIcon />, path: '/users' },
+    { text: 'Tipos de Proveedor', icon: <ProviderTypesIcon />, path: '/provider-types' },
+    { text: 'Proveedores', icon: <ProvidersIcon />, path: '/providers' },
   ];
 
   const drawer = (
