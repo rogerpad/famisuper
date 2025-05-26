@@ -19,6 +19,7 @@ import RolesList from './pages/roles/RolesList';
 import UsersList from './pages/users/UsersList';
 import ProviderTypesList from './pages/provider-types/ProviderTypesList';
 import ProvidersList from './pages/providers/ProvidersList';
+import TransactionTypesList from './pages/transaction-types/TransactionTypesList';
 import Login from './pages/auth/Login';
 import NotFound from './pages/NotFound';
 
@@ -55,6 +56,7 @@ function App() {
             <Route path="/users" element={<UsersList />} />
             <Route path="/provider-types" element={<ProviderTypesList />} />
             <Route path="/providers" element={<ProvidersList />} />
+            <Route path="/transaction-types" element={<TransactionTypesList />} />
           </Route>
         </Route>
 

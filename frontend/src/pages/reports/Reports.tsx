@@ -18,19 +18,61 @@ import {
   CircularProgress,
   Divider,
   Card,
-  CardContent
+  CardContent,
+  Tab,
+  Tabs,
+  TextField
 } from '@mui/material';
 import {
   FileDownload as FileDownloadIcon,
   Refresh as RefreshIcon
 } from '@mui/icons-material';
+import TransactionSummaryReport from './TransactionSummaryReport';
+
+interface TabPanelProps {
+  children?: React.ReactNode;
+  index: number;
+  value: number;
+}
+
+function TabPanel(props: TabPanelProps) {
+  const { children, value, index, ...other } = props;
+
+  return (
+    <div
+      role="tabpanel"
+      hidden={value !== index}
+      id={`report-tabpanel-${index}`}
+      aria-labelledby={`report-tab-${index}`}
+      {...other}
+    >
+      {value === index && (
+        <Box sx={{ pt: 3 }}>
+          {children}
+        </Box>
+      )}
+    </div>
+  );
+}
+
+function a11yProps(index: number) {
+  return {
+    id: `report-tab-${index}`,
+    'aria-controls': `report-tabpanel-${index}`,
+  };
+}
 
 const Reports: React.FC = () => {
+  const [tabValue, setTabValue] = useState(0);
   const [reportType, setReportType] = useState('transactions');
   const [startDate, setStartDate] = useState<string>('2025-04-13');
   const [endDate, setEndDate] = useState<string>('2025-05-13');
   const [loading, setLoading] = useState(false);
   const [reportData, setReportData] = useState<any[] | null>(null);
+  
+  const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
+    setTabValue(newValue);
+  };
 
   const handleGenerateReport = () => {
     setLoading(true);
@@ -100,11 +142,19 @@ const Reports: React.FC = () => {
   const totals = calculateTotals();
 
   return (
-      <Box sx={{ flexGrow: 1 }}>
-        <Typography variant="h4" component="h1" gutterBottom>
-          Reportes
-        </Typography>
-        
+    <Box sx={{ flexGrow: 1 }}>
+      <Typography variant="h4" component="h1" gutterBottom>
+        Reportes
+      </Typography>
+      
+      <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
+        <Tabs value={tabValue} onChange={handleTabChange} aria-label="reportes tabs">
+          <Tab label="Reporte General" {...a11yProps(0)} />
+          <Tab label="Resumen de Transacciones" {...a11yProps(1)} />
+        </Tabs>
+      </Box>
+      
+      <TabPanel value={tabValue} index={0}>
         <Paper sx={{ p: 3, mb: 4 }}>
           <Typography variant="h6" gutterBottom>
             Generar Reporte
@@ -116,52 +166,43 @@ const Reports: React.FC = () => {
                 <InputLabel id="report-type-label">Tipo de Reporte</InputLabel>
                 <Select
                   labelId="report-type-label"
-                  id="report-type"
                   value={reportType}
                   label="Tipo de Reporte"
                   onChange={(e) => setReportType(e.target.value)}
                 >
                   <MenuItem value="transactions">Transacciones</MenuItem>
                   <MenuItem value="sales">Ventas</MenuItem>
-                  <MenuItem value="customers">Clientes</MenuItem>
+                  <MenuItem value="inventory">Inventario</MenuItem>
                 </Select>
               </FormControl>
             </Grid>
             
             <Grid item xs={12} md={3}>
-              <FormControl fullWidth>
-                <InputLabel>Fecha Inicio</InputLabel>
-                <Select
-                  value={startDate}
-                  label="Fecha Inicio"
-                  onChange={(e) => setStartDate(e.target.value)}
-                >
-                  <MenuItem value="2025-04-13">13/04/2025</MenuItem>
-                  <MenuItem value="2025-04-20">20/04/2025</MenuItem>
-                  <MenuItem value="2025-04-27">27/04/2025</MenuItem>
-                </Select>
-              </FormControl>
+              <TextField
+                fullWidth
+                label="Fecha Inicial"
+                type="date"
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+                InputLabelProps={{ shrink: true }}
+              />
             </Grid>
             
             <Grid item xs={12} md={3}>
-              <FormControl fullWidth>
-                <InputLabel>Fecha Fin</InputLabel>
-                <Select
-                  value={endDate}
-                  label="Fecha Fin"
-                  onChange={(e) => setEndDate(e.target.value)}
-                >
-                  <MenuItem value="2025-05-13">13/05/2025</MenuItem>
-                  <MenuItem value="2025-05-06">06/05/2025</MenuItem>
-                  <MenuItem value="2025-04-29">29/04/2025</MenuItem>
-                </Select>
-              </FormControl>
+              <TextField
+                fullWidth
+                label="Fecha Final"
+                type="date"
+                value={endDate}
+                onChange={(e) => setEndDate(e.target.value)}
+                InputLabelProps={{ shrink: true }}
+              />
             </Grid>
             
             <Grid item xs={12} md={3}>
               <Button
-                variant="contained"
                 fullWidth
+                variant="contained"
                 startIcon={<RefreshIcon />}
                 onClick={handleGenerateReport}
                 disabled={loading}
@@ -279,7 +320,12 @@ const Reports: React.FC = () => {
             </Paper>
           </>
         )}
-      </Box>
+      </TabPanel>
+      
+      <TabPanel value={tabValue} index={1}>
+        <TransactionSummaryReport />
+      </TabPanel>
+    </Box>
   );
 };
 

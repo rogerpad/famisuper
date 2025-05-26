@@ -27,7 +27,8 @@ import {
   AdminPanelSettings as RolesIcon,
   People as UsersIcon,
   Category as ProviderTypesIcon,
-  LocalShipping as ProvidersIcon
+  LocalShipping as ProvidersIcon,
+  Payments as TransactionTypesIcon
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 
@@ -58,6 +59,7 @@ const MainLayout: React.FC = () => {
   const menuItems = [
     { text: 'Dashboard', icon: <DashboardIcon />, path: '/' },
     { text: 'Transacciones', icon: <ReceiptIcon />, path: '/transactions' },
+    { text: 'Tipos de Transacción', icon: <TransactionTypesIcon />, path: '/transaction-types' },
     { text: 'Reportes', icon: <AssessmentIcon />, path: '/reports' },
     { text: 'Gestión de Roles', icon: <RolesIcon />, path: '/roles' },
     { text: 'Gestión de Usuarios', icon: <UsersIcon />, path: '/users' },

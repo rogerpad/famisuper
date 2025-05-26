@@ -8,6 +8,7 @@ import { RolesModule } from './modules/roles/roles.module';
 import { DatabaseModule } from './database/database.module';
 import { ProviderTypesModule } from './modules/provider-types/provider-types.module';
 import { ProvidersModule } from './modules/providers/providers.module';
+import { TransactionTypesModule } from './modules/transaction-types/transaction-types.module';
 
 @Module({
   imports: [
@@ -28,6 +29,7 @@ import { ProvidersModule } from './modules/providers/providers.module';
     ReportsModule,
     ProviderTypesModule,
     ProvidersModule,
+    TransactionTypesModule,
   ],
 })
 export class AppModule {}

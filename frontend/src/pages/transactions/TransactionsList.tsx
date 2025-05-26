@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { 
   Box, 
   Typography, 
@@ -7,165 +7,156 @@ import {
   TextField,
   InputAdornment,
   CircularProgress,
-  Chip
+  Chip,
+  IconButton,
+  Tooltip,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogContentText,
+  DialogTitle
 } from '@mui/material';
-import { DataGrid, GridColDef, GridValueGetterParams } from '@mui/x-data-grid';
-import { Search as SearchIcon, Add as AddIcon } from '@mui/icons-material';
+import { DataGrid, GridColDef } from '@mui/x-data-grid';
+import { 
+  Search as SearchIcon, 
+  Add as AddIcon, 
+  Description as ReportIcon,
+  Edit as EditIcon,
+  Delete as DeleteIcon 
+} from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
-import api from '../../api/api';
-
-interface Transaction {
-  id: string;
-  date: string;
-  reference: string;
-  amount: number;
-  status: string;
-  customerName: string;
-}
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import transactionsApi, { Transaction } from '../../api/transactions/transactionsApi';
+import { format } from 'date-fns';
+import { es } from 'date-fns/locale';
+import TransactionForm from './TransactionForm';
 
 const TransactionsList: React.FC = () => {
-  const [transactions, setTransactions] = useState<Transaction[]>([]);
-  const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const [openForm, setOpenForm] = useState(false);
+  const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState<number | null>(null);
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
 
-  useEffect(() => {
-    // En un escenario real, estos datos vendrían de la API
-    // Aquí simulamos los datos para la demostración
-    setTimeout(() => {
-      const demoData: Transaction[] = [
-        { 
-          id: '1', 
-          date: '2025-05-13', 
-          reference: 'TRX-001', 
-          amount: 1250.00, 
-          status: 'Completada', 
-          customerName: 'Juan Pérez' 
-        },
-        { 
-          id: '2', 
-          date: '2025-05-12', 
-          reference: 'TRX-002', 
-          amount: 890.50, 
-          status: 'Completada', 
-          customerName: 'María González' 
-        },
-        { 
-          id: '3', 
-          date: '2025-05-11', 
-          reference: 'TRX-003', 
-          amount: 2340.75, 
-          status: 'Pendiente', 
-          customerName: 'Carlos Rodríguez' 
-        },
-        { 
-          id: '4', 
-          date: '2025-05-10', 
-          reference: 'TRX-004', 
-          amount: 1100.25, 
-          status: 'Completada', 
-          customerName: 'Ana Martínez' 
-        },
-        { 
-          id: '5', 
-          date: '2025-05-09', 
-          reference: 'TRX-005', 
-          amount: 760.00, 
-          status: 'Pendiente', 
-          customerName: 'Roberto Sánchez' 
-        },
-        { 
-          id: '6', 
-          date: '2025-05-08', 
-          reference: 'TRX-006', 
-          amount: 1500.00, 
-          status: 'Cancelada', 
-          customerName: 'Laura Díaz' 
-        },
-        { 
-          id: '7', 
-          date: '2025-05-07', 
-          reference: 'TRX-007', 
-          amount: 950.30, 
-          status: 'Completada', 
-          customerName: 'Pedro Fernández' 
-        },
-        { 
-          id: '8', 
-          date: '2025-05-06', 
-          reference: 'TRX-008', 
-          amount: 2100.00, 
-          status: 'Pendiente', 
-          customerName: 'Sofía López' 
-        },
-      ];
-      
-      setTransactions(demoData);
-      setLoading(false);
-    }, 1000);
-    
-    // En una implementación real, usaríamos:
-    // const fetchTransactions = async () => {
-    //   try {
-    //     const response = await api.get('/transactions');
-    //     setTransactions(response.data);
-    //   } catch (error) {
-    //     console.error('Error fetching transactions:', error);
-    //   } finally {
-    //     setLoading(false);
-    //   }
-    // };
-    // 
-    // fetchTransactions();
-  }, []);
+  // Consulta para obtener todas las transacciones
+  const { data: transactions = [], isLoading } = useQuery({
+    queryKey: ['transactions'],
+    queryFn: transactionsApi.getAll,
+  });
+
+  // Mutación para eliminar una transacción
+  const deleteMutation = useMutation({
+    mutationFn: transactionsApi.delete,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['transactions'] });
+      setConfirmDelete(null);
+    },
+  });
+
+  const handleOpenForm = (transaction?: Transaction) => {
+    if (transaction) {
+      setEditingTransaction(transaction);
+    } else {
+      setEditingTransaction(null);
+    }
+    setOpenForm(true);
+  };
+
+  const handleCloseForm = () => {
+    setOpenForm(false);
+    setEditingTransaction(null);
+  };
+
+  const handleDeleteConfirm = (id: number) => {
+    setConfirmDelete(id);
+  };
+
+  const handleDelete = () => {
+    if (confirmDelete) {
+      deleteMutation.mutate(confirmDelete);
+    }
+  };
+
+  const formatDate = (dateString: string) => {
+    try {
+      return format(new Date(dateString), 'dd/MM/yyyy', { locale: es });
+    } catch (error) {
+      return dateString;
+    }
+  };
 
   const columns: GridColDef[] = [
     { 
-      field: 'reference', 
-      headerName: 'Referencia', 
-      flex: 1,
-      minWidth: 120 
+      field: 'id', 
+      headerName: 'ID', 
+      width: 70 
     },
     { 
-      field: 'date', 
+      field: 'fecha', 
       headerName: 'Fecha', 
       flex: 1,
-      minWidth: 120 
+      minWidth: 120,
+      valueFormatter: (params) => formatDate(params.value),
     },
     { 
-      field: 'customerName', 
-      headerName: 'Cliente', 
+      field: 'hora', 
+      headerName: 'Hora', 
+      flex: 1,
+      minWidth: 100 
+    },
+    { 
+      field: 'usuario', 
+      headerName: 'Usuario', 
       flex: 1.5,
-      minWidth: 180 
+      minWidth: 180,
+      valueGetter: (params) => params.row.usuario?.nombre || 'Administrador Sistema',
     },
     { 
-      field: 'amount', 
-      headerName: 'Monto', 
-      flex: 1,
-      minWidth: 120,
-      valueFormatter: (params) => {
-        return `$${params.value.toLocaleString('es-ES', { minimumFractionDigits: 2 })}`;
-      }
+      field: 'agente', 
+      headerName: 'Agente', 
+      flex: 1.5,
+      minWidth: 180,
+      valueGetter: (params) => params.row.agente?.nombre || '',
     },
     { 
-      field: 'status', 
-      headerName: 'Estado', 
+      field: 'tipoTransaccion', 
+      headerName: 'Transacción', 
       flex: 1,
-      minWidth: 120,
+      minWidth: 150,
       renderCell: (params) => {
+        const tipoNombre = params.row.tipoTransaccion?.nombre || '';
         let color = 'default';
-        if (params.value === 'Completada') color = 'success';
-        if (params.value === 'Pendiente') color = 'warning';
-        if (params.value === 'Cancelada') color = 'error';
+        
+        if (tipoNombre.toLowerCase().includes('retiro')) color = 'error';
+        if (tipoNombre.toLowerCase().includes('depósito')) color = 'success';
+        if (tipoNombre.toLowerCase().includes('comisión')) color = 'warning';
+        if (tipoNombre.toLowerCase().includes('adicional')) color = 'info';
         
         return (
           <Chip 
-            label={params.value} 
-            color={color as 'default' | 'success' | 'warning' | 'error'} 
+            label={tipoNombre} 
+            color={color as 'default' | 'success' | 'warning' | 'error' | 'info'} 
             size="small" 
           />
         );
       }
+    },
+    { 
+      field: 'valor', 
+      headerName: 'Valor', 
+      flex: 1,
+      minWidth: 120,
+      valueFormatter: (params) => {
+        return `L${params.value.toLocaleString('es-HN', { minimumFractionDigits: 2 })}`;
+      }
+    },
+    { 
+      field: 'observacion', 
+      headerName: 'Observación', 
+      flex: 1.5,
+      minWidth: 200,
+      valueGetter: (params) => params.row.observacion || '-',
     },
     {
       field: 'actions',
@@ -174,43 +165,68 @@ const TransactionsList: React.FC = () => {
       minWidth: 120,
       sortable: false,
       renderCell: (params) => (
-        <Button
-          variant="outlined"
-          size="small"
-          onClick={() => navigate(`/transactions/${params.row.id}`)}
-        >
-          Ver Detalles
-        </Button>
+        <Box>
+          <Tooltip title="Editar">
+            <IconButton 
+              size="small" 
+              color="primary" 
+              onClick={() => handleOpenForm(params.row as Transaction)}
+            >
+              <EditIcon />
+            </IconButton>
+          </Tooltip>
+          <Tooltip title="Eliminar">
+            <IconButton 
+              size="small" 
+              color="error" 
+              onClick={() => handleDeleteConfirm(params.row.id)}
+            >
+              <DeleteIcon />
+            </IconButton>
+          </Tooltip>
+        </Box>
       ),
     },
   ];
 
   const filteredTransactions = transactions.filter(
     (transaction) =>
-      transaction.reference.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      transaction.customerName.toLowerCase().includes(searchTerm.toLowerCase())
+      (transaction.agente?.nombre?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
+      (transaction.tipoTransaccion?.nombre?.toLowerCase() || '').includes(searchTerm.toLowerCase())
   );
 
   return (
     <Box sx={{ flexGrow: 1 }}>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-        <Typography variant="h4" component="h1">
+        <Typography variant="h4" component="h1" display="flex" alignItems="center" gap={1}>
+          <span role="img" aria-label="transactions-icon" style={{ fontSize: '1.2em' }}>💳</span>
           Transacciones
         </Typography>
-        <Button 
-          variant="contained" 
-          startIcon={<AddIcon />}
-          onClick={() => navigate('/transactions/new')}
-        >
-          Nueva Transacción
-        </Button>
+        <Box>
+          <Button 
+            variant="outlined" 
+            startIcon={<ReportIcon />}
+            onClick={() => navigate('/reports')}
+            sx={{ mr: 2 }}
+          >
+            Reporte de Transacciones
+          </Button>
+          <Button 
+            variant="contained" 
+            startIcon={<AddIcon />}
+            onClick={() => handleOpenForm()}
+            color="primary"
+          >
+            Nueva Transacción
+          </Button>
+        </Box>
       </Box>
       
       <Paper sx={{ p: 2, mb: 3 }}>
         <TextField
           fullWidth
           variant="outlined"
-          placeholder="Buscar por referencia o cliente..."
+          placeholder="Buscar por agente o tipo de transacción..."
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
           InputProps={{
@@ -223,7 +239,7 @@ const TransactionsList: React.FC = () => {
           sx={{ mb: 2 }}
         />
         
-        {loading ? (
+        {isLoading ? (
           <Box sx={{ display: 'flex', justifyContent: 'center', p: 3 }}>
             <CircularProgress />
           </Box>
@@ -232,10 +248,13 @@ const TransactionsList: React.FC = () => {
             rows={filteredTransactions}
             columns={columns}
             autoHeight
-            pageSizeOptions={[5, 10, 25]}
+            pageSizeOptions={[10, 25, 50]}
             initialState={{
               pagination: {
                 paginationModel: { pageSize: 10, page: 0 },
+              },
+              sorting: {
+                sortModel: [{ field: 'id', sort: 'desc' }],
               },
             }}
             disableRowSelectionOnClick
@@ -243,6 +262,34 @@ const TransactionsList: React.FC = () => {
           />
         )}
       </Paper>
+
+      {/* Formulario de transacción */}
+      {openForm && (
+        <TransactionForm
+          open={openForm}
+          onClose={handleCloseForm}
+          transaction={editingTransaction}
+        />
+      )}
+
+      {/* Diálogo de confirmación para eliminar */}
+      <Dialog
+        open={confirmDelete !== null}
+        onClose={() => setConfirmDelete(null)}
+      >
+        <DialogTitle>Confirmar eliminación</DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            ¿Está seguro de que desea eliminar esta transacción? Esta acción no se puede deshacer.
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setConfirmDelete(null)}>Cancelar</Button>
+          <Button onClick={handleDelete} color="error" autoFocus>
+            Eliminar
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 };
