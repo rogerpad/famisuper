@@ -14,12 +14,16 @@ import AuthLayout from './layouts/AuthLayout';
 import Dashboard from './pages/dashboard/Dashboard';
 import TransactionsList from './pages/transactions/TransactionsList';
 import TransactionDetail from './pages/transactions/TransactionDetail';
+import TransactionSummary from './pages/transactions/TransactionSummary';
 import Reports from './pages/reports/Reports';
 import RolesList from './pages/roles/RolesList';
 import UsersList from './pages/users/UsersList';
 import ProviderTypesList from './pages/provider-types/ProviderTypesList';
 import ProvidersList from './pages/providers/ProvidersList';
 import TransactionTypesList from './pages/transaction-types/TransactionTypesList';
+import AgentClosingsList from './pages/agent-closings/AgentClosingsList';
+import AgentClosingForm from './pages/agent-closings/AgentClosingForm';
+import FormulaConfigForm from './pages/formula-configs/FormulaConfigForm';
 import Login from './pages/auth/Login';
 import NotFound from './pages/NotFound';
 
@@ -51,12 +55,17 @@ function App() {
             <Route path="/" element={<Dashboard />} />
             <Route path="/transactions" element={<TransactionsList />} />
             <Route path="/transactions/:id" element={<TransactionDetail />} />
+            <Route path="/transaction-summary" element={<TransactionSummary />} />
             <Route path="/reports" element={<Reports />} />
             <Route path="/roles" element={<RolesList />} />
             <Route path="/users" element={<UsersList />} />
             <Route path="/provider-types" element={<ProviderTypesList />} />
             <Route path="/providers" element={<ProvidersList />} />
             <Route path="/transaction-types" element={<TransactionTypesList />} />
+            <Route path="/agent-closings" element={<AgentClosingsList />} />
+            <Route path="/agent-closings/new" element={<AgentClosingForm />} />
+            <Route path="/agent-closings/edit/:id" element={<AgentClosingForm />} />
+            <Route path="/formula-configs/:providerId" element={<FormulaConfigForm />} />
           </Route>
         </Route>
 

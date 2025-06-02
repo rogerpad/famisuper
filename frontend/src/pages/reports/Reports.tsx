@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 import {
   Box,
   Typography,
@@ -63,12 +64,20 @@ function a11yProps(index: number) {
 }
 
 const Reports: React.FC = () => {
+  const location = useLocation();
   const [tabValue, setTabValue] = useState(0);
   const [reportType, setReportType] = useState('transactions');
   const [startDate, setStartDate] = useState<string>('2025-04-13');
   const [endDate, setEndDate] = useState<string>('2025-05-13');
   const [loading, setLoading] = useState(false);
   const [reportData, setReportData] = useState<any[] | null>(null);
+  
+  // Efecto para establecer la pestaña activa basada en el estado de navegación
+  useEffect(() => {
+    if (location.state && typeof location.state === 'object' && 'tabIndex' in location.state) {
+      setTabValue(location.state.tabIndex);
+    }
+  }, [location]);
   
   const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
     setTabValue(newValue);

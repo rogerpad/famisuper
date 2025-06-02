@@ -41,6 +41,9 @@ export class Transaction {
   @Column({ type: 'text', nullable: true })
   observacion: string;
 
+  @Column({ type: 'integer', default: 1 })
+  estado: number;
+
   @CreateDateColumn({ type: 'timestamptz', name: 'fecha_registro' })
   fechaRegistro: Date;
 }

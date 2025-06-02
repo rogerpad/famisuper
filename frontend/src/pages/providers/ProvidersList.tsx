@@ -24,8 +24,10 @@ import {
   Select,
   MenuItem,
   SelectChangeEvent,
+  Tooltip,
 } from '@mui/material';
-import { Add as AddIcon, Edit as EditIcon, Delete as DeleteIcon } from '@mui/icons-material';
+import { Add as AddIcon, Edit as EditIcon, Delete as DeleteIcon, Settings as SettingsIcon } from '@mui/icons-material';
+import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import providersApi, { Provider } from '../../api/providers/providersApi';
 import providerTypesApi from '../../api/provider-types/providerTypesApi';
@@ -34,6 +36,7 @@ import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 
 const ProvidersList: React.FC = () => {
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [openForm, setOpenForm] = useState(false);
   const [selectedProvider, setSelectedProvider] = useState<Provider | null>(null);
@@ -212,6 +215,17 @@ const ProvidersList: React.FC = () => {
                   >
                     <DeleteIcon />
                   </IconButton>
+                  {provider.tipoProveedor?.nombre?.toLowerCase().includes('agente') && (
+                    <Tooltip title="Configurar fórmula de cálculo">
+                      <IconButton
+                        color="success"
+                        aria-label="configurar fórmula"
+                        onClick={() => navigate(`/formula-configs/${provider.id}`)}
+                      >
+                        <SettingsIcon />
+                      </IconButton>
+                    </Tooltip>
+                  )}
                 </TableCell>
               </TableRow>
             ))}

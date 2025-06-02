@@ -25,6 +25,7 @@ export interface Transaction {
   };
   valor: number;
   observacion?: string;
+  estado: number;
   fechaRegistro: string;
 }
 
@@ -36,6 +37,7 @@ export interface CreateTransactionDto {
   tipoTransaccionId: number;
   valor: number;
   observacion?: string;
+  estado?: number; // Opcional porque se establecerá por defecto en el backend
 }
 
 export interface UpdateTransactionDto {
@@ -46,15 +48,22 @@ export interface UpdateTransactionDto {
   tipoTransaccionId?: number;
   valor?: number;
   observacion?: string;
+  estado?: number;
 }
 
 // El cliente HTTP centralizado ya maneja la autenticación
 
 // Funciones para interactuar con la API de transacciones
 const transactionsApi = {
-  // Obtener todas las transacciones
+  // Obtener todas las transacciones activas
   getAll: async (): Promise<Transaction[]> => {
     const response = await api.get('/transactions');
+    return response.data;
+  },
+
+  // Obtener todas las transacciones incluyendo inactivas
+  getAllWithInactive: async (): Promise<Transaction[]> => {
+    const response = await api.get('/transactions/all');
     return response.data;
   },
 
@@ -85,6 +94,20 @@ const transactionsApi = {
   getByDateRange: async (startDate: string, endDate: string): Promise<Transaction[]> => {
     const response = await api.get(
       `/transactions/date-range?startDate=${startDate}&endDate=${endDate}`
+    );
+    return response.data;
+  },
+  
+  // Obtener transacciones activas para el resumen
+  getForSummary: async (): Promise<Transaction[]> => {
+    const response = await api.get('/transactions/summary');
+    return response.data;
+  },
+  
+  // Obtener transacciones activas por rango de fechas para el resumen
+  getByDateRangeForSummary: async (startDate: string, endDate: string): Promise<Transaction[]> => {
+    const response = await api.get(
+      `/transactions/summary/date-range?startDate=${startDate}&endDate=${endDate}`
     );
     return response.data;
   },

@@ -42,6 +42,7 @@ const validationSchema = yup.object({
     .positive('El valor debe ser positivo')
     .min(0.01, 'El valor mínimo es 0.01'),
   observacion: yup.string(),
+  estado: yup.number().required('El estado es requerido'),
 });
 
 const TransactionForm: React.FC<TransactionFormProps> = ({ open, onClose, transaction }) => {
@@ -101,17 +102,32 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ open, onClose, transa
   });
 
   // Configurar Formik para el formulario
-  const formik = useFormik({
+  // Definir la interfaz para los valores del formulario
+  interface FormValues {
+    fecha: string;
+    hora: string;
+    usuarioId: number;
+    agenteId: string | number; // Puede ser string en el formulario pero number en la API
+    tipoTransaccionId: string | number; // Puede ser string en el formulario pero number en la API
+    estado: number;
+    valor: string | number; // Puede ser string en el formulario pero number en la API
+    observacion: string;
+  }
+  
+  // Obtener la fecha y hora actuales formateadas
+  const currentDate = format(new Date(), 'yyyy-MM-dd');
+  const currentTime = format(new Date(), 'HH:mm');
+
+  const formik = useFormik<FormValues>({
     initialValues: {
-      fecha: transaction?.fecha 
-        ? format(new Date(transaction.fecha), 'yyyy-MM-dd')
-        : format(new Date(), 'yyyy-MM-dd'),
-      hora: transaction?.hora || format(new Date(), 'HH:mm'),
-      usuarioId: transaction?.usuarioId || currentUserId,
-      agenteId: transaction?.agenteId || '',
-      tipoTransaccionId: transaction?.tipoTransaccionId || '',
-      valor: transaction?.valor || '',
-      observacion: transaction?.observacion || '',
+      fecha: currentDate,
+      hora: currentTime,
+      usuarioId: currentUserId,
+      agenteId: '',
+      tipoTransaccionId: '',
+      valor: '',
+      observacion: '',
+      estado: 1, // Por defecto activa
     },
     validationSchema,
     onSubmit: (values) => {
@@ -122,6 +138,7 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ open, onClose, transa
         agenteId: Number(values.agenteId),
         tipoTransaccionId: Number(values.tipoTransaccionId),
         valor: Number(values.valor),
+        estado: Number(values.estado),
       };
 
       if (isEditing && transaction) {
@@ -140,16 +157,27 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ open, onClose, transa
   // Actualizar los valores del formulario cuando cambia la transacción seleccionada
   useEffect(() => {
     if (transaction) {
+      console.log('Estado de la transacción:', transaction.estado);
+      
+      // Asegurarse de que el estado sea un número
+      const estadoValue = typeof transaction.estado === 'number' ? transaction.estado : 1;
+      
       formik.setValues({
         fecha: format(new Date(transaction.fecha), 'yyyy-MM-dd'),
         hora: transaction.hora,
         usuarioId: transaction.usuarioId,
-        agenteId: transaction.agenteId,
-        tipoTransaccionId: transaction.tipoTransaccionId,
-        valor: transaction.valor,
+        // Mantener los tipos como string para el formulario
+        agenteId: String(transaction.agenteId),
+        tipoTransaccionId: String(transaction.tipoTransaccionId),
+        valor: String(transaction.valor),
         observacion: transaction.observacion || '',
+        estado: estadoValue,
       });
+      
+      // Verificar el valor establecido
+      console.log('Valor establecido en formik:', formik.values.estado);
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [transaction]);
 
   const isSubmitting = createMutation.isLoading || updateMutation.isLoading;
@@ -181,6 +209,9 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ open, onClose, transa
                 helperText={formik.touched.fecha && formik.errors.fecha}
                 InputLabelProps={{ shrink: true }}
                 margin="normal"
+                InputProps={{
+                  readOnly: !isEditing,
+                }}
               />
             </Grid>
             <Grid item xs={12} md={6}>
@@ -196,6 +227,9 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ open, onClose, transa
                 helperText={formik.touched.hora && formik.errors.hora}
                 InputLabelProps={{ shrink: true }}
                 margin="normal"
+                InputProps={{
+                  readOnly: !isEditing,
+                }}
               />
             </Grid>
 
@@ -300,6 +334,32 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ open, onClose, transa
                 margin="normal"
               />
             </Grid>
+            
+            {isEditing && (
+              <Grid item xs={12} md={6}>
+                <FormControl 
+                  fullWidth 
+                  margin="normal"
+                  error={formik.touched.estado && Boolean(formik.errors.estado)}
+                >
+                  <InputLabel id="estado-label">Estado</InputLabel>
+                  <Select
+                    labelId="estado-label"
+                    id="estado"
+                    name="estado"
+                    value={Number(formik.values.estado)}
+                    onChange={formik.handleChange}
+                    label="Estado"
+                  >
+                    <MenuItem value={1}>Activa</MenuItem>
+                    <MenuItem value={0}>Inactiva</MenuItem>
+                  </Select>
+                  {formik.touched.estado && formik.errors.estado && (
+                    <FormHelperText>{formik.errors.estado}</FormHelperText>
+                  )}
+                </FormControl>
+              </Grid>
+            )}
           </Grid>
         </DialogContent>
         <DialogActions>

@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Box,
   Typography,
@@ -26,6 +27,7 @@ import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 
 const TransactionSummaryReport: React.FC = () => {
+  const navigate = useNavigate();
   const [startDate, setStartDate] = useState<string>(format(new Date(), 'yyyy-MM-01')); // Primer día del mes actual
   const [endDate, setEndDate] = useState<string>(format(new Date(), 'yyyy-MM-dd')); // Día actual
   
@@ -111,6 +113,11 @@ const TransactionSummaryReport: React.FC = () => {
   // Función para generar el reporte
   const handleGenerateReport = () => {
     refetch();
+  };
+  
+  // Función para navegar al formulario de nuevo cierre
+  const handleGenerarCierre = () => {
+    navigate('/agent-closings/new');
   };
 
   // Función para calcular el total general de efectivo (suma de todos los tipos)
@@ -271,14 +278,25 @@ const TransactionSummaryReport: React.FC = () => {
             />
           </Grid>
           
-          <Grid item xs={12} md={4}>
+          <Grid item xs={12} md={2}>
             <Button
               fullWidth
               variant="contained"
               onClick={handleGenerateReport}
               disabled={isLoading}
+              color="primary"
             >
               {isLoading ? <CircularProgress size={24} /> : 'Generar Reporte'}
+            </Button>
+          </Grid>
+          <Grid item xs={12} md={2}>
+            <Button
+              fullWidth
+              variant="contained"
+              onClick={handleGenerarCierre}
+              color="success"
+            >
+              Generar Cierre
             </Button>
           </Grid>
         </Grid>

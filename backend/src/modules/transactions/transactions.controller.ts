@@ -23,10 +23,37 @@ export class TransactionsController {
   }
 
   @Get()
-  @ApiOperation({ summary: 'Obtener todas las transacciones' })
-  @ApiResponse({ status: 200, description: 'Lista de transacciones', type: [Transaction] })
+  @ApiOperation({ summary: 'Obtener todas las transacciones activas' })
+  @ApiResponse({ status: 200, description: 'Lista de transacciones activas', type: [Transaction] })
   findAll() {
     return this.transactionsService.findAll();
+  }
+
+  @Get('all')
+  @ApiOperation({ summary: 'Obtener todas las transacciones incluyendo inactivas' })
+  @ApiResponse({ status: 200, description: 'Lista completa de transacciones', type: [Transaction] })
+  findAllWithInactive() {
+    return this.transactionsService.findAllWithInactive();
+  }
+  
+  @Get('summary')
+  @ApiOperation({ summary: 'Obtener transacciones activas para el resumen' })
+  @ApiResponse({ status: 200, description: 'Lista de transacciones activas para el resumen', type: [Transaction] })
+  getTransactionsForSummary() {
+    return this.transactionsService.getTransactionsForSummary();
+  }
+  
+  @Get('summary/date-range')
+  @ApiOperation({ summary: 'Obtener transacciones activas por rango de fechas para el resumen' })
+  @ApiQuery({ name: 'startDate', required: true, description: 'Fecha inicial (YYYY-MM-DD)' })
+  @ApiQuery({ name: 'endDate', required: true, description: 'Fecha final (YYYY-MM-DD)' })
+  @ApiResponse({ status: 200, description: 'Lista de transacciones activas en el rango de fechas para el resumen', type: [Transaction] })
+  @ApiResponse({ status: 400, description: 'Fechas inválidas' })
+  getTransactionsByDateRangeForSummary(
+    @Query('startDate') startDate: string,
+    @Query('endDate') endDate: string,
+  ) {
+    return this.transactionsService.getTransactionsByDateRangeForSummary(startDate, endDate);
   }
 
   @Get('date-range')

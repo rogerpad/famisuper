@@ -28,6 +28,8 @@ export class TransactionsService {
       ...createTransactionDto,
       // Convertir la fecha de string a Date si es necesario
       fecha: new Date(createTransactionDto.fecha),
+      // Asegurar que el estado sea 1 (activo)
+      estado: 1,
     });
 
     return this.transactionsRepository.save(newTransaction);
@@ -35,9 +37,57 @@ export class TransactionsService {
 
   async findAll(): Promise<Transaction[]> {
     return this.transactionsRepository.find({
+      where: {
+        estado: 1, // Solo transacciones activas
+      },
       relations: ['usuario', 'agente', 'tipoTransaccion'],
       order: {
         id: 'DESC',
+      },
+    });
+  }
+
+  async findAllWithInactive(): Promise<Transaction[]> {
+    return this.transactionsRepository.find({
+      relations: ['usuario', 'agente', 'tipoTransaccion'],
+      order: {
+        id: 'DESC',
+      },
+    });
+  }
+  
+  async getTransactionsForSummary(): Promise<Transaction[]> {
+    // Método específico para el resumen que garantiza solo transacciones activas
+    return this.transactionsRepository.find({
+      where: {
+        estado: 1, // Estrictamente solo transacciones activas
+      },
+      relations: ['usuario', 'agente', 'tipoTransaccion'],
+      order: {
+        fecha: 'DESC',
+        hora: 'DESC',
+      },
+    });
+  }
+  
+  async getTransactionsByDateRangeForSummary(startDate: string, endDate: string): Promise<Transaction[]> {
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    
+    if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+      throw new BadRequestException('Fechas inválidas');
+    }
+    
+    // Método específico para el resumen por rango de fechas que garantiza solo transacciones activas
+    return this.transactionsRepository.find({
+      where: {
+        fecha: Between(start, end),
+        estado: 1, // Estrictamente solo transacciones activas
+      },
+      relations: ['usuario', 'agente', 'tipoTransaccion'],
+      order: {
+        fecha: 'DESC',
+        hora: 'DESC',
       },
     });
   }
@@ -103,6 +153,7 @@ export class TransactionsService {
     return this.transactionsRepository.find({
       where: {
         fecha: Between(start, end),
+        estado: 1, // Solo transacciones activas
       },
       relations: ['usuario', 'agente', 'tipoTransaccion'],
       order: {
@@ -116,6 +167,7 @@ export class TransactionsService {
     return this.transactionsRepository.find({
       where: {
         agenteId,
+        estado: 1, // Solo transacciones activas
       },
       relations: ['usuario', 'agente', 'tipoTransaccion'],
       order: {
@@ -129,6 +181,29 @@ export class TransactionsService {
     return this.transactionsRepository.find({
       where: {
         tipoTransaccionId,
+        estado: 1, // Solo transacciones activas
+      },
+      relations: ['usuario', 'agente', 'tipoTransaccion'],
+      order: {
+        fecha: 'DESC',
+        hora: 'DESC',
+      },
+    });
+  }
+
+  async findByAgentAndDateRange(agenteId: number, startDate: string, endDate: string): Promise<Transaction[]> {
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    
+    if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+      throw new BadRequestException('Fechas inválidas');
+    }
+    
+    return this.transactionsRepository.find({
+      where: {
+        agenteId,
+        fecha: Between(start, end),
+        estado: 1, // Solo transacciones activas
       },
       relations: ['usuario', 'agente', 'tipoTransaccion'],
       order: {

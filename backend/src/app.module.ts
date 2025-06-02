@@ -9,6 +9,9 @@ import { DatabaseModule } from './database/database.module';
 import { ProviderTypesModule } from './modules/provider-types/provider-types.module';
 import { ProvidersModule } from './modules/providers/providers.module';
 import { TransactionTypesModule } from './modules/transaction-types/transaction-types.module';
+import { AgentClosingsModule } from './modules/agent-closings/agent-closings.module';
+import { FormulaConfigsModule } from './modules/formula-configs/formula-configs.module';
+import { MigrationModule } from './database/migrations/migration.module';
 
 @Module({
   imports: [
@@ -21,6 +24,9 @@ import { TransactionTypesModule } from './modules/transaction-types/transaction-
     // Módulo de base de datos (PostgreSQL)
     DatabaseModule,
     
+    // Módulo de migración para actualizar la estructura de la base de datos
+    MigrationModule,
+    
     // Módulos de la aplicación
     AuthModule,
     UsersModule,
@@ -30,6 +36,8 @@ import { TransactionTypesModule } from './modules/transaction-types/transaction-
     ProviderTypesModule,
     ProvidersModule,
     TransactionTypesModule,
+    AgentClosingsModule,
+    FormulaConfigsModule,
   ],
 })
 export class AppModule {}

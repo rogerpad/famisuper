@@ -60,10 +60,11 @@ export class ReportsService {
     const fechaInicio = startDate ? new Date(startDate) : new Date(new Date().getFullYear(), new Date().getMonth(), 1);
     const fechaFin = endDate ? new Date(endDate) : new Date();
     
-    // Obtener todas las transacciones en el rango de fechas
+    // Obtener todas las transacciones activas en el rango de fechas
     const transactions = await this.transactionsRepository.find({
       where: {
         fecha: Between(fechaInicio, fechaFin),
+        estado: 1, // Solo transacciones activas
       },
       relations: ['tipoTransaccion', 'agente'],
     });

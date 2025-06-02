@@ -28,7 +28,8 @@ import {
   People as UsersIcon,
   Category as ProviderTypesIcon,
   LocalShipping as ProvidersIcon,
-  Payments as TransactionTypesIcon
+  Payments as TransactionTypesIcon,
+  PointOfSale as AgentClosingsIcon
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 
@@ -60,6 +61,7 @@ const MainLayout: React.FC = () => {
     { text: 'Dashboard', icon: <DashboardIcon />, path: '/' },
     { text: 'Transacciones', icon: <ReceiptIcon />, path: '/transactions' },
     { text: 'Tipos de Transacción', icon: <TransactionTypesIcon />, path: '/transaction-types' },
+    { text: 'Cierre Final de Agentes', icon: <AgentClosingsIcon />, path: '/agent-closings' },
     { text: 'Reportes', icon: <AssessmentIcon />, path: '/reports' },
     { text: 'Gestión de Roles', icon: <RolesIcon />, path: '/roles' },
     { text: 'Gestión de Usuarios', icon: <UsersIcon />, path: '/users' },
