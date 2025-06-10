@@ -109,7 +109,7 @@ export class FormulaConfigsService {
 
   async updateBulkForProvider(
     proveedorId: number, 
-    configs: { tipoTransaccionId: number; incluirEnCalculo: boolean; factorMultiplicador: number }[]
+    configs: { tipoTransaccionId: number; incluirEnCalculo: boolean; factorMultiplicador: number; sumaTotal: boolean }[]
   ): Promise<FormulaConfig[]> {
     // Verificar si el proveedor existe
     const provider = await this.providersService.findOne(proveedorId);
@@ -136,6 +136,7 @@ export class FormulaConfigsService {
         await this.formulaConfigsRepository.update(existingConfig.id, {
           incluirEnCalculo: config.incluirEnCalculo,
           factorMultiplicador: config.factorMultiplicador,
+          sumaTotal: config.sumaTotal,
         });
         
         results.push(await this.findOne(existingConfig.id));
@@ -146,6 +147,7 @@ export class FormulaConfigsService {
           tipoTransaccionId: config.tipoTransaccionId,
           incluirEnCalculo: config.incluirEnCalculo,
           factorMultiplicador: config.factorMultiplicador,
+          sumaTotal: config.sumaTotal,
         });
         
         results.push(newConfig);
@@ -155,50 +157,82 @@ export class FormulaConfigsService {
     return results;
   }
 
-  // Método para calcular el resultado final basado en las transacciones y la configuración
-  async calculateResultadoFinal(proveedorId: number, startDate: string, endDate: string): Promise<number> {
-    // Verificar si el proveedor existe
-    const provider = await this.providersService.findOne(proveedorId);
-    if (!provider) {
-      throw new NotFoundException(`Proveedor con ID ${proveedorId} no encontrado`);
-    }
-
-    // Obtener las configuraciones de fórmulas para este proveedor
-    const formulaConfigs = await this.findByProvider(proveedorId);
+  // Método para calcular el resultado final basado en las transacciones activas y la configuración
+  async calculateResultadoFinal(proveedorId: number, startDate?: string, endDate?: string): Promise<number> {
+    console.log(`[FCS] ===== INICIANDO CÁLCULO RESULTADO FINAL =====`);
+    console.log(`[FCS] Parámetros: proveedorId=${proveedorId}, no se filtra por fechas, se consideran todas las transacciones activas`);
     
-    // Si no hay configuraciones, retornar 0
-    if (!formulaConfigs || formulaConfigs.length === 0) {
-      return 0;
-    }
-
-    // Obtener todas las transacciones del agente en el rango de fechas
-    const transactions = await this.transactionsService.findByAgentAndDateRange(proveedorId, startDate, endDate);
-    
-    // Si no hay transacciones, retornar 0
-    if (!transactions || transactions.length === 0) {
-      return 0;
-    }
-
-    // Crear un mapa de configuraciones por tipo de transacción para facilitar la búsqueda
-    const configMap = new Map();
-    formulaConfigs.forEach(config => {
-      configMap.set(config.tipoTransaccionId, config);
-    });
-
-    // Calcular el resultado final sumando o restando las transacciones según la configuración
-    let resultadoFinal = 0;
-
-    for (const transaction of transactions) {
-      // Verificar si existe una configuración para este tipo de transacción
-      const config = configMap.get(transaction.tipoTransaccionId);
-      
-      // Si existe configuración y está incluida en el cálculo
-      if (config && config.incluirEnCalculo) {
-        // Aplicar el factor multiplicador (1 para sumar, -1 para restar, etc.)
-        resultadoFinal += transaction.valor * config.factorMultiplicador;
+    try {
+      // Verificar si el proveedor existe
+      const provider = await this.providersService.findOne(proveedorId);
+      if (!provider) {
+        console.error(`[FCS] Proveedor con ID ${proveedorId} no encontrado.`);
+        return 0;
       }
-    }
+      console.log(`[FCS] Proveedor encontrado: ${provider.nombre} (ID: ${provider.id})`);
 
-    return resultadoFinal;
+      // Obtener las configuraciones de fórmulas para este proveedor
+      const formulaConfigs = await this.findByProvider(proveedorId);
+      const activeConfigs = formulaConfigs.filter(config => config.incluirEnCalculo);
+      console.log(`[FCS] Configuraciones de fórmula activas encontradas: ${activeConfigs.length}`);
+      
+      // Mostrar todas las configuraciones activas para depuración
+      activeConfigs.forEach(ac => {
+        console.log(`[FCS] Config: tipoTransaccionId=${ac.tipoTransaccionId}, factor=${ac.factorMultiplicador}, sumaTotal=${ac.sumaTotal}`);
+      });
+
+      if (activeConfigs.length === 0) {
+        console.log('[FCS] No hay configuraciones activas, retornando 0.');
+        return 0;
+      }
+
+      let resultadoFinal = 0;
+
+      // Separar configuraciones que usan suma total y las que no
+      const sumaTotalConfigs = activeConfigs.filter(config => config.sumaTotal);
+      const individualConfigs = activeConfigs.filter(config => !config.sumaTotal);
+      
+      console.log(`[FCS] Configuraciones con sumaTotal: ${sumaTotalConfigs.length}`);
+      console.log(`[FCS] Configuraciones individuales: ${individualConfigs.length}`);
+
+      // Procesar configuraciones con sumaTotal
+      for (const config of sumaTotalConfigs) {
+        console.log(`[FCS] Procesando config sumaTotal para tipoTransaccionId: ${config.tipoTransaccionId} con factor: ${config.factorMultiplicador}`);
+        
+        // Obtener la suma de todas las transacciones activas de este tipo sin importar el agente
+        const sumOfAllTransactions = await this.transactionsService.getSumOfActiveTransactionsByType(
+          config.tipoTransaccionId,
+        );
+        
+        console.log(`[FCS] Suma total para tipo ${config.tipoTransaccionId}: ${sumOfAllTransactions}`);
+        resultadoFinal += sumOfAllTransactions * config.factorMultiplicador;
+        console.log(`[FCS] Resultado final parcial después de sumaTotal: ${resultadoFinal}`);
+      }
+
+      // Procesar configuraciones individuales
+      if (individualConfigs.length > 0) {
+        console.log('[FCS] Procesando configuraciones individuales.');
+        
+        // Para cada configuración individual, obtener la suma de las transacciones solo para este agente
+        for (const config of individualConfigs) {
+          console.log(`[FCS] Procesando config individual para tipoTransaccionId: ${config.tipoTransaccionId} con factor: ${config.factorMultiplicador}`);
+          
+          const sumForAgent = await this.transactionsService.getSumOfActiveTransactionsByAgentAndType(
+            proveedorId,
+            config.tipoTransaccionId,
+          );
+          
+          console.log(`[FCS] Suma para agente ${proveedorId}, tipo ${config.tipoTransaccionId}: ${sumForAgent}`);
+          resultadoFinal += sumForAgent * config.factorMultiplicador;
+          console.log(`[FCS] Resultado final parcial después de config individual: ${resultadoFinal}`);
+        }
+      }
+
+      console.log(`[FCS] Resultado final calculado: ${resultadoFinal}`);
+      return resultadoFinal;
+    } catch (error) {
+      console.error('[FCS] Error al calcular el resultado final:', error);
+      throw error;
+    }
   }
 }

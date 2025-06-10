@@ -64,12 +64,19 @@ const FormulaConfigForm: React.FC = () => {
   
   // Mutación para guardar las configuraciones
   const saveConfigsMutation = useMutation({
-    mutationFn: (configs: BulkUpdateConfigDto[]) => 
-      formulaConfigsApi.bulkUpdateForProvider(Number(providerId), configs),
-    onSuccess: () => {
+    mutationFn: (configs: BulkUpdateConfigDto[]) => {
+      console.log('Enviando configuraciones al backend:', configs);
+      return formulaConfigsApi.bulkUpdateForProvider(Number(providerId), configs);
+    },
+    onSuccess: (data) => {
+      console.log('Configuraciones guardadas exitosamente:', data);
       queryClient.invalidateQueries({ queryKey: ['formulaConfigs'] });
       navigate(`/providers`);
     },
+    onError: (error) => {
+      console.error('Error al guardar las configuraciones:', error);
+      alert('Error al guardar las configuraciones. Revisa la consola para más detalles.');
+    }
   });
   
   // Inicializar las configuraciones cuando se cargan los tipos de transacciones y las configuraciones existentes
@@ -85,6 +92,7 @@ const FormulaConfigForm: React.FC = () => {
           tipoTransaccionId: type.id,
           incluirEnCalculo: existingConfig ? existingConfig.incluirEnCalculo : false,
           factorMultiplicador: existingConfig ? existingConfig.factorMultiplicador : 1,
+          sumaTotal: existingConfig ? existingConfig.sumaTotal : false,
         };
       });
       
@@ -114,8 +122,23 @@ const FormulaConfigForm: React.FC = () => {
     );
   };
   
+  // Manejar cambios en el switch de suma total
+  const handleSumaTotalChange = (tipoTransaccionId: number, checked: boolean) => {
+    console.log(`Cambiando sumaTotal para tipo ${tipoTransaccionId} a ${checked}`);
+    setConfigs(prevConfigs => {
+      const newConfigs = prevConfigs.map(config => 
+        config.tipoTransaccionId === tipoTransaccionId
+          ? { ...config, sumaTotal: checked }
+          : config
+      );
+      console.log('Nuevo estado de configs después de cambiar sumaTotal:', newConfigs);
+      return newConfigs;
+    });
+  };
+  
   // Guardar las configuraciones
   const handleSave = () => {
+    console.log('Guardando configuraciones:', configs);
     saveConfigsMutation.mutate(configs);
   };
   
@@ -149,6 +172,7 @@ const FormulaConfigForm: React.FC = () => {
           <Typography variant="body1">
             Seleccione los tipos de transacciones que desea incluir en el cálculo del Resultado Final para este agente. 
             Para cada tipo, puede definir un factor multiplicador (1 para sumar, -1 para restar).
+            La opción "Suma Total" permite determinar si se sumarán todas las transacciones de ese tipo sin importar a qué agente pertenecen.
           </Typography>
         </Alert>
         
@@ -160,6 +184,7 @@ const FormulaConfigForm: React.FC = () => {
                 <TableCell>Descripción</TableCell>
                 <TableCell align="center">Incluir en Cálculo</TableCell>
                 <TableCell align="center">Factor Multiplicador</TableCell>
+                <TableCell align="center">Suma Total</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
@@ -191,6 +216,19 @@ const FormulaConfigForm: React.FC = () => {
                         </Select>
                       </FormControl>
                       <Tooltip title="Este factor determina si el valor de la transacción se suma o resta en el cálculo del Resultado Final">
+                        <IconButton size="small" sx={{ ml: 1 }}>
+                          <InfoIcon fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
+                    </TableCell>
+                    <TableCell align="center">
+                      <Switch
+                        checked={config.sumaTotal}
+                        onChange={(e) => handleSumaTotalChange(config.tipoTransaccionId, e.target.checked)}
+                        color="secondary"
+                        disabled={!config.incluirEnCalculo}
+                      />
+                      <Tooltip title="Si está activado, se sumarán todas las transacciones de este tipo sin importar a qué agente pertenecen, y con ese valor total se realizará el cálculo del Resultado Final">
                         <IconButton size="small" sx={{ ml: 1 }}>
                           <InfoIcon fontSize="small" />
                         </IconButton>

@@ -243,6 +243,9 @@ const TransactionSummaryReport: React.FC = () => {
 
   // Usar datos reales o datos de ejemplo
   const reportData = data || mockData;
+  
+  // Filtrar el proveedor "EFECTIVO AGENTE" para que no se muestre en el reporte
+  const filteredAgentes = reportData.agentes.filter(agente => agente.nombre !== 'EFECTIVO AGENTE');
 
   return (
     <Box sx={{ flexGrow: 1 }}>
@@ -337,7 +340,7 @@ const TransactionSummaryReport: React.FC = () => {
             <TableHead>
               <TableRow>
                 <TableCell sx={{ fontWeight: 'bold' }}>Tipo de Transacción</TableCell>
-                {reportData.agentes.map((agente) => (
+                {filteredAgentes.map((agente) => (
                   <TableCell key={agente.id} align="right" sx={{ fontWeight: 'bold' }}>
                     {agente.nombre}
                   </TableCell>
@@ -351,7 +354,7 @@ const TransactionSummaryReport: React.FC = () => {
               {reportData.transactionTypes.map((row) => (
                 <TableRow key={row.tipoTransaccionId}>
                   <TableCell>{row.tipoTransaccion}</TableCell>
-                  {reportData.agentes.map((agente) => (
+                  {filteredAgentes.map((agente) => (
                     <TableCell key={agente.id} align="right">
                       {row.agentes[agente.id] > 0 
                         ? formatCurrency(row.agentes[agente.id]) 
@@ -367,7 +370,7 @@ const TransactionSummaryReport: React.FC = () => {
             <TableFooter>
               <TableRow sx={{ '& .MuiTableCell-root': { fontWeight: 'bold', bgcolor: 'primary.light', color: 'white' } }}>
                 <TableCell>TOTAL</TableCell>
-                {reportData.agentes.map((agente) => (
+                {filteredAgentes.map((agente) => (
                   <TableCell key={agente.id} align="right">
                     {calcularTotalPorAgente(agente.id) > 0 
                       ? formatCurrency(calcularTotalPorAgente(agente.id)) 

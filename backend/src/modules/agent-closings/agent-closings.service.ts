@@ -21,58 +21,83 @@ export class AgentClosingsService {
   ) {}
 
   async create(createAgentClosingDto: CreateAgentClosingDto): Promise<AgentClosing> {
-    // Verificar si el proveedor existe y es de tipo agente
-    const provider = await this.providersRepository.findOne({
-      where: { 
-        id: createAgentClosingDto.proveedorId,
-      },
-      relations: ['tipoProveedor'],
-    });
+    console.log(`[CS-CREATE] Iniciando creación de cierre con datos:`, JSON.stringify(createAgentClosingDto));
+    try {
+      // Verificar si el proveedor existe y es de tipo agente
+      const provider = await this.providersRepository.findOne({
+        where: { 
+          id: createAgentClosingDto.proveedorId,
+        },
+        relations: ['tipoProveedor'],
+      });
 
-    if (!provider) {
-      throw new NotFoundException(`No se encontró el proveedor con ID ${createAgentClosingDto.proveedorId}`);
-    }
+      if (!provider) {
+        console.error(`[CS-CREATE] No se encontró el proveedor con ID ${createAgentClosingDto.proveedorId}`);
+        throw new NotFoundException(`No se encontró el proveedor con ID ${createAgentClosingDto.proveedorId}`);
+      }
+      console.log(`[CS-CREATE] Proveedor encontrado: ${provider.nombre} (ID: ${provider.id})`);
 
-    // Verificar si el proveedor es de tipo agente
-    if (provider.tipoProveedor.nombre.toLowerCase() !== 'agente') {
-      throw new ConflictException(`El proveedor seleccionado no es de tipo agente`);
-    }
+      // Verificar si el proveedor es de tipo agente
+      if (provider.tipoProveedor?.nombre?.toLowerCase() !== 'agente') {
+        console.error(`[CS-CREATE] El proveedor seleccionado no es de tipo agente: ${provider.tipoProveedor?.nombre}`);
+        throw new ConflictException(`El proveedor seleccionado no es de tipo agente`);
+      }
+      console.log(`[CS-CREATE] Proveedor es de tipo agente: ${provider.tipoProveedor.nombre}`);
 
-    // Verificar si ya existe un cierre para este proveedor en la misma fecha
-    const existingClosing = await this.agentClosingsRepository.findOne({
-      where: {
-        proveedorId: createAgentClosingDto.proveedorId,
+      // Verificar si ya existe un cierre para este proveedor en la misma fecha
+      const existingClosing = await this.agentClosingsRepository.findOne({
+        where: {
+          proveedorId: createAgentClosingDto.proveedorId,
+          fechaCierre: new Date(createAgentClosingDto.fechaCierre),
+        },
+      });
+
+      if (existingClosing) {
+        console.error(`[CS-CREATE] Ya existe un cierre para este agente en la fecha ${createAgentClosingDto.fechaCierre}`);
+        throw new ConflictException(`Ya existe un cierre para este agente en la fecha ${createAgentClosingDto.fechaCierre}`);
+      }
+      console.log(`[CS-CREATE] No existe cierre previo para esta fecha, continuando...`);
+      
+      // Calcular el resultado final basado en las transacciones y la configuración de fórmulas
+      const fechaCierre = new Date(createAgentClosingDto.fechaCierre);
+      const startDate = format(fechaCierre, 'yyyy-MM-01'); // Primer día del mes
+      const endDate = format(fechaCierre, 'yyyy-MM-dd'); // Fecha de cierre
+      
+      console.log(`[CS-CREATE] Calculando resultado final para fechas: ${startDate} a ${endDate}`);
+      // Calcular el resultado final
+      const resultadoFinal = await this.calculateResultadoFinal(
+        createAgentClosingDto.proveedorId,
+        startDate,
+        endDate
+      );
+      console.log(`[CS-CREATE] Resultado final calculado: ${resultadoFinal}`);
+      
+      // Calcular la diferencia
+      const diferencia = createAgentClosingDto.saldoFinal - resultadoFinal;
+      console.log(`[CS-CREATE] Diferencia calculada: ${diferencia} (saldoFinal: ${createAgentClosingDto.saldoFinal} - resultadoFinal: ${resultadoFinal})`);
+
+      // Asegurarse de que adicionalCta tenga un valor predeterminado si no viene en el DTO
+      if (createAgentClosingDto.adicionalCta === undefined) {
+        createAgentClosingDto.adicionalCta = 0;
+        console.log(`[CS-CREATE] Estableciendo adicionalCta predeterminado a 0`);
+      }
+
+      // Crear el nuevo cierre con los valores calculados
+      const newClosing = this.agentClosingsRepository.create({
+        ...createAgentClosingDto,
         fechaCierre: new Date(createAgentClosingDto.fechaCierre),
-      },
-    });
-
-    if (existingClosing) {
-      throw new ConflictException(`Ya existe un cierre para este agente en la fecha ${createAgentClosingDto.fechaCierre}`);
+        resultadoFinal,
+        diferencia,
+      });
+      console.log(`[CS-CREATE] Objeto de cierre creado:`, JSON.stringify(newClosing));
+      
+      const savedClosing = await this.agentClosingsRepository.save(newClosing);
+      console.log(`[CS-CREATE] Cierre guardado exitosamente con ID: ${savedClosing.id}`);
+      return savedClosing;
+    } catch (error) {
+      console.error(`[CS-CREATE] Error al crear cierre:`, error);
+      throw error;
     }
-    
-    // Calcular el resultado final basado en las transacciones y la configuración de fórmulas
-    const fechaCierre = new Date(createAgentClosingDto.fechaCierre);
-    const startDate = format(fechaCierre, 'yyyy-MM-01'); // Primer día del mes
-    const endDate = format(fechaCierre, 'yyyy-MM-dd'); // Fecha de cierre
-    
-    // Calcular el resultado final
-    const resultadoFinal = await this.calculateResultadoFinal(
-      createAgentClosingDto.proveedorId,
-      startDate,
-      endDate
-    );
-    
-    // Calcular la diferencia
-    const diferencia = createAgentClosingDto.saldoFinal - resultadoFinal;
-
-    // Crear el nuevo cierre con los valores calculados
-    const newClosing = this.agentClosingsRepository.create({
-      ...createAgentClosingDto,
-      fechaCierre: new Date(createAgentClosingDto.fechaCierre),
-      resultadoFinal,
-      diferencia,
-    });
-    return this.agentClosingsRepository.save(newClosing);
   }
 
   async findAll(startDate?: string, endDate?: string): Promise<AgentClosing[]> {
@@ -220,44 +245,83 @@ export class AgentClosingsService {
   
   // Método para calcular el resultado final basado en las transacciones y la configuración de fórmulas
   async calculateResultadoFinal(proveedorId: number, startDate: string, endDate: string): Promise<number> {
+    console.log(`[CS] ===== INICIANDO CÁLCULO RESULTADO FINAL =====`);
+    console.log(`[CS] Parámetros: proveedorId=${proveedorId}, startDate=${startDate}, endDate=${endDate}`);
     try {
-      // Obtener las configuraciones de fórmulas para este proveedor
+      // 1. Obtener detalles del proveedor para verificar su nombre
+      const provider = await this.providersRepository.findOne({ where: { id: proveedorId } });
+      if (!provider) {
+        console.error(`[CS] Proveedor con ID ${proveedorId} no encontrado.`);
+        return 0;
+      }
+      console.log(`[CS] Proveedor encontrado: ${provider.nombre} (ID: ${provider.id})`);
+
+      // 2. Obtener las configuraciones de fórmulas para este proveedor
       const formulaConfigs = await this.formulaConfigsService.findByProvider(proveedorId);
-      
-      // Filtrar solo las configuraciones que están incluidas en el cálculo
       const activeConfigs = formulaConfigs.filter(config => config.incluirEnCalculo);
+      console.log(`[CS] Configuraciones de fórmula activas encontradas: ${activeConfigs.length}`);
       
+      // Mostrar todas las configuraciones activas para depuración
+      activeConfigs.forEach(ac => {
+        console.log(`[CS] Config: tipoTransaccionId=${ac.tipoTransaccionId}, factor=${ac.factorMultiplicador}, sumaTotal=${ac.sumaTotal}`);
+      });
+
       if (activeConfigs.length === 0) {
-        return 0; // No hay configuraciones activas, retornar 0
+        console.log('[CS] No hay configuraciones activas, retornando 0.');
+        return 0;
+      }
+
+      let resultadoFinal = 0;
+
+      // Separar configuraciones que usan suma total y las que no
+      const sumaTotalConfigs = activeConfigs.filter(config => config.sumaTotal);
+      const individualConfigs = activeConfigs.filter(config => !config.sumaTotal);
+      
+      console.log(`[CS] Configuraciones con sumaTotal: ${sumaTotalConfigs.length}`);
+      console.log(`[CS] Configuraciones individuales: ${individualConfigs.length}`);
+
+      // Procesar configuraciones con sumaTotal
+      for (const config of sumaTotalConfigs) {
+        console.log(`[CS] Procesando config sumaTotal para tipoTransaccionId: ${config.tipoTransaccionId} con factor: ${config.factorMultiplicador}`);
+        
+        // Obtener la suma de todas las transacciones de este tipo sin importar el agente
+        const sumOfAllTransactions = await this.transactionsService.getSumOfActiveTransactionsByType(
+          config.tipoTransaccionId,
+          startDate,
+          endDate,
+        );
+        
+        console.log(`[CS] Suma total para tipo ${config.tipoTransaccionId}: ${sumOfAllTransactions}`);
+        resultadoFinal += sumOfAllTransactions * config.factorMultiplicador;
+        console.log(`[CS] Resultado final parcial después de sumaTotal: ${resultadoFinal}`);
+      }
+
+      // Procesar configuraciones individuales
+      if (individualConfigs.length > 0) {
+        console.log('[CS] Procesando configuraciones individuales.');
+        const configMap = new Map<number, number>();
+        individualConfigs.forEach(config => {
+          configMap.set(config.tipoTransaccionId, config.factorMultiplicador);
+        });
+
+        const transactions = await this.transactionsService.findByAgentAndDateRange(
+          proveedorId,
+          startDate,
+          endDate,
+        );
+        console.log(`[CS] Transacciones individuales encontradas: ${transactions.length}`);
+
+        transactions.forEach(transaction => {
+          if (configMap.has(transaction.tipoTransaccionId)) {
+            resultadoFinal += transaction.valor * configMap.get(transaction.tipoTransaccionId)!;
+          }
+        });
       }
       
-      // Crear un mapa de tipos de transacción y sus factores multiplicadores
-      const configMap = new Map<number, number>();
-      activeConfigs.forEach(config => {
-        configMap.set(config.tipoTransaccionId, config.factorMultiplicador);
-      });
-      
-      // Obtener todas las transacciones del agente en el rango de fechas
-      const transactions = await this.transactionsService.findByAgentAndDateRange(
-        proveedorId,
-        startDate,
-        endDate
-      );
-      
-      // Calcular el resultado final
-      let resultadoFinal = 0;
-      
-      transactions.forEach(transaction => {
-        // Verificar si el tipo de transacción está incluido en el cálculo
-        if (configMap.has(transaction.tipoTransaccionId)) {
-          // Aplicar el factor multiplicador
-          resultadoFinal += transaction.valor * configMap.get(transaction.tipoTransaccionId);
-        }
-      });
-      
+      console.log(`[CS] Resultado final calculado: ${resultadoFinal}`);
       return resultadoFinal;
     } catch (error) {
-      console.error('Error al calcular el resultado final:', error);
+      console.error(`[CS] Error al calcular el resultado final para proveedor ${proveedorId}:`, error);
       return 0;
     }
   }

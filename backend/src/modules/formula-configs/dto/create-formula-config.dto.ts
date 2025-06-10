@@ -16,4 +16,8 @@ export class CreateFormulaConfigDto {
   @IsNotEmpty()
   @IsNumber()
   factorMultiplicador: number;
+
+  @IsNotEmpty()
+  @IsBoolean()
+  sumaTotal: boolean;
 }

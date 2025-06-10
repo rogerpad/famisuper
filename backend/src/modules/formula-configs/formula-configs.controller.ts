@@ -42,7 +42,7 @@ export class FormulaConfigsController {
   @Post('provider/:id/bulk-update')
   updateBulkForProvider(
     @Param('id') id: string,
-    @Body() configs: { tipoTransaccionId: number; incluirEnCalculo: boolean; factorMultiplicador: number }[]
+    @Body() configs: { tipoTransaccionId: number; incluirEnCalculo: boolean; factorMultiplicador: number; sumaTotal: boolean }[]
   ) {
     return this.formulaConfigsService.updateBulkForProvider(+id, configs);
   }

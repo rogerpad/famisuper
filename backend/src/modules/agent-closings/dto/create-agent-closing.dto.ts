@@ -18,10 +18,10 @@ export class CreateAgentClosingDto {
   @IsNumber({}, { message: 'El saldo inicial debe ser un número' })
   saldoInicial: number;
 
-  @ApiProperty({ description: 'Adicional CTA del cierre' })
-  @IsNotEmpty({ message: 'El adicional CTA es requerido' })
+  @ApiProperty({ description: 'Adicional CTA del cierre', required: false })
+  @IsOptional()
   @IsNumber({}, { message: 'El adicional CTA debe ser un número' })
-  adicionalCta: number;
+  adicionalCta?: number = 0;
 
   @ApiProperty({ description: 'Resultado final del cierre' })
   @IsNotEmpty({ message: 'El resultado final es requerido' })

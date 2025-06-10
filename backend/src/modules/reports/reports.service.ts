@@ -56,18 +56,17 @@ export class ReportsService {
       order: { nombre: 'ASC' },
     });
 
-    // Preparar fechas para el filtro
-    const fechaInicio = startDate ? new Date(startDate) : new Date(new Date().getFullYear(), new Date().getMonth(), 1);
-    const fechaFin = endDate ? new Date(endDate) : new Date();
-    
-    // Obtener todas las transacciones activas en el rango de fechas
+    // Para el cálculo del resultado final, solo consideramos transacciones activas sin filtrar por fechas
+    // Obtener todas las transacciones activas
     const transactions = await this.transactionsRepository.find({
       where: {
-        fecha: Between(fechaInicio, fechaFin),
         estado: 1, // Solo transacciones activas
       },
       relations: ['tipoTransaccion', 'agente'],
     });
+  
+    console.log(`[RS] getTransactionSummary - Obteniendo todas las transacciones activas sin filtro de fechas`);
+    console.log(`[RS] getTransactionSummary - Total de transacciones activas: ${transactions.length}`);
 
     // Inicializar el objeto de resumen
     const summaryMap: { [tipoTransaccionId: number]: TransactionSummary } = {};

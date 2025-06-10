@@ -58,7 +58,7 @@ const MainLayout: React.FC = () => {
   };
 
   const menuItems = [
-    { text: 'Dashboard', icon: <DashboardIcon />, path: '/' },
+   // { text: 'Dashboard', icon: <DashboardIcon />, path: '/' },
     { text: 'Transacciones', icon: <ReceiptIcon />, path: '/transactions' },
     { text: 'Tipos de Transacción', icon: <TransactionTypesIcon />, path: '/transaction-types' },
     { text: 'Cierre Final de Agentes', icon: <AgentClosingsIcon />, path: '/agent-closings' },

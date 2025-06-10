@@ -15,6 +15,7 @@ export interface FormulaConfig {
   };
   incluirEnCalculo: boolean;
   factorMultiplicador: number;
+  sumaTotal: boolean;
 }
 
 export interface CreateFormulaConfigDto {
@@ -35,6 +36,7 @@ export interface BulkUpdateConfigDto {
   tipoTransaccionId: number;
   incluirEnCalculo: boolean;
   factorMultiplicador: number;
+  sumaTotal: boolean;
 }
 
 // El cliente HTTP centralizado ya maneja la autenticación

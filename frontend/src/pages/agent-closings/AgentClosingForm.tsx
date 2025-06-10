@@ -36,6 +36,7 @@ interface AgentClosingFormValues {
   proveedorId: number;
   fechaCierre: Date;
   saldoInicial: number;
+  adicionalCta: number;
   resultadoFinal: number;
   saldoFinal: number;
   diferencia: number;
@@ -51,6 +52,7 @@ const AgentClosingForm: React.FC = () => {
     proveedorId: 0,
     fechaCierre: new Date(),
     saldoInicial: 0,
+    adicionalCta: 0,
     resultadoFinal: 0,
     saldoFinal: 0,
     diferencia: 0,
@@ -78,32 +80,60 @@ const AgentClosingForm: React.FC = () => {
   // Create mutation
   const createMutation = useMutation({
     mutationFn: (values: AgentClosingFormValues) => {
-      // Convertir la fecha a formato string para la API
+      // Convertir la fecha a formato string para la API y asegurar que todos los campos numéricos sean números
       const formattedValues = {
         ...values,
+        proveedorId: Number(values.proveedorId), // Asegurar que proveedorId sea un número
         fechaCierre: format(values.fechaCierre, 'yyyy-MM-dd'),
+        saldoInicial: Number(values.saldoInicial) || 0,
+        adicionalCta: Number(values.adicionalCta) || 0,
+        resultadoFinal: Number(values.resultadoFinal) || 0,
+        saldoFinal: Number(values.saldoFinal) || 0,
+        diferencia: Number(values.diferencia) || 0,
       };
-      return agentClosingsApi.createAgentClosing(formattedValues as any);
+      console.log('Enviando datos al backend:', JSON.stringify(formattedValues));
+      return agentClosingsApi.createAgentClosing(formattedValues);
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
+      console.log('Cierre creado exitosamente:', data);
       queryClient.invalidateQueries({ queryKey: ['agentClosings'] });
       navigate('/agent-closings');
+    },
+    onError: (error: any) => {
+      console.error('Error al crear el cierre:', error);
+      if (error.response) {
+        console.error('Detalles del error:', error.response.data);
+      }
     },
   });
 
   // Update mutation
   const updateMutation = useMutation({
     mutationFn: (values: AgentClosingFormValues) => {
-      // Convertir la fecha a formato string para la API
+      // Convertir la fecha a formato string para la API y asegurar que todos los campos numéricos sean números
       const formattedValues = {
         ...values,
+        proveedorId: Number(values.proveedorId), // Asegurar que proveedorId sea un número
         fechaCierre: format(values.fechaCierre, 'yyyy-MM-dd'),
+        saldoInicial: Number(values.saldoInicial) || 0,
+        adicionalCta: Number(values.adicionalCta) || 0,
+        resultadoFinal: Number(values.resultadoFinal) || 0,
+        saldoFinal: Number(values.saldoFinal) || 0,
+        diferencia: Number(values.diferencia) || 0,
       };
-      return agentClosingsApi.updateAgentClosing(Number(id), formattedValues as any);
+      console.log('Actualizando cierre con datos:', JSON.stringify(formattedValues));
+      return agentClosingsApi.updateAgentClosing(Number(id), formattedValues);
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
+      console.log('Cierre actualizado exitosamente:', data);
       queryClient.invalidateQueries({ queryKey: ['agentClosings'] });
       navigate('/agent-closings');
+    },
+    onError: (error: any) => {
+      console.error('Error al actualizar el cierre:', error);
+      if (error.response) {
+        console.error('Detalles del error:', error.response.data);
+      }
     },
   });
 
@@ -113,6 +143,7 @@ const AgentClosingForm: React.FC = () => {
         proveedorId: agentClosing.proveedorId,
         fechaCierre: parse(agentClosing.fechaCierre, 'yyyy-MM-dd', new Date()),
         saldoInicial: agentClosing.saldoInicial || 0,
+        adicionalCta: agentClosing.adicionalCta || 0,
         resultadoFinal: agentClosing.resultadoFinal || 0,
         saldoFinal: agentClosing.saldoFinal || 0,
         diferencia: agentClosing.diferencia || 0,
@@ -134,11 +165,38 @@ const AgentClosingForm: React.FC = () => {
     estado: yup.string().required('El estado es requerido'),
   });
 
-  const handleSubmit = (values: AgentClosingFormValues) => {
-    if (id) {
-      updateMutation.mutate(values);
-    } else {
-      createMutation.mutate(values);
+  const handleSubmit = async (values: AgentClosingFormValues) => {
+    try {
+      // Añadir logs detallados para depuración
+      console.log('Valores del formulario a enviar:', values);
+      
+      if (id) {
+        // Actualizar cierre existente
+        console.log('Actualizando cierre existente con ID:', id);
+        await updateMutation.mutateAsync(values);
+        alert('Cierre final actualizado con éxito');
+      } else {
+        // Crear nuevo cierre
+        console.log('Creando nuevo cierre con valores:', JSON.stringify(values));
+        const result = await createMutation.mutateAsync(values);
+        console.log('Respuesta del servidor al crear:', result);
+        alert('Cierre final creado con éxito');
+      }
+      navigate('/agent-closings');
+    } catch (error: any) {
+      console.error('Error al guardar el cierre final:', error);
+      // Mostrar más detalles del error
+      if (error.response) {
+        console.error('Respuesta del servidor:', error.response.data);
+        console.error('Código de estado:', error.response.status);
+        alert(`Error al guardar: ${error.response?.data?.message || 'Error desconocido'}`);
+      } else if (error.request) {
+        console.error('No se recibió respuesta del servidor');
+        alert('No se pudo conectar con el servidor');
+      } else {
+        console.error('Error al configurar la solicitud:', error.message);
+        alert(`Error: ${error.message || 'Error desconocido'}`);
+      }
     }
   };
 
@@ -227,9 +285,11 @@ const AgentClosingForm: React.FC = () => {
     // Asegurar que los valores son números
     const resultadoFinal = values.resultadoFinal || 0;
     const saldoFinal = values.saldoFinal || 0;
+    const adicionalCta = values.adicionalCta || 0;
     
-    // Calcular la diferencia: Saldo Final - Resultado Final
-    const diferencia = saldoFinal - resultadoFinal;
+    // Calcular la diferencia: Saldo Final - (Resultado Final + Adicional CTA)
+    const diferencia = saldoFinal - (resultadoFinal + adicionalCta);
+    //const diferencia = saldoFinal - resultadoFinal;
     
     // Actualizar el campo diferencia con el valor calculado
     setFieldValue('diferencia', diferencia);
@@ -276,6 +336,7 @@ const AgentClosingForm: React.FC = () => {
                           // Limpiar los campos del formulario excepto la fecha de cierre y el ID del proveedor
                           setFieldValue('proveedorId', proveedorId);
                           setFieldValue('saldoInicial', 0);
+                          setFieldValue('adicionalCta', 0);
                           setFieldValue('resultadoFinal', 0);
                           setFieldValue('saldoFinal', 0);
                           setFieldValue('diferencia', 0);
@@ -321,6 +382,29 @@ const AgentClosingForm: React.FC = () => {
                         setFieldValue('saldoInicial', parseFloat(e.target.value) || 0);
                         calculateDifference(
                           { ...values, saldoInicial: parseFloat(e.target.value) || 0 },
+                          setFieldValue
+                        );
+                      }}
+                    />
+                  </Grid>
+
+                  <Grid item xs={12} md={6}>
+                    <Typography variant="subtitle1" gutterBottom>Adicional CTA (L)</Typography>
+                    <Field
+                      as={TextField}
+                      fullWidth
+                      id="adicionalCta"
+                      name="adicionalCta"
+                      type="number"
+                      InputProps={{
+                        inputProps: { min: 0, step: 0.01 },
+                      }}
+                      error={touched.adicionalCta && Boolean(errors.adicionalCta)}
+                      helperText={touched.adicionalCta && errors.adicionalCta}
+                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                        setFieldValue('adicionalCta', parseFloat(e.target.value) || 0);
+                        calculateDifference(
+                          { ...values, adicionalCta: parseFloat(e.target.value) || 0 },
                           setFieldValue
                         );
                       }}

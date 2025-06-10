@@ -26,4 +26,7 @@ export class FormulaConfig {
 
   @Column({ name: 'factor_multiplicador', default: 1 })
   factorMultiplicador: number;
+
+  @Column({ name: 'suma_total', default: false })
+  sumaTotal: boolean;
 }
