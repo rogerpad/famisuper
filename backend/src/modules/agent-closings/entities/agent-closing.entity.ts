@@ -13,6 +13,9 @@ export class AgentClosing {
   @JoinColumn({ name: 'proveedor_id' })
   proveedor: Provider;
 
+  @Column({ name: 'turno_id', nullable: true })
+  turnoId: number;
+
   @Column({ name: 'fecha_cierre', type: 'date' })
   fechaCierre: Date;
 
