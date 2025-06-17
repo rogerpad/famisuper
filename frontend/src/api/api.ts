@@ -9,6 +9,18 @@ const api = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
+  // Asegurar que los datos se serialicen correctamente
+  transformRequest: [(data, headers) => {
+    // Si los datos ya son una cadena (probablemente ya JSON.stringify), devolverlos tal cual
+    if (typeof data === 'string') {
+      return data;
+    }
+    // De lo contrario, convertirlos a JSON
+    if (data && headers && headers['Content-Type'] === 'application/json') {
+      return JSON.stringify(data);
+    }
+    return data;
+  }],
 });
 
 // Interceptor para agregar token de autenticación
@@ -31,11 +43,29 @@ api.interceptors.response.use(
     return response;
   },
   (error) => {
-    if (error.response && error.response.status === 401) {
-      // Redirigir a login si hay error de autenticación
+    // Verificar si es un error de autenticación (401) y no estamos en la página de login
+    if (error.response && error.response.status === 401 && 
+        !window.location.pathname.includes('/login')) {
+      console.log('Error 401 detectado, redirigiendo a login');
+      // Limpiar datos de autenticación
       localStorage.removeItem('token');
-      window.location.href = '/login';
+      localStorage.removeItem('user');
+      
+      // Usar setTimeout para evitar problemas de redirección durante una solicitud en curso
+      setTimeout(() => {
+        window.location.href = '/login';
+      }, 100);
     }
+    
+    // Mejorar el mensaje de error para depuración
+    if (error.response) {
+      console.error(`Error API ${error.response.status}:`, error.response.data);
+    } else if (error.request) {
+      console.error('Error de red, no se recibió respuesta:', error.request);
+    } else {
+      console.error('Error al configurar la solicitud:', error.message);
+    }
+    
     return Promise.reject(error);
   }
 );

@@ -286,7 +286,15 @@ const TransactionsList: React.FC = () => {
             variant="outlined" 
             startIcon={<ReportIcon />}
             onClick={() => navigate('/reports', { state: { tabIndex: 1 } })}
-            sx={{ mr: 2 }}
+            sx={{ 
+              mr: 2, 
+              borderColor: 'rgba(220, 118, 51, 0.5)',
+              color: '#dc7633',
+              '&:hover': {
+                borderColor: '#dc7633',
+                backgroundColor: 'rgba(220, 118, 51, 0.04)'
+              }
+            }}
           >
             Resumen de Transacciones
           </Button>
@@ -294,14 +302,27 @@ const TransactionsList: React.FC = () => {
             variant="contained" 
             startIcon={<AddIcon />}
             onClick={() => handleOpenForm()}
-            color="primary"
+            sx={{
+              backgroundColor: '#dc7633',
+              '&:hover': {
+                backgroundColor: '#b35c20'
+              },
+              boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+            }}
           >
             Nueva Transacción
           </Button>
         </Box>
       </Box>
       
-      <Paper sx={{ p: 2, mb: 3 }}>
+      <Paper sx={{ 
+        p: 2, 
+        mb: 3, 
+        borderRadius: '8px',
+        boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
+        border: '1px solid rgba(0,0,0,0.05)',
+        overflow: 'hidden'
+      }}>
         <Grid container spacing={2} sx={{ mb: 2 }}>
           <Grid item xs={12} md={8}>
             <TextField
@@ -355,7 +376,31 @@ const TransactionsList: React.FC = () => {
               },
             }}
             disableRowSelectionOnClick
-            sx={{ minHeight: 400 }}
+            sx={{ 
+              minHeight: 400,
+              '& .MuiDataGrid-columnHeaders': {
+                backgroundColor: '#f5f5f5',
+                borderBottom: '1px solid rgba(0,0,0,0.1)',
+              },
+              '& .MuiDataGrid-cell': {
+                borderBottom: '1px solid rgba(0,0,0,0.05)',
+              },
+              '& .MuiDataGrid-row:hover': {
+                backgroundColor: 'rgba(220, 118, 51, 0.04)',
+              },
+              '& .MuiDataGrid-row.Mui-selected': {
+                backgroundColor: 'rgba(220, 118, 51, 0.08)',
+                '&:hover': {
+                  backgroundColor: 'rgba(220, 118, 51, 0.12)',
+                },
+              },
+              '& .MuiDataGrid-columnHeaderTitle': {
+                fontWeight: 'bold',
+              },
+              '& .MuiDataGrid-toolbarContainer': {
+                padding: '8px 16px',
+              },
+            }}
           />
         )}
       </Paper>

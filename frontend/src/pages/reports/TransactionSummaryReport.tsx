@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Box,
@@ -25,11 +25,13 @@ import { useQuery } from '@tanstack/react-query';
 import reportsApi, { TransactionReportData } from '../../api/reports/reportsApi';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
+import html2pdf from 'html2pdf.js';
 
 const TransactionSummaryReport: React.FC = () => {
   const navigate = useNavigate();
   const [startDate, setStartDate] = useState<string>(format(new Date(), 'yyyy-MM-01')); // Primer día del mes actual
   const [endDate, setEndDate] = useState<string>(format(new Date(), 'yyyy-MM-dd')); // Día actual
+  const reportRef = useRef<HTMLDivElement>(null);
   
   // Consulta para obtener los datos del reporte
   const { data, isLoading, isError, refetch } = useQuery<TransactionReportData>({
@@ -57,42 +59,35 @@ const TransactionSummaryReport: React.FC = () => {
   // Función para imprimir (descargar PDF)
   const handlePrint = async () => {
     try {
-      console.log('Iniciando descarga del PDF...');
-      // Usar fetch directamente en lugar de la API para evitar problemas con Axios
-      const baseUrl = 'http://localhost:4001'; // URL base del backend
-      const url = `${baseUrl}/reports/transactions-summary/print?startDate=${startDate}&endDate=${endDate}`;
-      
-      console.log('URL de solicitud:', url);
-      const token = localStorage.getItem('token');
-      
-      const response = await fetch(url, {
-        method: 'GET',
-        headers: {
-          'Authorization': token ? `Bearer ${token}` : '',
-        },
-      });
-      
-      if (!response.ok) {
-        throw new Error(`Error HTTP: ${response.status}`);
+      if (!reportRef.current) {
+        throw new Error('No se pudo encontrar el elemento del reporte');
       }
+
+      // Crear una copia del elemento para no modificar el original
+      const element = reportRef.current.cloneNode(true) as HTMLElement;
       
-      console.log('Respuesta recibida:', response);
-      const blob = await response.blob();
-      console.log('Blob recibido:', blob);
+      // Configurar opciones para el PDF
+      const opt = {
+        margin: [10, 10, 10, 10],
+        filename: `Reporte_Transacciones_${format(new Date(), 'yyyy-MM-dd')}.pdf`,
+        image: { type: 'jpeg', quality: 0.98 },
+        html2canvas: { scale: 2, useCORS: true },
+        jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' }
+      };
       
-      // Crear una URL para el blob
-      const blobUrl = window.URL.createObjectURL(blob);
-      
-      // Abrir el PDF directamente en una nueva pestaña
-      window.open(blobUrl, '_blank');
-      
-      // También descargar el archivo
-      const a = document.createElement('a');
-      a.href = blobUrl;
-      a.download = `Reporte_Transacciones_${format(new Date(), 'yyyy-MM-dd')}.pdf`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
+      // Generar el PDF
+      console.log('Generando PDF...');
+      html2pdf()
+        .set(opt)
+        .from(element)
+        .save()
+        .then(() => {
+          console.log('PDF generado correctamente');
+        })
+        .catch((err: any) => {
+          console.error('Error al generar el PDF:', err);
+          alert('Error al generar el PDF. Por favor, intente nuevamente.');
+        });
     } catch (error) {
       console.error('Error al generar el PDF:', error);
       alert('Error al generar el PDF. Por favor, intente nuevamente.');
@@ -297,7 +292,7 @@ const TransactionSummaryReport: React.FC = () => {
               fullWidth
               variant="contained"
               onClick={handleGenerarCierre}
-              color="success"
+              sx={{ bgcolor: '#dc7633', '&:hover': { bgcolor: '#c56a2d' } }}
             >
               Generar Cierre
             </Button>
@@ -335,17 +330,27 @@ const TransactionSummaryReport: React.FC = () => {
           </Box>
         </Box>
         
-        <TableContainer>
+        <div ref={reportRef}>
+          <Box sx={{ mb: 2 }}>
+            <Typography variant="h6" align="center" gutterBottom>
+              Reporte de Transacciones
+            </Typography>
+            <Typography variant="subtitle1" align="center" gutterBottom>
+              Período: {format(new Date(startDate), 'dd/MM/yyyy')} - {format(new Date(endDate), 'dd/MM/yyyy')}
+            </Typography>
+          </Box>
+          
+          <TableContainer>
           <Table>
             <TableHead>
-              <TableRow>
-                <TableCell sx={{ fontWeight: 'bold' }}>Tipo de Transacción</TableCell>
+              <TableRow sx={{ bgcolor: '#dc7633' }}>
+                <TableCell sx={{ fontWeight: 'bold', color: 'white' }}>Tipo de Transacción</TableCell>
                 {filteredAgentes.map((agente) => (
-                  <TableCell key={agente.id} align="right" sx={{ fontWeight: 'bold' }}>
+                  <TableCell key={agente.id} align="right" sx={{ fontWeight: 'bold', color: 'white' }}>
                     {agente.nombre}
                   </TableCell>
                 ))}
-                <TableCell align="right" sx={{ fontWeight: 'bold', bgcolor: 'success.light' }}>
+                <TableCell align="right" sx={{ fontWeight: 'bold', color: 'white' }}>
                   Efectivo
                 </TableCell>
               </TableRow>
@@ -361,7 +366,7 @@ const TransactionSummaryReport: React.FC = () => {
                         : '-'}
                     </TableCell>
                   ))}
-                  <TableCell align="right" sx={{ bgcolor: 'success.light' }}>
+                  <TableCell align="right" sx={{ bgcolor: 'hsl(23, 40%, 73%)' }}>
                     {calcularTotalPorTipo(row) > 0 ? formatCurrency(calcularTotalPorTipo(row)) : '-'}
                   </TableCell>
                 </TableRow>
@@ -377,13 +382,14 @@ const TransactionSummaryReport: React.FC = () => {
                       : 'L0.00'}
                   </TableCell>
                 ))}
-                <TableCell align="right" sx={{ bgcolor: 'success.main', color: 'white' }}>
+                <TableCell align="right" sx={{ bgcolor: 'hsl(23, 40%, 73%)', color: 'black', fontWeight: 'bold' }}>
                   {formatCurrency(calcularTotalEfectivo())}
                 </TableCell>
               </TableRow>
             </TableFooter>
           </Table>
         </TableContainer>
+        </div>
       </Paper>
     </Box>
   );

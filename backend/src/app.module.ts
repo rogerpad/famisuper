@@ -12,6 +12,7 @@ import { TransactionTypesModule } from './modules/transaction-types/transaction-
 import { AgentClosingsModule } from './modules/agent-closings/agent-closings.module';
 import { FormulaConfigsModule } from './modules/formula-configs/formula-configs.module';
 import { MigrationModule } from './database/migrations/migration.module';
+import { PermisosModule } from './modules/permisos/permisos.module';
 
 @Module({
   imports: [
@@ -31,6 +32,7 @@ import { MigrationModule } from './database/migrations/migration.module';
     AuthModule,
     UsersModule,
     RolesModule,
+    PermisosModule,
     TransactionsModule,
     ReportsModule,
     ProviderTypesModule,

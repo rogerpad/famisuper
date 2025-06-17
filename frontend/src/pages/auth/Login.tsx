@@ -15,6 +15,7 @@ import authApi from '../../api/auth/authApi';
 interface LoginFormValues {
   username: string;
   password: string;
+  submit?: string; // Campo para errores generales del formulario
 }
 
 const Login: React.FC = () => {
@@ -33,24 +34,75 @@ const Login: React.FC = () => {
       password: Yup.string()
         .required('La contraseña es obligatoria'),
     }),
-    onSubmit: async (values) => {
+    onSubmit: async (values, { setSubmitting, setErrors, resetForm }) => {
       try {
         setLoading(true);
         setError('');
-        const response = await authApi.login({
-          username: values.username,
-          password: values.password
+        
+        console.log('Intentando iniciar sesión con:', { 
+          username: values.username, 
+          password: '***' 
         });
-        localStorage.setItem('token', response.access_token);
-        // Guardar información del usuario si es necesario
-        localStorage.setItem('user', JSON.stringify(response.user));
-        navigate('/');
-      } catch (err: any) {
-        console.error('Error de inicio de sesión:', err);
-        setError(
-          err.response?.data?.message || 'Error al iniciar sesión. Inténtalo de nuevo.'
-        );
+        
+        // Configurar un timeout para la solicitud
+        const loginPromise = authApi.login({ username: values.username, password: values.password });
+        
+        // Timeout de 15 segundos
+        const timeoutPromise = new Promise((_, reject) => {
+          setTimeout(() => reject(new Error('Tiempo de espera agotado')), 15000);
+        });
+        
+        // Esperar a que se complete el login o se agote el tiempo
+        const response = await Promise.race([loginPromise, timeoutPromise]) as any;
+        console.log('Respuesta de login:', response);
+        
+        // Verificar si la respuesta es válida
+        if (response && response.access_token) {
+          console.log('Login exitoso, guardando token manualmente');
+          
+          // Guardar token y datos del usuario en localStorage
+          localStorage.setItem('token', response.access_token);
+          if (response.user) {
+            localStorage.setItem('user', JSON.stringify(response.user));
+          }
+          
+          console.log('Token guardado en localStorage:', response.access_token.substring(0, 20) + '...');
+          
+          // Forzar una recarga completa de la página para reiniciar el estado
+          console.log('Recargando la página para aplicar la autenticación...');
+          
+          // Usar window.location.replace para evitar problemas con el historial del navegador
+          setTimeout(() => {
+            window.location.replace('/');
+          }, 500);
+        } else {
+          console.error('Respuesta de login inválida:', response);
+          setErrors({ submit: 'Error en la respuesta del servidor' });
+        }
+      } catch (error: any) {
+        console.error('Error al iniciar sesión:', error);
+        
+        // Mostrar mensaje de error apropiado
+        if (error.response) {
+          if (error.response.status === 401) {
+            setErrors({ submit: 'Credenciales incorrectas o usuario inactivo' });
+          } else if (error.response.status >= 500) {
+            setErrors({ submit: 'Error en el servidor. Inténtelo de nuevo más tarde.' });
+          } else {
+            setErrors({ submit: error.response.data?.message || 'Error al iniciar sesión' });
+          }
+        } else if (error.message === 'Tiempo de espera agotado') {
+          setErrors({ submit: 'El servidor está tardando en responder. Inténtelo de nuevo.' });
+        } else if (error.message) {
+          setErrors({ submit: error.message });
+        } else {
+          setErrors({ submit: 'Error desconocido al iniciar sesión' });
+        }
+        
+        // Mantener el nombre de usuario pero limpiar la contraseña en caso de error
+        resetForm({ values: { username: values.username, password: '' } });
       } finally {
+        setSubmitting(false);
         setLoading(false);
       }
     },
@@ -58,9 +110,9 @@ const Login: React.FC = () => {
 
   return (
     <Box component="form" onSubmit={formik.handleSubmit} noValidate sx={{ mt: 1 }}>
-      {error && (
+      {(error || formik.errors.submit) && (
         <Alert severity="error" sx={{ mb: 2 }}>
-          {error}
+          {error || formik.errors.submit}
         </Alert>
       )}
       
@@ -107,7 +159,7 @@ const Login: React.FC = () => {
       </Button>
       
       <Typography variant="body2" color="text.secondary" align="center">
-        Sistema de Cierre de Transacciones Famisuper
+       {/* Sistema de Cierre de Transacciones Famisuper */}
       </Typography>
     </Box>
   );

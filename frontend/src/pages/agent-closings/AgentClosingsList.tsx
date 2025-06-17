@@ -85,20 +85,34 @@ const AgentClosingsList = () => {
   return (
     <Box sx={{ p: 3 }}>
       <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
-        <Typography variant="h5" component="h1">
+        <Typography variant="h4" component="h1" display="flex" alignItems="center" gap={1}>
+          <span role="img" aria-label="closings-icon" style={{ fontSize: '1.2em' }}>📊</span>
           Cierres Finales de Agentes
         </Typography>
         <Button
           variant="contained"
-          color="success"
           startIcon={<AddIcon />}
           onClick={() => navigate('/agent-closings/new')}
+          sx={{
+            backgroundColor: '#dc7633',
+            '&:hover': {
+              backgroundColor: '#b35c20'
+            },
+            boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+          }}
         >
           Nuevo Cierre
         </Button>
       </Box>
 
-      <Paper sx={{ p: 2, mb: 3 }}>
+      <Paper sx={{ 
+        p: 2, 
+        mb: 3, 
+        borderRadius: '8px',
+        boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
+        border: '1px solid rgba(0,0,0,0.05)',
+        overflow: 'hidden'
+      }}>
         <Box display="flex" gap={2} flexWrap="wrap">
           <LocalizationProvider dateAdapter={AdapterDateFns} adapterLocale={es}>
             <DatePicker
@@ -129,9 +143,16 @@ const AgentClosingsList = () => {
           </LocalizationProvider>
 
           <Button
-            variant="outlined"
+            variant="contained"
             onClick={() => refetch()}
-            sx={{ height: 40 }}
+            sx={{ 
+              height: 40,
+              backgroundColor: '#dc7633',
+              '&:hover': {
+                backgroundColor: '#b35c20'
+              },
+              boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+            }}
           >
             Filtrar
           </Button>
@@ -143,20 +164,25 @@ const AgentClosingsList = () => {
           <Typography>Cargando...</Typography>
         </Box>
       ) : (
-        <TableContainer component={Paper}>
+        <TableContainer component={Paper} sx={{ 
+          borderRadius: '8px',
+          boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
+          border: '1px solid rgba(0,0,0,0.05)',
+          overflow: 'hidden'
+        }}>
           <Table>
-            <TableHead>
+            <TableHead sx={{ backgroundColor: '#f5f5f5' }}>
               <TableRow>
-                <TableCell>ID</TableCell>
-                <TableCell>Agente</TableCell>
-                <TableCell>Fecha de Cierre</TableCell>
-                <TableCell align="right">Saldo Inicial</TableCell>
-                <TableCell align="right">Adicional CTA</TableCell>
-                <TableCell align="right">Resultado Final</TableCell>
-                <TableCell align="right">Saldo Final</TableCell>
-                <TableCell align="right">Diferencia</TableCell>
-                <TableCell>Estado</TableCell>
-                <TableCell align="center">Acciones</TableCell>
+                <TableCell sx={{ fontWeight: 'bold' }}>ID</TableCell>
+                <TableCell sx={{ fontWeight: 'bold' }}>Agente</TableCell>
+                <TableCell sx={{ fontWeight: 'bold' }}>Fecha de Cierre</TableCell>
+                <TableCell align="right" sx={{ fontWeight: 'bold' }}>Saldo Inicial</TableCell>
+                <TableCell align="right" sx={{ fontWeight: 'bold' }}>Adicional CTA</TableCell>
+                <TableCell align="right" sx={{ fontWeight: 'bold' }}>Resultado Final</TableCell>
+                <TableCell align="right" sx={{ fontWeight: 'bold' }}>Saldo Final</TableCell>
+                <TableCell align="right" sx={{ fontWeight: 'bold' }}>Diferencia</TableCell>
+                <TableCell sx={{ fontWeight: 'bold' }}>Estado</TableCell>
+                <TableCell align="center" sx={{ fontWeight: 'bold' }}>Acciones</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>

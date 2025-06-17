@@ -1,6 +1,7 @@
 import React from 'react';
 import { Outlet } from 'react-router-dom';
 import { Box, Container, Paper, Typography } from '@mui/material';
+import Copyright from '../components/Copyright';
 
 const AuthLayout: React.FC = () => {
   return (
@@ -33,6 +34,9 @@ const AuthLayout: React.FC = () => {
             <Outlet />
           </Box>
         </Paper>
+        <Box sx={{ mt: 3 }}>
+          <Copyright companyName="FamiSuper" />
+        </Box>
       </Container>
     </Box>
   );

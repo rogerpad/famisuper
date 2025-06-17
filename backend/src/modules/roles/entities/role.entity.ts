@@ -1,4 +1,5 @@
-import { Entity, Column, PrimaryGeneratedColumn } from 'typeorm';
+import { Entity, Column, PrimaryGeneratedColumn, OneToMany } from 'typeorm';
+import { PermisoRol } from '../../permisos/entities/permiso-rol.entity';
 
 @Entity({ name: 'tbl_roles' })
 export class Role {
@@ -13,4 +14,7 @@ export class Role {
 
   @Column({ type: 'boolean', default: true })
   activo: boolean;
+  
+  @OneToMany(() => PermisoRol, permisoRol => permisoRol.rol)
+  permisosRoles: PermisoRol[];
 }

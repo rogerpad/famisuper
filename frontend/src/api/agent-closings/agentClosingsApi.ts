@@ -1,4 +1,8 @@
 import api from '../api';
+import agentClosingsMockApi from './agentClosingsMock';
+
+// Bandera para usar mock o API real
+const USE_MOCK = false; // Usando la API real conectada a la base de datos
 
 export interface AgentClosing {
   id: number;
@@ -36,6 +40,10 @@ export interface UpdateAgentClosingDto extends Partial<CreateAgentClosingDto> {}
 export const agentClosingsApi = {
   // Obtener todos los cierres finales de agentes
   getAllAgentClosings: async (startDate?: string, endDate?: string): Promise<AgentClosing[]> => {
+    if (USE_MOCK) {
+      return agentClosingsMockApi.getAllAgentClosings(startDate, endDate);
+    }
+    
     const params: any = {};
     if (startDate) params.startDate = startDate;
     if (endDate) params.endDate = endDate;
@@ -46,6 +54,10 @@ export const agentClosingsApi = {
   
   // Calcular el resultado final para un agente en un rango de fechas
   calculateResultadoFinal: async (proveedorId: number, startDate: string, endDate: string): Promise<number> => {
+    if (USE_MOCK) {
+      return agentClosingsMockApi.calculateResultadoFinal(proveedorId, startDate, endDate);
+    }
+    
     const response = await api.get(`/formula-configs/provider/${proveedorId}/calculate`, {
       params: { startDate, endDate }
     });
@@ -54,29 +66,49 @@ export const agentClosingsApi = {
 
   // Obtener un cierre final de agente por su ID
   getAgentClosingById: async (id: number): Promise<AgentClosing> => {
+    if (USE_MOCK) {
+      return agentClosingsMockApi.getAgentClosingById(id);
+    }
+    
     const response = await api.get(`/agent-closings/${id}`);
     return response.data;
   },
 
   // Crear un nuevo cierre final de agente
   createAgentClosing: async (data: CreateAgentClosingDto): Promise<AgentClosing> => {
+    if (USE_MOCK) {
+      return agentClosingsMockApi.createAgentClosing(data);
+    }
+    
     const response = await api.post('/agent-closings', data);
     return response.data;
   },
 
   // Actualizar un cierre final de agente existente
   updateAgentClosing: async (id: number, data: UpdateAgentClosingDto): Promise<AgentClosing> => {
+    if (USE_MOCK) {
+      return agentClosingsMockApi.updateAgentClosing(id, data);
+    }
+    
     const response = await api.patch(`/agent-closings/${id}`, data);
     return response.data;
   },
 
   // Eliminar un cierre final de agente
   deleteAgentClosing: async (id: number): Promise<void> => {
+    if (USE_MOCK) {
+      return agentClosingsMockApi.deleteAgentClosing(id);
+    }
+    
     await api.delete(`/agent-closings/${id}`);
   },
 
   // Obtener todos los proveedores de tipo agente
   getAgentProviders: async () => {
+    if (USE_MOCK) {
+      return agentClosingsMockApi.getAgentProviders();
+    }
+    
     const response = await api.get('/providers/agent-type');
     return response.data;
   }

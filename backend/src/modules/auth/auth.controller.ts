@@ -27,7 +27,22 @@ export class AuthController {
   @ApiResponse({ status: 200, description: 'Login exitoso' })
   @ApiResponse({ status: 401, description: 'Credenciales inválidas' })
   async login(@Body() loginDto: LoginDto) {
-    return this.authService.login(loginDto.username, loginDto.password);
+    console.log('Recibiendo solicitud de login:', loginDto);
+    
+    try {
+      // Verificar que el DTO tenga los campos necesarios
+      if (!loginDto || !loginDto.username || !loginDto.password) {
+        console.error('Datos de login incompletos:', loginDto);
+        throw new Error('Datos de login incompletos');
+      }
+      
+      const result = await this.authService.login(loginDto.username, loginDto.password);
+      console.log('Login exitoso para usuario:', loginDto.username);
+      return result;
+    } catch (error) {
+      console.error('Error en login:', error.message);
+      throw error;
+    }
   }
 
   @Get('verify')

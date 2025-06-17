@@ -22,8 +22,19 @@ async function bootstrap() {
       whitelist: true,
       transform: true,
       forbidNonWhitelisted: true,
+      enableDebugMessages: true,
+      disableErrorMessages: false,
     }),
   );
+  
+  // Interceptor global para logging de errores
+  app.use((req, res, next) => {
+    console.log(`Request ${req.method} ${req.url}`);
+    if (req.method === 'POST' || req.method === 'PUT') {
+      console.log('Request body:', req.body);
+    }
+    next();
+  });
 
   // Configuración de Swagger
   const config = new DocumentBuilder()

@@ -305,10 +305,24 @@ const AgentClosingForm: React.FC = () => {
 
   return (
     <Box sx={{ maxWidth: 800, mx: 'auto', p: 2 }}>
-      <Card>
+      <Card elevation={2} sx={{ 
+        borderRadius: '8px', 
+        overflow: 'hidden',
+        '& .MuiOutlinedInput-root:focus-within': {
+          '& > fieldset': {
+            borderColor: '#dc7633'
+          }
+        },
+        '& .MuiInputLabel-root.Mui-focused': {
+          color: '#dc7633'
+        },
+        '& .MuiFormLabel-root.Mui-focused': {
+          color: '#dc7633'
+        }
+      }}>
         <CardHeader
           title={id ? 'Editar Cierre Final' : 'Agregar Cierre Final'}
-          sx={{ bgcolor: 'success.main', color: 'white' }}
+          sx={{ bgcolor: '#dc7633', color: 'white' }}
         />
         <CardContent>
           <Formik
@@ -505,18 +519,31 @@ const AgentClosingForm: React.FC = () => {
                       <Button
                         type="button"
                         variant="outlined"
-                        color="error"
                         startIcon={<CancelIcon />}
                         onClick={() => navigate('/agent-closings')}
+                        sx={{
+                          borderColor: 'rgba(220, 118, 51, 0.5)',
+                          color: '#dc7633',
+                          '&:hover': {
+                            borderColor: '#dc7633',
+                            backgroundColor: 'rgba(220, 118, 51, 0.04)'
+                          }
+                        }}
                       >
                         Cancelar
                       </Button>
                       <Button
                         type="submit"
                         variant="contained"
-                        color="success"
                         startIcon={<SaveIcon />}
                         disabled={createMutation.isLoading || updateMutation.isLoading}
+                        sx={{
+                          backgroundColor: '#dc7633',
+                          '&:hover': {
+                            backgroundColor: '#b35c20'
+                          },
+                          boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+                        }}
                       >
                         {(createMutation.isLoading || updateMutation.isLoading) ? 'Guardando...' : 'Guardar Cierre Final'}
                       </Button>
