@@ -19,7 +19,7 @@ export const dbConfig: TypeOrmModuleOptions & PostgresConnectionOptions = {
   password: process.env.DB_PASSWORD || 'Post2025',
   database: process.env.DB_DATABASE || 'db_famisuper',
   entities: [__dirname + '/../**/*.entity{.ts,.js}'],
-  synchronize: process.env.DB_SYNCHRONIZE === 'true',
+  synchronize: false, // Desactivado temporalmente para evitar problemas con la estructura de la tabla
   logging: process.env.DB_LOGGING === 'true',
   autoLoadEntities: true,
   migrations: [__dirname + '/migrations/**/*{.ts,.js}'],

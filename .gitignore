@@ -64,3 +64,5 @@ lerna-debug.log*
 *.bak
 *.backup
 *.swp
+backend/src/database/backup/
+backend/scripts/backup/

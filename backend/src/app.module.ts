@@ -13,6 +13,7 @@ import { AgentClosingsModule } from './modules/agent-closings/agent-closings.mod
 import { FormulaConfigsModule } from './modules/formula-configs/formula-configs.module';
 import { MigrationModule } from './database/migrations/migration.module';
 import { PermisosModule } from './modules/permisos/permisos.module';
+import { TurnosModule } from './modules/turnos/turnos.module';
 
 @Module({
   imports: [
@@ -40,6 +41,7 @@ import { PermisosModule } from './modules/permisos/permisos.module';
     TransactionTypesModule,
     AgentClosingsModule,
     FormulaConfigsModule,
+    TurnosModule,
   ],
 })
 export class AppModule {}

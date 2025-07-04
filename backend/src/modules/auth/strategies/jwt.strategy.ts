@@ -28,6 +28,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       // Actualizar el último acceso del usuario
       await this.usersService.updateLastAccess(user.id);
       
+      // Incluir los permisos del payload en el objeto de usuario
       return {
         id: user.id,
         username: user.username,
@@ -35,6 +36,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
         apellido: user.apellido,
         rol_id: user.rol_id,
         rol: user.rol,
+        permissions: payload.permissions || [], // Incluir los permisos del token
       };
     } catch (error) {
       console.error('Error en la validación JWT:', error);

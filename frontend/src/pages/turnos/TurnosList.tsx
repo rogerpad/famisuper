@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Box,
   Button,
@@ -19,18 +19,46 @@ import {
   DialogTitle,
   Alert,
   CircularProgress,
+  Tooltip,
 } from '@mui/material';
-import { Add as AddIcon, Edit as EditIcon, Delete as DeleteIcon } from '@mui/icons-material';
+import { 
+  Add as AddIcon, 
+  Edit as EditIcon, 
+  Delete as DeleteIcon,
+  PlayArrow as PlayIcon,
+  Stop as StopIcon,
+  PersonAdd as PersonAddIcon 
+} from '@mui/icons-material';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import turnosApi, { Turno } from '../../api/turnos/turnosApi';
+import { useAuth } from '../../contexts/AuthContext';
 import TurnoForm from '../turnos/TurnoForm';
+import AsignarUsuariosDialog from './AsignarUsuariosDialog';
 
 const TurnosList: React.FC = () => {
+  const { state, hasPermission } = useAuth();
   const queryClient = useQueryClient();
   const [openForm, setOpenForm] = useState(false);
   const [selectedTurno, setSelectedTurno] = useState<Turno | null>(null);
   const [openDeleteDialog, setOpenDeleteDialog] = useState(false);
   const [turnoToDelete, setTurnoToDelete] = useState<Turno | null>(null);
+  const [openAsignarUsuariosDialog, setOpenAsignarUsuariosDialog] = useState(false);
+  const [turnoForAsignarUsuarios, setTurnoForAsignarUsuarios] = useState<Turno | null>(null);
+
+  // Mutaciones para iniciar y finalizar turnos
+  const iniciarTurnoMutation = useMutation({
+    mutationFn: (id: number) => turnosApi.iniciarTurno(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['turnos'] });
+    },
+  });
+
+  const finalizarTurnoMutation = useMutation({
+    mutationFn: (id: number) => turnosApi.finalizarTurno(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['turnos'] });
+    },
+  });
 
   // Obtener la lista de turnos
   const { data: turnos, isLoading, error } = useQuery({
@@ -40,6 +68,7 @@ const TurnosList: React.FC = () => {
 
   // Mutación para eliminar un turno
   const deleteMutation = useMutation({
+
     mutationFn: (id: number) => turnosApi.delete(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['turnos'] });
@@ -73,6 +102,26 @@ const TurnosList: React.FC = () => {
     if (turnoToDelete) {
       deleteMutation.mutate(turnoToDelete.id);
     }
+  };
+
+  // Manejadores para asignar usuarios
+  const handleOpenAsignarUsuariosDialog = (turno: Turno) => {
+    setTurnoForAsignarUsuarios(turno);
+    setOpenAsignarUsuariosDialog(true);
+  };
+
+  const handleCloseAsignarUsuariosDialog = () => {
+    setOpenAsignarUsuariosDialog(false);
+    setTurnoForAsignarUsuarios(null);
+  };
+
+  // Manejadores para iniciar y finalizar turnos
+  const handleIniciarTurno = (id: number) => {
+    iniciarTurnoMutation.mutate(id);
+  };
+
+  const handleFinalizarTurno = (id: number) => {
+    finalizarTurnoMutation.mutate(id);
   };
 
   // Renderizado condicional para estados de carga y error
@@ -122,14 +171,16 @@ const TurnosList: React.FC = () => {
         <Typography variant="h4" component="h1" gutterBottom>
           Gestión de Turnos
         </Typography>
-        <Button
-          variant="contained"
-          sx={{ bgcolor: '#dc7633', '&:hover': { bgcolor: '#c56a2d' } }}
-          startIcon={<AddIcon />}
-          onClick={() => handleOpenForm()}
-        >
-          Nuevo Turno
-        </Button>
+        {hasPermission('crear_turnos') && (
+          <Button
+            variant="contained"
+            sx={{ bgcolor: '#dc7633', '&:hover': { bgcolor: '#c56a2d' } }}
+            startIcon={<AddIcon />}
+            onClick={() => handleOpenForm()}
+          >
+            Nuevo Turno
+          </Button>
+        )}
       </Box>
 
       <TableContainer component={Paper}>
@@ -139,7 +190,8 @@ const TurnosList: React.FC = () => {
               <TableCell sx={{ color: 'white' }}>ID</TableCell>
               <TableCell sx={{ color: 'white' }}>Nombre</TableCell>
               <TableCell sx={{ color: 'white' }}>Usuario</TableCell>
-              <TableCell sx={{ color: 'white' }}>Estado</TableCell>
+              <TableCell sx={{ color: 'white' }}>Hora Inicio</TableCell>
+              <TableCell sx={{ color: 'white' }}>Hora Fin</TableCell>
               <TableCell sx={{ color: 'white' }}>Descripción</TableCell>
               <TableCell sx={{ color: 'white' }}>Estado</TableCell>
               <TableCell sx={{ color: 'white' }}>Acciones</TableCell>
@@ -150,8 +202,11 @@ const TurnosList: React.FC = () => {
               <TableRow key={turno.id}>
                 <TableCell>{turno.id}</TableCell>
                 <TableCell>{turno.nombre}</TableCell>
-                <TableCell>{turno.usuario?.nombre} {turno.usuario?.apellido}</TableCell>
-                <TableCell>{turno.estado || '-'}</TableCell>
+                <TableCell>{turno.usuarios && turno.usuarios.length > 0 ? 
+                  turno.usuarios.map(u => `${u.nombre} ${u.apellido}`).join(', ') : 
+                  'Sin usuarios asignados'}</TableCell>
+                <TableCell>{turno.horaInicio || '-'}</TableCell>
+                <TableCell>{turno.horaFin || '-'}</TableCell>
                 <TableCell>{turno.descripcion || '-'}</TableCell>
                 <TableCell>
                   <Chip
@@ -161,20 +216,64 @@ const TurnosList: React.FC = () => {
                   />
                 </TableCell>
                 <TableCell>
-                  <IconButton
-                    color="primary"
-                    aria-label="editar"
-                    onClick={() => handleOpenForm(turno)}
-                  >
-                    <EditIcon />
-                  </IconButton>
-                  <IconButton
-                    color="error"
-                    aria-label="eliminar"
-                    onClick={() => handleOpenDeleteDialog(turno)}
-                  >
-                    <DeleteIcon />
-                  </IconButton>
+                  {/* Botones de acción según permisos */}
+                  {hasPermission('editar_turnos') && (
+                    <Tooltip title="Editar turno">
+                      <IconButton
+                        color="primary"
+                        aria-label="editar"
+                        onClick={() => handleOpenForm(turno)}
+                      >
+                        <EditIcon />
+                      </IconButton>
+                    </Tooltip>
+                  )}
+                  {hasPermission('editar_turnos') && (
+                    <Tooltip title="Asignar usuarios">
+                      <IconButton
+                        color="primary"
+                        aria-label="asignar usuarios"
+                        onClick={() => handleOpenAsignarUsuariosDialog(turno)}
+                      >
+                        <PersonAddIcon />
+                      </IconButton>
+                    </Tooltip>
+                  )}
+                  {hasPermission('eliminar_turnos') && (
+                    <Tooltip title="Eliminar turno">
+                      <IconButton
+                        color="error"
+                        aria-label="eliminar"
+                        onClick={() => handleOpenDeleteDialog(turno)}
+                      >
+                        <DeleteIcon />
+                      </IconButton>
+                    </Tooltip>
+                  )}
+                  {hasPermission('iniciar_turnos') && !turno.horaInicio && (
+                    <Tooltip title="Iniciar turno">
+                      <IconButton
+                        color="success"
+                        aria-label="iniciar turno"
+                        onClick={() => handleIniciarTurno(turno.id)}
+                        disabled={iniciarTurnoMutation.isLoading}
+                      >
+                        <PlayIcon />
+                      </IconButton>
+                    </Tooltip>
+                  )}
+                  {hasPermission('finalizar_turnos') && turno.horaInicio && !turno.horaFin && (
+                    <Tooltip title="Finalizar turno">
+                      <IconButton
+                        color="warning"
+                        aria-label="finalizar turno"
+                        onClick={() => handleFinalizarTurno(turno.id)}
+                        disabled={finalizarTurnoMutation.isLoading}
+                      >
+                        <StopIcon />
+                      </IconButton>
+                    </Tooltip>
+                  )}
                 </TableCell>
               </TableRow>
             ))}
@@ -194,6 +293,13 @@ const TurnosList: React.FC = () => {
         open={openForm}
         onClose={handleCloseForm}
         turno={selectedTurno}
+      />
+
+      {/* Diálogo para asignar usuarios */}
+      <AsignarUsuariosDialog
+        open={openAsignarUsuariosDialog}
+        onClose={handleCloseAsignarUsuariosDialog}
+        turno={turnoForAsignarUsuarios}
       />
 
       {/* Diálogo de confirmación para eliminar turno */}

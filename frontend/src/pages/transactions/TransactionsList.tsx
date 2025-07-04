@@ -107,8 +107,17 @@ const TransactionsList: React.FC = () => {
 
   const formatDate = (dateString: string) => {
     try {
+      // Manejar correctamente las fechas en formato YYYY-MM-DD
+      if (dateString && dateString.match(/^\d{4}-\d{2}-\d{2}$/)) {
+        // Dividir la fecha en partes
+        const [year, month, day] = dateString.split('-').map(Number);
+        // Formatear directamente sin crear un objeto Date
+        return `${day.toString().padStart(2, '0')}/${month.toString().padStart(2, '0')}/${year}`;
+      }
+      // Para otros formatos, usar date-fns
       return format(new Date(dateString), 'dd/MM/yyyy', { locale: es });
     } catch (error) {
+      console.error('Error al formatear fecha:', error);
       return dateString;
     }
   };

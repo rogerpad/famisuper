@@ -336,7 +336,12 @@ const TransactionSummaryReport: React.FC = () => {
               Reporte de Transacciones
             </Typography>
             <Typography variant="subtitle1" align="center" gutterBottom>
-              Período: {format(new Date(startDate), 'dd/MM/yyyy')} - {format(new Date(endDate), 'dd/MM/yyyy')}
+              Período: {startDate && startDate.match(/^\d{4}-\d{2}-\d{2}$/) 
+                ? `${startDate.split('-')[2]}/${startDate.split('-')[1]}/${startDate.split('-')[0]}` 
+                : format(new Date(startDate), 'dd/MM/yyyy')} - 
+              {endDate && endDate.match(/^\d{4}-\d{2}-\d{2}$/) 
+                ? `${endDate.split('-')[2]}/${endDate.split('-')[1]}/${endDate.split('-')[0]}` 
+                : format(new Date(endDate), 'dd/MM/yyyy')}
             </Typography>
           </Box>
           

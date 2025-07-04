@@ -1,4 +1,5 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, Query, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, Query, UseGuards, Req } from '@nestjs/common';
+import { Request } from 'express';
 import { TransactionsService } from './transactions.service';
 import { CreateTransactionDto } from './dto/create-transaction.dto';
 import { UpdateTransactionDto } from './dto/update-transaction.dto';
@@ -18,8 +19,21 @@ export class TransactionsController {
   @ApiResponse({ status: 201, description: 'Transacción creada exitosamente', type: Transaction })
   @ApiResponse({ status: 400, description: 'Datos de entrada inválidos' })
   @ApiResponse({ status: 404, description: 'Agente o tipo de transacción no encontrado' })
-  create(@Body() createTransactionDto: CreateTransactionDto) {
-    return this.transactionsService.create(createTransactionDto);
+  create(@Body() createTransactionDto: CreateTransactionDto, @Req() req: Request) {
+    // Obtener el ID del usuario desde el token JWT
+    // En NestJS con JWT, el objeto req.user contiene los datos del usuario autenticado
+    const user = req.user as any; // Usamos any temporalmente para evitar problemas de tipo
+    const userId = user.id;
+    
+    console.log(`Creando transacción con usuario autenticado ID: ${userId}`);
+    
+    // Sobrescribir el usuarioId en el DTO con el ID del usuario autenticado
+    const transactionWithAuthUser = {
+      ...createTransactionDto,
+      usuarioId: userId
+    };
+    
+    return this.transactionsService.create(transactionWithAuthUser);
   }
 
   @Get()

@@ -19,6 +19,11 @@ import {
   TextField,
   Typography,
   InputAdornment,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogContentText,
+  DialogTitle,
 } from '@mui/material';
 import SaveIcon from '@mui/icons-material/Save';
 import CancelIcon from '@mui/icons-material/Cancel';
@@ -40,7 +45,7 @@ interface AgentClosingFormValues {
   resultadoFinal: number;
   saldoFinal: number;
   diferencia: number;
-  observaciones: string;
+  observaciones: string | null;
   estado: string;
 }
 
@@ -56,9 +61,13 @@ const AgentClosingForm: React.FC = () => {
     resultadoFinal: 0,
     saldoFinal: 0,
     diferencia: 0,
-    observaciones: '',
+    observaciones: null,
     estado: 'activo',
   });
+  
+  // Estado para controlar el diálogo de confirmación
+  const [openConfirmDialog, setOpenConfirmDialog] = useState(false);
+  const [formValuesToSubmit, setFormValuesToSubmit] = useState<AgentClosingFormValues | null>(null);
 
   // Fetch agent-type providers
   const { data: providers, isLoading: isLoadingProviders } = useQuery({
@@ -90,6 +99,8 @@ const AgentClosingForm: React.FC = () => {
         resultadoFinal: Number(values.resultadoFinal) || 0,
         saldoFinal: Number(values.saldoFinal) || 0,
         diferencia: Number(values.diferencia) || 0,
+        // Convertir null a undefined para que coincida con el tipo esperado por la API
+        observaciones: values.observaciones || undefined,
       };
       console.log('Enviando datos al backend:', JSON.stringify(formattedValues));
       return agentClosingsApi.createAgentClosing(formattedValues);
@@ -120,6 +131,8 @@ const AgentClosingForm: React.FC = () => {
         resultadoFinal: Number(values.resultadoFinal) || 0,
         saldoFinal: Number(values.saldoFinal) || 0,
         diferencia: Number(values.diferencia) || 0,
+        // Convertir null a undefined para que coincida con el tipo esperado por la API
+        observaciones: values.observaciones || undefined,
       };
       console.log('Actualizando cierre con datos:', JSON.stringify(formattedValues));
       return agentClosingsApi.updateAgentClosing(Number(id), formattedValues);
@@ -138,20 +151,29 @@ const AgentClosingForm: React.FC = () => {
   });
 
   useEffect(() => {
-    if (agentClosing) {
+    if (agentClosing && !isLoadingAgentClosing) {
+      // Convertir la fecha string a objeto Date para el formulario, evitando problemas de zona horaria
+      let fechaCierre;
+      if (agentClosing.fechaCierre && agentClosing.fechaCierre.match(/^\d{4}-\d{2}-\d{2}$/)) {
+        // Si es formato YYYY-MM-DD, crear Date con año, mes y día explícitos
+        const [year, month, day] = agentClosing.fechaCierre.split('-');
+        fechaCierre = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+      } else {
+        fechaCierre = agentClosing.fechaCierre ? new Date(agentClosing.fechaCierre) : new Date();
+      }
+
       setInitialValues({
-        proveedorId: agentClosing.proveedorId,
-        fechaCierre: parse(agentClosing.fechaCierre, 'yyyy-MM-dd', new Date()),
-        saldoInicial: agentClosing.saldoInicial || 0,
-        adicionalCta: agentClosing.adicionalCta || 0,
-        resultadoFinal: agentClosing.resultadoFinal || 0,
-        saldoFinal: agentClosing.saldoFinal || 0,
-        diferencia: agentClosing.diferencia || 0,
-        observaciones: agentClosing.observaciones || '',
-        estado: agentClosing.estado,
+        ...agentClosing,
+        fechaCierre,
+        // Asegurar que los valores numéricos sean números
+        saldoInicial: Number(agentClosing.saldoInicial) || 0,
+        adicionalCta: Number(agentClosing.adicionalCta) || 0,
+        resultadoFinal: Number(agentClosing.resultadoFinal) || 0,
+        saldoFinal: Number(agentClosing.saldoFinal) || 0,
+        diferencia: Number(agentClosing.diferencia) || 0,
       });
     }
-  }, [agentClosing]);
+  }, [agentClosing, isLoadingAgentClosing]);
 
   const validationSchema = yup.object({
     proveedorId: yup.number().min(1, 'El agente es requerido').required('El agente es requerido'),
@@ -165,26 +187,73 @@ const AgentClosingForm: React.FC = () => {
     estado: yup.string().required('El estado es requerido'),
   });
 
-  const handleSubmit = async (values: AgentClosingFormValues) => {
+  // Función para abrir el diálogo de confirmación
+  const openConfirmationDialog = (values: AgentClosingFormValues) => {
+    setFormValuesToSubmit(values);
+    setOpenConfirmDialog(true);
+  };
+
+  // Función para cerrar el diálogo de confirmación
+  const handleCloseConfirmDialog = () => {
+    setOpenConfirmDialog(false);
+  };
+
+  // Función para procesar el envío después de la confirmación
+  const handleConfirmedSubmit = async () => {
+    if (!formValuesToSubmit) return;
+    
     try {
-      // Añadir logs detallados para depuración
-      console.log('Valores del formulario a enviar:', values);
+      // Crear una copia de los valores del formulario para procesarlos
+      const formValues = { ...formValuesToSubmit };
+      
+      // Añadir logs detallados para depuración de los valores originales
+      console.log('Valores originales del formulario:', JSON.stringify(formValues, (key, value) => {
+        if (value instanceof Date) return format(value, 'yyyy-MM-dd');
+        return value;
+      }, 2));
+      
+      // Asegurar que los valores numéricos sean correctos
+      const resultadoFinalNum = Number(formValues.resultadoFinal) || 0;
+      const diferenciaNum = Number(formValues.diferencia) || 0;
+      
+      console.log('Valores críticos procesados:');
+      console.log('- resultadoFinal:', resultadoFinalNum, typeof resultadoFinalNum);
+      console.log('- diferencia:', diferenciaNum, typeof diferenciaNum);
+      
+      // Actualizar los valores en el objeto formValues para mantener el tipo Date para fechaCierre
+      formValues.resultadoFinal = resultadoFinalNum;
+      formValues.diferencia = diferenciaNum;
+      formValues.saldoInicial = Number(formValues.saldoInicial) || 0;
+      formValues.adicionalCta = Number(formValues.adicionalCta) || 0;
+      formValues.saldoFinal = Number(formValues.saldoFinal) || 0;
+      
+      console.log('Valores del formulario actualizados para enviar a la mutación:', 
+        JSON.stringify(formValues, (key, value) => {
+          if (value instanceof Date) return format(value, 'yyyy-MM-dd');
+          return value;
+        }, 2));
       
       if (id) {
         // Actualizar cierre existente
         console.log('Actualizando cierre existente con ID:', id);
-        await updateMutation.mutateAsync(values);
+        await updateMutation.mutateAsync(formValues);
         alert('Cierre final actualizado con éxito');
       } else {
         // Crear nuevo cierre
-        console.log('Creando nuevo cierre con valores:', JSON.stringify(values));
-        const result = await createMutation.mutateAsync(values);
-        console.log('Respuesta del servidor al crear:', result);
+        console.log('Creando nuevo cierre');
+        const result = await createMutation.mutateAsync(formValues);
+        console.log('Cierre creado con éxito:', result);
         alert('Cierre final creado con éxito');
       }
+      
+      // Cerrar el diálogo
+      handleCloseConfirmDialog();
+      
+      // Redireccionar a la lista de cierres
       navigate('/agent-closings');
     } catch (error: any) {
-      console.error('Error al guardar el cierre final:', error);
+      console.error('Error al guardar el cierre:', error);
+      
       // Mostrar más detalles del error
       if (error.response) {
         console.error('Respuesta del servidor:', error.response.data);
@@ -197,7 +266,16 @@ const AgentClosingForm: React.FC = () => {
         console.error('Error al configurar la solicitud:', error.message);
         alert(`Error: ${error.message || 'Error desconocido'}`);
       }
+      
+      // Cerrar el diálogo en caso de error
+      handleCloseConfirmDialog();
     }
+  };
+  
+  // Función que se llama al enviar el formulario
+  const handleSubmit = (values: AgentClosingFormValues) => {
+    // Mostrar diálogo de confirmación
+    openConfirmationDialog(values);
   };
 
   // Función para obtener el saldo inicial del agente seleccionado (transacción tipo Saldo Inicial)
@@ -256,9 +334,14 @@ const AgentClosingForm: React.FC = () => {
     if (proveedorId <= 0) return;
 
     try {
-      // Calcular el primer día del mes y la fecha de cierre
-      const startDate = format(new Date(fechaCierre.getFullYear(), fechaCierre.getMonth(), 1), 'yyyy-MM-dd');
+      // Crear fechas usando el constructor explícito para evitar problemas de zona horaria
+      // Primer día del mes
+      const primerDiaMes = new Date(fechaCierre.getFullYear(), fechaCierre.getMonth(), 1);
+      const startDate = format(primerDiaMes, 'yyyy-MM-dd');
+      // Fecha de cierre
       const endDate = format(fechaCierre, 'yyyy-MM-dd');
+      
+      console.log(`Calculando resultado final para agente ${proveedorId} desde ${startDate} hasta ${endDate}`);
 
       // Obtener el resultado final calculado
       const resultadoFinal = await agentClosingsApi.calculateResultadoFinal(proveedorId, startDate, endDate);
@@ -555,6 +638,44 @@ const AgentClosingForm: React.FC = () => {
           </Formik>
         </CardContent>
       </Card>
+
+      {/* Diálogo de confirmación para guardar el cierre final */}
+      <Dialog
+        open={openConfirmDialog}
+        onClose={handleCloseConfirmDialog}
+        aria-labelledby="alert-dialog-title"
+        aria-describedby="alert-dialog-description"
+      >
+        <DialogTitle id="alert-dialog-title">
+          {id ? "¿Confirmar actualización de cierre final?" : "¿Confirmar creación de cierre final?"}
+        </DialogTitle>
+        <DialogContent>
+          <DialogContentText id="alert-dialog-description">
+            {id
+              ? "¿Está seguro que desea actualizar este cierre final? Esta acción modificará los datos existentes."
+              : "¿Está seguro que desea crear este cierre final? Esta acción no se puede deshacer."}
+            <br /><br />
+            {formValuesToSubmit && (
+              <>
+                <strong>Fecha de cierre:</strong> {formValuesToSubmit.fechaCierre instanceof Date ? format(formValuesToSubmit.fechaCierre, 'dd/MM/yyyy') : (typeof formValuesToSubmit.fechaCierre === 'string' ? formValuesToSubmit.fechaCierre : 'Fecha no disponible')}<br />
+                <strong>Agente:</strong> {providers?.find(p => p.id === formValuesToSubmit?.proveedorId)?.nombre || 'No seleccionado'}<br />
+                <strong>Saldo inicial:</strong> L. {typeof formValuesToSubmit.saldoInicial === 'number' ? formValuesToSubmit.saldoInicial.toFixed(2) : '0.00'}<br />
+                <strong>Resultado final:</strong> L. {typeof formValuesToSubmit.resultadoFinal === 'number' ? formValuesToSubmit.resultadoFinal.toFixed(2) : '0.00'}<br />
+                <strong>Saldo final:</strong> L. {typeof formValuesToSubmit.saldoFinal === 'number' ? formValuesToSubmit.saldoFinal.toFixed(2) : '0.00'}<br />
+                <strong>Diferencia:</strong> L. {typeof formValuesToSubmit.diferencia === 'number' ? formValuesToSubmit.diferencia.toFixed(2) : '0.00'}<br />
+              </>
+            )}
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCloseConfirmDialog} color="primary">
+            Cancelar
+          </Button>
+          <Button onClick={handleConfirmedSubmit} color="primary" autoFocus variant="contained">
+            {id ? "Actualizar" : "Crear"}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 };

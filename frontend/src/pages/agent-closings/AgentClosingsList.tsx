@@ -79,6 +79,12 @@ const AgentClosingsList = () => {
   };
 
   const formatDate = (date: string) => {
+    // Si la fecha está en formato YYYY-MM-DD, formatearla manualmente para evitar problemas de zona horaria
+    if (date && date.match(/^\d{4}-\d{2}-\d{2}$/)) {
+      const [year, month, day] = date.split('-');
+      return `${day}/${month}/${year}`;
+    }
+    // Si no está en ese formato, usar date-fns (aunque puede tener problemas de zona horaria)
     return format(new Date(date), 'dd/MM/yyyy', { locale: es });
   };
 

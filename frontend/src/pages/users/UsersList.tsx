@@ -30,6 +30,8 @@ import {
   Schedule as ScheduleIcon,
   KeyboardArrowDown as KeyboardArrowDownIcon,
   KeyboardArrowUp as KeyboardArrowUpIcon,
+  PlayArrow as PlayArrowIcon,
+  Stop as StopIcon,
 } from '@mui/icons-material';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import usersApi, { User } from '../../api/users/usersApi';
@@ -83,6 +85,22 @@ const UsersList: React.FC = () => {
       queryClient.invalidateQueries({ queryKey: ['turnos', expandedUser] });
       setOpenDeleteTurnoDialog(false);
       setTurnoToDelete(null);
+    },
+  });
+  
+  // Mutación para iniciar un turno
+  const iniciarTurnoMutation = useMutation({
+    mutationFn: (id: number) => turnosApi.iniciarTurno(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['turnos', expandedUser] });
+    },
+  });
+  
+  // Mutación para finalizar un turno
+  const finalizarTurnoMutation = useMutation({
+    mutationFn: (id: number) => turnosApi.finalizarTurno(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['turnos', expandedUser] });
     },
   });
 
@@ -144,6 +162,16 @@ const UsersList: React.FC = () => {
     if (turnoToDelete) {
       deleteTurnoMutation.mutate(turnoToDelete.id);
     }
+  };
+  
+  // Manejador para iniciar un turno
+  const handleIniciarTurno = (turnoId: number) => {
+    iniciarTurnoMutation.mutate(turnoId);
+  };
+  
+  // Manejador para finalizar un turno
+  const handleFinalizarTurno = (turnoId: number) => {
+    finalizarTurnoMutation.mutate(turnoId);
   };
 
   // Renderizado condicional para estados de carga y error
@@ -303,7 +331,8 @@ const UsersList: React.FC = () => {
                               <TableRow sx={{ bgcolor: '#f5f5f5' }}>
                                 <TableCell>ID</TableCell>
                                 <TableCell>Nombre</TableCell>
-                                <TableCell>Estado</TableCell>
+                                <TableCell>Hora Inicio</TableCell>
+                                <TableCell>Hora Fin</TableCell>
                                 <TableCell>Descripción</TableCell>
                                 <TableCell>Activo</TableCell>
                                 <TableCell>Acciones</TableCell>
@@ -314,7 +343,8 @@ const UsersList: React.FC = () => {
                                 <TableRow key={turno.id}>
                                   <TableCell>{turno.id}</TableCell>
                                   <TableCell>{turno.nombre}</TableCell>
-                                  <TableCell>{turno.estado || '-'}</TableCell>
+                                  <TableCell>{turno.horaInicio || '-'}</TableCell>
+                                  <TableCell>{turno.horaFin || '-'}</TableCell>
                                   <TableCell>{turno.descripcion || '-'}</TableCell>
                                   <TableCell>
                                     <Chip
@@ -339,6 +369,26 @@ const UsersList: React.FC = () => {
                                       onClick={() => handleOpenDeleteTurnoDialog(turno)}
                                     >
                                       <DeleteIcon fontSize="small" />
+                                    </IconButton>
+                                    <IconButton
+                                      size="small"
+                                      color="success"
+                                      aria-label="iniciar turno"
+                                      onClick={() => handleIniciarTurno(turno.id)}
+                                      disabled={iniciarTurnoMutation.isLoading}
+                                      title="Iniciar Turno"
+                                    >
+                                      <PlayArrowIcon fontSize="small" />
+                                    </IconButton>
+                                    <IconButton
+                                      size="small"
+                                      color="warning"
+                                      aria-label="finalizar turno"
+                                      onClick={() => handleFinalizarTurno(turno.id)}
+                                      disabled={finalizarTurnoMutation.isLoading}
+                                      title="Finalizar Turno"
+                                    >
+                                      <StopIcon fontSize="small" />
                                     </IconButton>
                                   </TableCell>
                                 </TableRow>
@@ -380,7 +430,7 @@ const UsersList: React.FC = () => {
           open={openTurnoForm}
           onClose={handleCloseTurnoForm}
           turno={selectedTurno}
-          usuario_id={userForTurno.id}
+          usuariosIds={userForTurno ? [userForTurno.id] : []}
         />
       )}
 

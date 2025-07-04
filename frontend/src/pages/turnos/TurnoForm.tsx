@@ -28,21 +28,23 @@ interface TurnoFormProps {
   open: boolean;
   onClose: () => void;
   turno: Turno | null;
-  usuario_id?: number;
+  usuariosIds?: number[];
 }
 
 // Esquema de validación para el formulario
 const turnoSchema = Yup.object().shape({
   nombre: Yup.string().required('El nombre del turno es requerido'),
-  usuario_id: Yup.number().required('El usuario es requerido'),
-  estado: Yup.string(),
+  horaInicio: Yup.string().required('La hora de inicio es requerida'),
+  horaFin: Yup.string().required('La hora de fin es requerida'),
   descripcion: Yup.string(),
   activo: Yup.boolean(),
+  usuariosIds: Yup.array().of(Yup.number()),
 });
 
-const TurnoForm: React.FC<TurnoFormProps> = ({ open, onClose, turno, usuario_id }) => {
+const TurnoForm: React.FC<TurnoFormProps> = ({ open, onClose, turno, usuariosIds = [] }) => {
   const queryClient = useQueryClient();
   const isNewTurno = !turno;
+  const [error, setError] = React.useState<string | null>(null);
 
   // Consulta para obtener los usuarios
   const { data: users, isLoading: isLoadingUsers } = useQuery({
@@ -67,43 +69,98 @@ const TurnoForm: React.FC<TurnoFormProps> = ({ open, onClose, turno, usuario_id 
       queryClient.invalidateQueries({ queryKey: ['turnos'] });
       onClose();
     },
+    onError: (error: any) => {
+      console.error('Error en la mutación de actualización:', error);
+      // El error se maneja en el componente
+    }
   });
 
   // Valores iniciales para el formulario
   const initialValues = {
     nombre: turno?.nombre || '',
-    usuario_id: turno?.usuario_id || usuario_id || '',
-    estado: turno?.estado || 'Disponible',
+    horaInicio: turno?.horaInicio || '08:00',
+    horaFin: turno?.horaFin || '16:00',
     descripcion: turno?.descripcion || '',
     activo: turno?.activo ?? true,
+    usuariosIds: turno?.usuarios?.map(u => u.id) || usuariosIds || [],
+  };
+
+  // Limpiar el error al cerrar el diálogo
+  const handleClose = () => {
+    setError(null);
+    onClose();
   };
 
   // Manejar el envío del formulario
-  const handleSubmit = (values: any) => {
+  const handleSubmit = async (values: any) => {
     try {
+      // Limpiar cualquier error previo
+      setError(null);
+      
+      // Validar que la hora de inicio sea anterior a la hora de fin
+      if (values.horaInicio >= values.horaFin) {
+        setError('La hora de inicio debe ser anterior a la hora de fin');
+        return;
+      }
+      
+      // Asegurarse de que las horas estén en formato HH:MM (máximo 5 caracteres)
+      const formatearHora = (hora: string): string => {
+        if (!hora) return hora;
+        // Si la hora incluye segundos (HH:MM:SS), eliminarlos
+        if (hora.length > 5) {
+          return hora.substring(0, 5);
+        }
+        return hora;
+      };
+      
       const turnoData = {
         nombre: values.nombre,
-        usuario_id: Number(values.usuario_id),
-        estado: values.estado || undefined,
+        horaInicio: formatearHora(values.horaInicio),
+        horaFin: formatearHora(values.horaFin),
         descripcion: values.descripcion || undefined,
         activo: values.activo,
+        usuariosIds: values.usuariosIds || [],
       };
+
+      console.log('Datos a enviar:', turnoData);
 
       if (isNewTurno) {
         // Para crear un nuevo turno
-        createMutation.mutate(turnoData as CreateTurnoDto);
+        try {
+          await createMutation.mutateAsync(turnoData as CreateTurnoDto);
+        } catch (error: any) {
+          console.error('Error al crear turno:', error);
+          setError(error.message || 'Error al crear el turno');
+          return;
+        }
       } else if (turno) {
         // Para actualizar un turno existente
-        updateMutation.mutate({ id: turno.id, turnoData });
+        try {
+          await updateMutation.mutateAsync({ id: turno.id, turnoData });
+        } catch (error: any) {
+          console.error('Error al actualizar turno:', error);
+          setError(error.message || 'Error al actualizar el turno');
+          return;
+        }
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error al procesar el formulario:', error);
+      setError(error.message || 'Error al procesar el formulario');
     }
   };
 
   return (
-    <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
+    <Dialog open={open} onClose={handleClose} maxWidth="md" fullWidth>
       <DialogTitle>{isNewTurno ? 'Crear Nuevo Turno' : 'Editar Turno'}</DialogTitle>
+      
+      {/* Mostrar alerta de error si existe */}
+      {error && (
+        <Box sx={{ mx: 3, mt: 2 }}>
+          <Alert severity="error" onClose={() => setError(null)}>
+            {error}
+          </Alert>
+        </Box>
+      )}
       <Formik
         initialValues={initialValues}
         validationSchema={turnoSchema}
@@ -128,53 +185,37 @@ const TurnoForm: React.FC<TurnoFormProps> = ({ open, onClose, turno, usuario_id 
                   </Field>
                 </Grid>
                 <Grid item xs={12} md={6}>
-                  <Field name="usuario_id">
+                  {/* El campo de selección de usuario ha sido eliminado ya que usuarioId no existe más en el backend */}
+                </Grid>
+                <Grid item xs={12} md={6}>
+                  <Field name="horaInicio">
                     {({ field }: FieldProps) => (
-                      <FormControl 
-                        fullWidth 
+                      <TextField
+                        {...field}
+                        label="Hora de Inicio"
+                        type="time"
+                        fullWidth
                         margin="normal"
-                        error={touched.usuario_id && Boolean(errors.usuario_id)}
-                      >
-                        <InputLabel>Usuario</InputLabel>
-                        <Select
-                          {...field}
-                          label="Usuario"
-                          disabled={Boolean(usuario_id)}
-                        >
-                          {isLoadingUsers ? (
-                            <MenuItem value="" disabled>
-                              Cargando usuarios...
-                            </MenuItem>
-                          ) : (
-                            users?.map((user) => (
-                              <MenuItem key={user.id} value={user.id}>
-                                {user.nombre} {user.apellido} ({user.username})
-                              </MenuItem>
-                            ))
-                          )}
-                        </Select>
-                        {touched.usuario_id && errors.usuario_id && (
-                          <FormHelperText>{errors.usuario_id}</FormHelperText>
-                        )}
-                      </FormControl>
+                        InputLabelProps={{ shrink: true }}
+                        error={touched.horaInicio && Boolean(errors.horaInicio)}
+                        helperText={touched.horaInicio && errors.horaInicio as string}
+                      />
                     )}
                   </Field>
                 </Grid>
                 <Grid item xs={12} md={6}>
-                  <Field name="estado">
+                  <Field name="horaFin">
                     {({ field }: FieldProps) => (
-                      <FormControl fullWidth margin="normal">
-                        <InputLabel>Estado</InputLabel>
-                        <Select
-                          {...field}
-                          label="Estado"
-                        >
-                          <MenuItem value="Disponible">Disponible</MenuItem>
-                          <MenuItem value="En uso">En uso</MenuItem>
-                          <MenuItem value="Finalizado">Finalizado</MenuItem>
-                          <MenuItem value="Pausado">Pausado</MenuItem>
-                        </Select>
-                      </FormControl>
+                      <TextField
+                        {...field}
+                        label="Hora de Fin"
+                        type="time"
+                        fullWidth
+                        margin="normal"
+                        InputLabelProps={{ shrink: true }}
+                        error={touched.horaFin && Boolean(errors.horaFin)}
+                        helperText={touched.horaFin && errors.horaFin as string}
+                      />
                     )}
                   </Field>
                 </Grid>
@@ -221,7 +262,7 @@ const TurnoForm: React.FC<TurnoFormProps> = ({ open, onClose, turno, usuario_id 
               )}
             </DialogContent>
             <DialogActions>
-              <Button onClick={onClose} color="secondary">
+              <Button onClick={handleClose} color="secondary">
                 Cancelar
               </Button>
               <Button

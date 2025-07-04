@@ -147,7 +147,10 @@ const permisosApi = {
     if (USE_MOCK) {
       return Promise.resolve([...mockPermisos]);
     }
-    const response = await api.get('/permisos');
+    // Agregar timestamp para evitar caché
+    const timestamp = new Date().getTime();
+    const response = await api.get(`/permisos?_t=${timestamp}`);
+    console.log('Permisos obtenidos del backend:', response.data);
     return response.data;
   },
 
@@ -156,7 +159,10 @@ const permisosApi = {
     if (USE_MOCK) {
       return Promise.resolve(mockPermisos.filter(p => p.modulo === modulo));
     }
-    const response = await api.get(`/permisos/modulo/${modulo}`);
+    // Agregar timestamp para evitar caché
+    const timestamp = new Date().getTime();
+    const response = await api.get(`/permisos/modulo/${modulo}?_t=${timestamp}`);
+    console.log(`Permisos del módulo ${modulo} obtenidos del backend:`, response.data);
     return response.data;
   },
 
@@ -168,7 +174,10 @@ const permisosApi = {
         .map(pr => pr.permiso_id);
       return Promise.resolve(mockPermisos.filter(p => permisosIds.includes(p.id)));
     }
-    const response = await api.get(`/permisos/roles/${rolId}`);
+    // Agregar timestamp para evitar caché
+    const timestamp = new Date().getTime();
+    const response = await api.get(`/permisos/roles/${rolId}?_t=${timestamp}`);
+    console.log(`Permisos del rol ${rolId} obtenidos del backend:`, response.data);
     return response.data;
   },
 

@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, Between } from 'typeorm';
+import { Repository } from 'typeorm';
 import { Transaction } from './entities/transaction.entity';
 import { CreateTransactionDto } from './dto/create-transaction.dto';
 import { UpdateTransactionDto } from './dto/update-transaction.dto';
@@ -43,68 +43,85 @@ export class TransactionsService {
   }
 
   async findAll(): Promise<Transaction[]> {
-    return this.transactionsRepository.find({
-      where: {
-        estado: 1, // Solo transacciones activas
-      },
-      relations: ['usuario', 'agente', 'tipoTransaccion'],
-      order: {
-        id: 'DESC',
-      },
-    });
+    // Usamos QueryBuilder para tener más control sobre la consulta SQL
+    const transactions = await this.transactionsRepository
+      .createQueryBuilder('transaction')
+      .leftJoinAndSelect('transaction.usuario', 'usuario')
+      .leftJoinAndSelect('transaction.agente', 'agente')
+      .leftJoinAndSelect('transaction.tipoTransaccion', 'tipoTransaccion')
+      .where('transaction.estado = :estado', { estado: 1 })
+      .orderBy('transaction.id', 'DESC')
+      .getMany();
+    
+    // Registramos algunas fechas para depuración
+    if (transactions.length > 0) {
+      console.log(`[TS] findAll - Ejemplo de fecha en DB: ${transactions[0].fecha}`);
+      // La fecha ya viene como string desde la base de datos cuando usamos QueryBuilder
+    }
+    
+    return transactions;
   }
 
   async findAllWithInactive(): Promise<Transaction[]> {
-    return this.transactionsRepository.find({
-      relations: ['usuario', 'agente', 'tipoTransaccion'],
-      order: {
-        id: 'DESC',
-      },
-    });
+    // Usamos QueryBuilder para tener más control sobre la consulta SQL
+    const transactions = await this.transactionsRepository
+      .createQueryBuilder('transaction')
+      .leftJoinAndSelect('transaction.usuario', 'usuario')
+      .leftJoinAndSelect('transaction.agente', 'agente')
+      .leftJoinAndSelect('transaction.tipoTransaccion', 'tipoTransaccion')
+      .orderBy('transaction.id', 'DESC')
+      .getMany();
+    
+    return transactions;
   }
   
   async getTransactionsForSummary(): Promise<Transaction[]> {
     // Método específico para el resumen que garantiza solo transacciones activas
-    return this.transactionsRepository.find({
-      where: {
-        estado: 1, // Estrictamente solo transacciones activas
-      },
-      relations: ['usuario', 'agente', 'tipoTransaccion'],
-      order: {
-        fecha: 'DESC',
-        hora: 'DESC',
-      },
-    });
+    const transactions = await this.transactionsRepository
+      .createQueryBuilder('transaction')
+      .leftJoinAndSelect('transaction.usuario', 'usuario')
+      .leftJoinAndSelect('transaction.agente', 'agente')
+      .leftJoinAndSelect('transaction.tipoTransaccion', 'tipoTransaccion')
+      .where('transaction.estado = :estado', { estado: 1 })
+      .orderBy('transaction.fecha', 'DESC')
+      .addOrderBy('transaction.hora', 'DESC')
+      .getMany();
+    
+    return transactions;
   }
   
   async getTransactionsByDateRangeForSummary(startDate: string, endDate: string): Promise<Transaction[]> {
-    // Procesar fechas correctamente para evitar problemas con zona horaria
-    // Formato esperado: YYYY-MM-DD
-    const [startYear, startMonth, startDay] = startDate.split('-').map(Number);
-    const [endYear, endMonth, endDay] = endDate.split('-').map(Number);
+    console.log(`[TS] getTransactionsByDateRangeForSummary - Fecha inicio original: ${startDate}`);
+    console.log(`[TS] getTransactionsByDateRangeForSummary - Fecha fin original: ${endDate}`);
     
-    const start = new Date(startYear, startMonth - 1, startDay);
-    const end = new Date(endYear, endMonth - 1, endDay);
-    
-    console.log(`[TS] getTransactionsByDateRangeForSummary - Fecha inicio original: ${startDate}, procesada: ${start.toISOString()}`);
-    console.log(`[TS] getTransactionsByDateRangeForSummary - Fecha fin original: ${endDate}, procesada: ${end.toISOString()}`);
-    
-    if (isNaN(start.getTime()) || isNaN(end.getTime())) {
-      throw new BadRequestException('Fechas inválidas');
+    // Validar formato de fecha
+    if (!startDate.match(/^\d{4}-\d{2}-\d{2}$/) || !endDate.match(/^\d{4}-\d{2}-\d{2}$/)) {
+      throw new BadRequestException('Formato de fecha inválido. Use YYYY-MM-DD');
     }
     
-    // Método específico para el resumen por rango de fechas que garantiza solo transacciones activas
-    return this.transactionsRepository.find({
-      where: {
-        fecha: Between(start, end),
-        estado: 1, // Estrictamente solo transacciones activas
-      },
-      relations: ['usuario', 'agente', 'tipoTransaccion'],
-      order: {
-        fecha: 'DESC',
-        hora: 'DESC',
-      },
-    });
+    // Usamos QueryBuilder para tener más control sobre la consulta SQL
+    // Al usar directamente las fechas como strings en la consulta SQL, evitamos problemas de zona horaria
+    const transactions = await this.transactionsRepository
+      .createQueryBuilder('transaction')
+      .leftJoinAndSelect('transaction.usuario', 'usuario')
+      .leftJoinAndSelect('transaction.agente', 'agente')
+      .leftJoinAndSelect('transaction.tipoTransaccion', 'tipoTransaccion')
+      .where('transaction.estado = :estado', { estado: 1 })
+      .andWhere('transaction.fecha >= :startDate', { startDate })
+      .andWhere('transaction.fecha <= :endDate', { endDate })
+      .orderBy('transaction.fecha', 'DESC')
+      .addOrderBy('transaction.hora', 'DESC')
+      .getMany();
+    
+    // Registramos algunas fechas para depuración
+    if (transactions.length > 0) {
+      console.log(`[TS] getTransactionsByDateRangeForSummary - Encontradas ${transactions.length} transacciones`);
+      console.log(`[TS] getTransactionsByDateRangeForSummary - Ejemplo de fecha en DB: ${transactions[0].fecha}`);
+    } else {
+      console.log('[TS] getTransactionsByDateRangeForSummary - No se encontraron transacciones en el rango especificado');
+    }
+    
+    return transactions;
   }
 
   async findOne(id: number): Promise<Transaction> {
@@ -169,90 +186,92 @@ export class TransactionsService {
   }
 
   async findByDateRange(startDate: string, endDate: string): Promise<Transaction[]> {
-    // Procesar fechas correctamente para evitar problemas con zona horaria
-    // Formato esperado: YYYY-MM-DD
-    const [startYear, startMonth, startDay] = startDate.split('-').map(Number);
-    const [endYear, endMonth, endDay] = endDate.split('-').map(Number);
-    
-    const start = new Date(startYear, startMonth - 1, startDay);
-    const end = new Date(endYear, endMonth - 1, endDay);
-    
-    console.log(`[TS] findByDateRange - Fecha inicio original: ${startDate}, procesada: ${start.toISOString()}`);
-    console.log(`[TS] findByDateRange - Fecha fin original: ${endDate}, procesada: ${end.toISOString()}`);
-    
-    if (isNaN(start.getTime()) || isNaN(end.getTime())) {
-      throw new BadRequestException('Fechas inválidas');
+    // Validar formato de fecha
+    if (!startDate.match(/^\d{4}-\d{2}-\d{2}$/) || !endDate.match(/^\d{4}-\d{2}-\d{2}$/)) {
+      throw new BadRequestException('Formato de fecha inválido. Use YYYY-MM-DD');
     }
     
-    return this.transactionsRepository.find({
-      where: {
-        fecha: Between(start, end),
-        estado: 1, // Solo transacciones activas
-      },
-      relations: ['usuario', 'agente', 'tipoTransaccion'],
-      order: {
-        fecha: 'DESC',
-        hora: 'DESC',
-      },
-    });
+    // Usamos QueryBuilder para tener más control sobre la consulta SQL
+    const transactions = await this.transactionsRepository
+      .createQueryBuilder('transaction')
+      .leftJoinAndSelect('transaction.usuario', 'usuario')
+      .leftJoinAndSelect('transaction.agente', 'agente')
+      .leftJoinAndSelect('transaction.tipoTransaccion', 'tipoTransaccion')
+      .where('transaction.estado = :estado', { estado: 1 })
+      .andWhere('transaction.fecha >= :startDate', { startDate })
+      .andWhere('transaction.fecha <= :endDate', { endDate })
+      .orderBy('transaction.fecha', 'DESC')
+      .addOrderBy('transaction.hora', 'DESC')
+      .getMany();
+    
+    return transactions;
   }
 
   async findByAgent(agenteId: number): Promise<Transaction[]> {
-    return this.transactionsRepository.find({
-      where: {
-        agenteId,
-        estado: 1, // Solo transacciones activas
-      },
-      relations: ['usuario', 'agente', 'tipoTransaccion'],
-      order: {
-        fecha: 'DESC',
-        hora: 'DESC',
-      },
-    });
+    // Usamos QueryBuilder para tener más control sobre la consulta SQL
+    const transactions = await this.transactionsRepository
+      .createQueryBuilder('transaction')
+      .leftJoinAndSelect('transaction.usuario', 'usuario')
+      .leftJoinAndSelect('transaction.agente', 'agente')
+      .leftJoinAndSelect('transaction.tipoTransaccion', 'tipoTransaccion')
+      .where('transaction.agenteId = :agenteId', { agenteId })
+      .andWhere('transaction.estado = :estado', { estado: 1 })
+      .orderBy('transaction.fecha', 'DESC')
+      .addOrderBy('transaction.hora', 'DESC')
+      .getMany();
+    
+    return transactions;
   }
 
   async findByTransactionType(tipoTransaccionId: number): Promise<Transaction[]> {
-    return this.transactionsRepository.find({
-      where: {
-        tipoTransaccionId,
-        estado: 1, // Solo transacciones activas
-      },
-      relations: ['usuario', 'agente', 'tipoTransaccion'],
-      order: {
-        fecha: 'DESC',
-        hora: 'DESC',
-      },
-    });
+    // Usamos QueryBuilder para tener más control sobre la consulta SQL
+    const transactions = await this.transactionsRepository
+      .createQueryBuilder('transaction')
+      .leftJoinAndSelect('transaction.usuario', 'usuario')
+      .leftJoinAndSelect('transaction.agente', 'agente')
+      .leftJoinAndSelect('transaction.tipoTransaccion', 'tipoTransaccion')
+      .where('transaction.tipoTransaccionId = :tipoTransaccionId', { tipoTransaccionId })
+      .andWhere('transaction.estado = :estado', { estado: 1 })
+      .orderBy('transaction.fecha', 'DESC')
+      .addOrderBy('transaction.hora', 'DESC')
+      .getMany();
+    
+    return transactions;
   }
 
   async findByAgentAndDateRange(agenteId: number, startDate: string, endDate: string): Promise<Transaction[]> {
-    // Procesar fechas correctamente para evitar problemas con zona horaria
-    // Formato esperado: YYYY-MM-DD
-    const [startYear, startMonth, startDay] = startDate.split('-').map(Number);
-    const [endYear, endMonth, endDay] = endDate.split('-').map(Number);
+    console.log(`[TS] findByAgentAndDateRange - Fecha inicio original: ${startDate}`);
+    console.log(`[TS] findByAgentAndDateRange - Fecha fin original: ${endDate}`);
     
-    const start = new Date(startYear, startMonth - 1, startDay);
-    const end = new Date(endYear, endMonth - 1, endDay);
-    
-    console.log(`[TS] findByAgentAndDateRange - Fecha inicio original: ${startDate}, procesada: ${start.toISOString()}`);
-    console.log(`[TS] findByAgentAndDateRange - Fecha fin original: ${endDate}, procesada: ${end.toISOString()}`);
-    
-    if (isNaN(start.getTime()) || isNaN(end.getTime())) {
-      throw new BadRequestException('Fechas inválidas');
+    // Validar formato de fecha
+    if (!startDate.match(/^\d{4}-\d{2}-\d{2}$/) || !endDate.match(/^\d{4}-\d{2}-\d{2}$/)) {
+      throw new BadRequestException('Formato de fecha inválido. Use YYYY-MM-DD');
     }
     
-    return this.transactionsRepository.find({
-      where: {
-        agenteId,
-        fecha: Between(start, end),
-        estado: 1, // Solo transacciones activas
-      },
-      relations: ['usuario', 'agente', 'tipoTransaccion'],
-      order: {
-        fecha: 'DESC',
-        hora: 'DESC',
-      },
-    });
+    // Usamos QueryBuilder para tener más control sobre la consulta SQL
+    // Al usar directamente las fechas como strings en la consulta SQL, evitamos problemas de zona horaria
+    const transactions = await this.transactionsRepository
+      .createQueryBuilder('transaction')
+      .leftJoinAndSelect('transaction.usuario', 'usuario')
+      .leftJoinAndSelect('transaction.agente', 'agente')
+      .leftJoinAndSelect('transaction.tipoTransaccion', 'tipoTransaccion')
+      .where('transaction.agenteId = :agenteId', { agenteId })
+      .andWhere('transaction.estado = :estado', { estado: 1 })
+      .andWhere('transaction.fecha >= :startDate', { startDate })
+      .andWhere('transaction.fecha <= :endDate', { endDate })
+      .orderBy('transaction.fecha', 'DESC')
+      .addOrderBy('transaction.hora', 'DESC')
+      .getMany();
+    
+    // Registramos algunas fechas para depuración
+    if (transactions.length > 0) {
+      console.log(`[TS] findByAgentAndDateRange - Encontradas ${transactions.length} transacciones`);
+      console.log(`[TS] findByAgentAndDateRange - Ejemplo de fecha en DB: ${transactions[0].fecha}`);
+    } else {
+      console.log('[TS] findByAgentAndDateRange - No se encontraron transacciones en el rango especificado');
+    }
+    
+    return transactions;
   }
 
   /**

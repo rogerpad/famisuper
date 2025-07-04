@@ -131,6 +131,14 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ open, onClose, transa
     },
     validationSchema,
     onSubmit: (values) => {
+      // Evitar múltiples envíos
+      if (createMutation.isLoading || updateMutation.isLoading) {
+        console.log('Operación en progreso, evitando doble envío');
+        return;
+      }
+      
+      console.log('Iniciando envío de formulario de transacción');
+      
       // Preparar los datos para enviar
       const transactionData: CreateTransactionDto = {
         ...values,
@@ -141,14 +149,19 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ open, onClose, transa
         estado: Number(values.estado),
       };
 
+      // Registrar los datos que se van a enviar
+      console.log('Datos a enviar:', transactionData);
+
       if (isEditing && transaction) {
         // Actualizar transacción existente
+        console.log(`Actualizando transacción con ID: ${transaction.id}`);
         updateMutation.mutate({
           id: transaction.id,
           transaction: transactionData,
         });
       } else {
         // Crear nueva transacción
+        console.log('Creando nueva transacción');
         createMutation.mutate(transactionData);
       }
     },

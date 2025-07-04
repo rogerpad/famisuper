@@ -3,6 +3,7 @@ import { Routes, Route } from 'react-router-dom';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
 import { AuthProvider } from './contexts/AuthContext';
+import TurnoProvider from './contexts/TurnoContext';
 
 // Componente de protección de rutas
 import ProtectedRoute from './components/ProtectedRoute';
@@ -27,7 +28,10 @@ import AgentClosingsList from './pages/agent-closings/AgentClosingsList';
 import AgentClosingForm from './pages/agent-closings/AgentClosingForm';
 import FormulaConfigForm from './pages/formula-configs/FormulaConfigForm';
 import TurnosList from './pages/turnos/TurnosList';
+import TurnosVendedor from './pages/turnos/TurnosVendedor';
 import VendedorDashboard from './pages/vendedor/VendedorDashboard';
+import TurnosAdmin from './pages/turnos/TurnosAdmin';
+import TurnosAdminDemo from './pages/turnos/TurnosAdminDemo';
 import Login from './pages/auth/Login';
 import NotFound from './pages/NotFound';
 
@@ -90,12 +94,16 @@ function App() {
     <ThemeProvider theme={theme}>
       <CssBaseline />
       <AuthProvider>
-        <Routes>
+        <TurnoProvider>
+          <Routes>
             {/* Rutas públicas */}
             <Route element={<AuthLayout />}>
               <Route path="/login" element={<Login />} />
             </Route>
-
+            
+            {/* Ruta de demostración de turnos - Accesible sin autenticación */}
+            <Route path="/turnos/demo" element={<TurnosAdminDemo />} />
+            
             {/* Ruta de acceso denegado (fuera de la protección) */}
             <Route path="/access-denied" element={<AccessDenied />} />
             
@@ -151,11 +159,7 @@ function App() {
                     <UsersList />
                   </ProtectedRoute>
                 } />
-                <Route path="/turnos" element={
-                  <ProtectedRoute requiredPermission="ver_turnos">
-                    <TurnosList />
-                  </ProtectedRoute>
-                } />
+                {/* Ruta de turnos eliminada para evitar duplicidad */}
                 <Route path="/provider-types" element={
                   <ProtectedRoute requiredPermission="ver_tipos_proveedor">
                     <ProviderTypesList />
@@ -172,6 +176,23 @@ function App() {
                   </ProtectedRoute>
                 } />
                 
+                {/* Rutas de administración de turnos con permisos granulares */}
+                <Route path="/turnos" element={
+                  <ProtectedRoute requiredPermission="ver_turnos">
+                    <TurnosList />
+                  </ProtectedRoute>
+                } />
+                <Route path="/turnos/admin" element={
+                  <ProtectedRoute requiredPermission="ver_turnos">
+                    <TurnosAdmin />
+                  </ProtectedRoute>
+                } />
+                <Route path="/turnos/vendedor" element={
+                  <ProtectedRoute requiredPermission="ver_turnos">
+                    <TurnosVendedor />
+                  </ProtectedRoute>
+                } />
+
                 {/* Rutas de Vendedor con permisos específicos */}
                 <Route path="/vendedor" element={
                   <ProtectedRoute requiredPermission="ver_dashboard_vendedor">
@@ -198,7 +219,8 @@ function App() {
 
             {/* Ruta 404 */}
             <Route path="*" element={<NotFound />} />
-        </Routes>
+          </Routes>
+        </TurnoProvider>
       </AuthProvider>
     </ThemeProvider>
   );

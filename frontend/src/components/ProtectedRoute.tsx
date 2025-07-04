@@ -63,8 +63,27 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ requiredPermission, chi
   
   // Si se requiere un permiso específico, verificar si el usuario lo tiene
   if (requiredPermission && !authState.permissions[requiredPermission]) {
-    // Redirigir a una página de acceso denegado o a la página principal
-    return <Navigate to="/access-denied" replace />;
+    // Verificar permisos especiales basados en el rol
+    const userRole = authState.user?.rol?.nombre;
+    
+    // Lista de permisos especiales por rol
+    const specialRolePermissions: Record<string, string[]> = {
+      'ADMIN': ['admin_turnos'] // El rol ADMIN siempre tiene acceso a admin_turnos
+      // Puedes agregar más roles y sus permisos especiales aquí
+    };
+    
+    // Verificar si el usuario tiene un rol con permisos especiales
+    const hasSpecialPermission = userRole && 
+      specialRolePermissions[userRole] && 
+      specialRolePermissions[userRole].includes(requiredPermission);
+    
+    if (hasSpecialPermission) {
+      console.log(`Permitiendo acceso a ${requiredPermission} para usuario con rol ${userRole}`);
+    } else {
+      // Redirigir a una página de acceso denegado
+      console.log(`Acceso denegado a ${requiredPermission} para usuario con rol ${userRole}`);
+      return <Navigate to="/access-denied" replace />;
+    }
   }
   
   // Si hay children, renderizarlos directamente, de lo contrario usar Outlet para rutas anidadas

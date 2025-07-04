@@ -2,7 +2,7 @@ import api from '../api';
 import agentClosingsMockApi from './agentClosingsMock';
 
 // Bandera para usar mock o API real
-const USE_MOCK = false; // Usando la API real conectada a la base de datos
+const USE_MOCK = false; // Usando la API real para obtener datos de la base de datos
 
 export interface AgentClosing {
   id: number;
@@ -80,8 +80,20 @@ export const agentClosingsApi = {
       return agentClosingsMockApi.createAgentClosing(data);
     }
     
-    const response = await api.post('/agent-closings', data);
-    return response.data;
+    // Logs detallados para depuración
+    console.log('[API] Enviando datos al backend para crear cierre:', JSON.stringify(data, null, 2));
+    console.log('[API] Valores específicos a verificar:');
+    console.log('[API] - resultadoFinal:', data.resultadoFinal, typeof data.resultadoFinal);
+    console.log('[API] - diferencia:', data.diferencia, typeof data.diferencia);
+    
+    try {
+      const response = await api.post('/agent-closings', data);
+      console.log('[API] Respuesta del backend:', response.data);
+      return response.data;
+    } catch (error: any) {
+      console.error('[API] Error al crear cierre:', error.response?.data || error.message);
+      throw error;
+    }
   },
 
   // Actualizar un cierre final de agente existente

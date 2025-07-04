@@ -15,6 +15,14 @@ interface User {
     descripcion?: string;
     activo: boolean;
   };
+  turno?: {
+    id: number;
+    nombre: string;
+    horaInicio: string;
+    horaFin: string;
+    descripcion?: string;
+    activo: boolean;
+  };
 }
 
 interface JwtPayload {

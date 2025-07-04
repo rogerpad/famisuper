@@ -1,6 +1,8 @@
 import React from 'react';
-import { Container, Typography, Grid, Card, CardContent, CardActions, Button } from '@mui/material';
+import { Container, Typography, Grid, Card, CardContent, CardActions, Button, Box, Divider } from '@mui/material';
 import { PermissionGuard, useHasPermission } from '../../components/auth/PermissionGuard';
+import TurnoStats from '../../components/TurnoStats';
+import { useTurno } from '../../contexts/TurnoContext';
 
 // Definimos los códigos de permisos para el rol de Vendedor
 export const VENDEDOR_PERMISSIONS = {
@@ -19,11 +21,21 @@ export const VENDEDOR_PERMISSIONS = {
 const VendedorDashboard: React.FC = () => {
   // Utilizamos el hook para verificar permisos específicos
   const canCreateSales = useHasPermission(VENDEDOR_PERMISSIONS.CREAR_VENTAS);
+  const { turnoActual } = useTurno();
   
   return (
     <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
       <Typography variant="h4" component="h1" gutterBottom>
         Dashboard de Vendedor
+      </Typography>
+      
+      {/* Estadísticas del turno actual */}
+      <TurnoStats />
+      
+      <Divider sx={{ my: 3 }} />
+      
+      <Typography variant="h5" component="h2" gutterBottom>
+        Acciones Rápidas
       </Typography>
       
       <Grid container spacing={3}>

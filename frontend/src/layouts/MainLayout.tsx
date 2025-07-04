@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { Outlet, useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import Copyright from '../components/Copyright';
+import TurnoIndicator from '../components/TurnoIndicator';
 import logoImage from '../assets/images/LogoFS.png';
 import { 
   AppBar, 
@@ -37,7 +38,8 @@ import {
   Payments as TransactionTypesIcon,
   PointOfSale as AgentClosingsIcon,
   Store as StoreIcon,
-  Schedule as TurnosIcon
+  Schedule as TurnosIcon,
+  AccessTime as AccessTimeIcon
 } from '@mui/icons-material';
 
 const drawerWidth = 240;
@@ -75,6 +77,7 @@ const MENU_PERMISSIONS = {
   ROLES: 'ver_roles',
   USERS: 'ver_usuarios',
   TURNOS: 'ver_turnos',
+  ADMIN_TURNOS: 'admin_turnos',
   PROVIDER_TYPES: 'ver_tipos_proveedor',
   PROVIDERS: 'ver_proveedores',
   
@@ -95,6 +98,7 @@ const ROLE_PERMISSIONS = {
     MENU_PERMISSIONS.ROLES,
     MENU_PERMISSIONS.USERS,
     MENU_PERMISSIONS.TURNOS,
+    MENU_PERMISSIONS.ADMIN_TURNOS,
     MENU_PERMISSIONS.PROVIDER_TYPES,
     MENU_PERMISSIONS.PROVIDERS
   ],
@@ -116,6 +120,12 @@ const menuItemsConfig = [
     permissionCode: MENU_PERMISSIONS.VENDEDOR_DASHBOARD 
   },
   { 
+    text: 'Mis Turnos', 
+    icon: <TurnosIcon />, 
+    path: '/turnos/vendedor', 
+    permissionCode: MENU_PERMISSIONS.TURNOS 
+  },
+  { 
     text: 'Ventas', 
     icon: <ReceiptIcon />, 
     path: '/ventas', 
@@ -135,6 +145,12 @@ const menuItemsConfig = [
   },
   
   // Menú para Administradores
+  { 
+    text: 'Administración de Turnos', 
+    icon: <AccessTimeIcon />, 
+    path: '/turnos', 
+    permissionCode: MENU_PERMISSIONS.TURNOS 
+  },
   { 
     text: 'Transacciones', 
     icon: <ReceiptIcon />, 
@@ -171,12 +187,8 @@ const menuItemsConfig = [
     path: '/users', 
     permissionCode: MENU_PERMISSIONS.USERS 
   },
-  { 
-    text: 'Gestión de Turnos', 
-    icon: <TurnosIcon />, 
-    path: '/turnos', 
-    permissionCode: MENU_PERMISSIONS.TURNOS 
-  },
+  // Entrada de menú 'Gestión de Turnos' eliminada para evitar duplicidad
+  // Solo se mantiene 'Administración de Turnos'
   { 
     text: 'Tipos de Proveedor', 
     icon: <ProviderTypesIcon />, 
@@ -302,6 +314,9 @@ const menuItemsConfig = [
               <Typography variant="body2" sx={{ mr: 1 }}>
                 {authState.user.nombre} {authState.user.apellido}
               </Typography>
+              {hasRole('Vendedor') && (
+                <TurnoIndicator />
+              )}
             </Box>
           )}
           

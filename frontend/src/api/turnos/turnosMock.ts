@@ -5,8 +5,9 @@ const mockTurnos: Turno[] = [
   {
     id: 1,
     nombre: 'Turno Mañana',
-    usuario_id: 1,
-    estado: 'Activo',
+    usuarioId: 1,
+    horaInicio: '08:00',
+    horaFin: '14:00',
     descripcion: 'Turno de 8:00 AM a 2:00 PM',
     activo: true,
     usuario: {
@@ -19,8 +20,9 @@ const mockTurnos: Turno[] = [
   {
     id: 2,
     nombre: 'Turno Tarde',
-    usuario_id: 2,
-    estado: 'Activo',
+    usuarioId: 2,
+    horaInicio: '14:00',
+    horaFin: '20:00',
     descripcion: 'Turno de 2:00 PM a 8:00 PM',
     activo: true,
     usuario: {
@@ -33,8 +35,9 @@ const mockTurnos: Turno[] = [
   {
     id: 3,
     nombre: 'Turno Noche',
-    usuario_id: 3,
-    estado: 'Inactivo',
+    usuarioId: 3,
+    horaInicio: '20:00',
+    horaFin: '08:00',
     descripcion: 'Turno de 8:00 PM a 8:00 AM',
     activo: false,
     usuario: {
@@ -65,9 +68,9 @@ const turnosMockApi = {
     return Promise.resolve({...turno});
   },
 
-  // Obtener turnos por usuario_id
+  // Obtener turnos por usuarioId
   getByUsuarioId: async (usuarioId: number): Promise<Turno[]> => {
-    const turnos = mockTurnos.filter(t => t.usuario_id === usuarioId);
+    const turnos = mockTurnos.filter(t => t.usuarioId === usuarioId);
     return Promise.resolve([...turnos]);
   },
 
@@ -76,9 +79,10 @@ const turnosMockApi = {
     const newTurno: Turno = {
       id: nextId++,
       nombre: turnoData.nombre,
-      usuario_id: turnoData.usuario_id,
-      estado: turnoData.estado || 'Disponible',
-      descripcion: turnoData.descripcion,
+      horaInicio: turnoData.horaInicio,
+      horaFin: turnoData.horaFin,
+      usuarioId: turnoData.usuarioId,
+      descripcion: turnoData.descripcion || '',
       activo: turnoData.activo ?? true,
       // Aquí normalmente se agregaría el usuario completo, pero en el mock no lo tenemos
     };
@@ -110,6 +114,21 @@ const turnosMockApi = {
     
     mockTurnos.splice(index, 1);
     return Promise.resolve();
+  },
+  
+  // Asignar usuarios a un turno (mock)
+  asignarUsuarios: async (turnoId: number, usuariosIds: number[]): Promise<void> => {
+    return Promise.resolve();
+  },
+  
+  // Obtener usuarios por turno (mock)
+  getUsuariosPorTurno: async (turnoId: number): Promise<any[]> => {
+    return Promise.resolve([]);
+  },
+  
+  // Obtener turnos por usuario (mock)
+  getTurnosPorUsuario: async (usuarioId: number): Promise<Turno[]> => {
+    return Promise.resolve([]);
   }
 };
 

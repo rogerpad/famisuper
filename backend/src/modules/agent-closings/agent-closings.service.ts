@@ -21,7 +21,10 @@ export class AgentClosingsService {
   ) {}
 
   async create(createAgentClosingDto: CreateAgentClosingDto): Promise<AgentClosing> {
-    console.log(`[CS-CREATE] Iniciando creación de cierre con datos:`, JSON.stringify(createAgentClosingDto));
+    console.log(`[CS-CREATE] Iniciando creación de cierre con datos:`, JSON.stringify(createAgentClosingDto, null, 2));
+    console.log(`[CS-CREATE] Valores específicos recibidos:`);
+    console.log(`[CS-CREATE] - resultadoFinal:`, createAgentClosingDto.resultadoFinal, typeof createAgentClosingDto.resultadoFinal);
+    console.log(`[CS-CREATE] - diferencia:`, createAgentClosingDto.diferencia, typeof createAgentClosingDto.diferencia);
     try {
       // Verificar si el proveedor existe y es de tipo agente
       const provider = await this.providersRepository.findOne({
@@ -45,12 +48,13 @@ export class AgentClosingsService {
       console.log(`[CS-CREATE] Proveedor es de tipo agente: ${provider.tipoProveedor.nombre}`);
 
       // Verificar si ya existe un cierre para este proveedor en la misma fecha
-      const existingClosing = await this.agentClosingsRepository.findOne({
-        where: {
-          proveedorId: createAgentClosingDto.proveedorId,
-          fechaCierre: new Date(createAgentClosingDto.fechaCierre),
-        },
-      });
+      // Usar la fecha directamente como string para evitar problemas de zona horaria
+      console.log(`[CS-CREATE] Verificando cierres existentes para fecha ${createAgentClosingDto.fechaCierre}`);
+      const existingClosing = await this.agentClosingsRepository
+        .createQueryBuilder('closing')
+        .where('closing.proveedor_id = :proveedorId', { proveedorId: createAgentClosingDto.proveedorId })
+        .andWhere('closing.fecha_cierre = :fechaCierre', { fechaCierre: createAgentClosingDto.fechaCierre })
+        .getOne();
 
       if (existingClosing) {
         console.error(`[CS-CREATE] Ya existe un cierre para este agente en la fecha ${createAgentClosingDto.fechaCierre}`);
@@ -82,16 +86,46 @@ export class AgentClosingsService {
         console.log(`[CS-CREATE] Estableciendo adicionalCta predeterminado a 0`);
       }
 
-      // Crear el nuevo cierre con los valores calculados
-      const newClosing = this.agentClosingsRepository.create({
-        ...createAgentClosingDto,
-        fechaCierre: new Date(createAgentClosingDto.fechaCierre),
-        resultadoFinal,
-        diferencia,
-      });
-      console.log(`[CS-CREATE] Objeto de cierre creado:`, JSON.stringify(newClosing));
+      // Crear la nueva entidad de cierre final
+      // IMPORTANTE: No convertir la fecha a objeto Date para evitar desfase de zona horaria
       
-      const savedClosing = await this.agentClosingsRepository.save(newClosing);
+      // Asegurarse de que los valores calculados se usen correctamente
+      console.log(`[CS-CREATE] Preparando valores para crear entidad:`);
+      console.log(`[CS-CREATE] - resultadoFinal calculado:`, resultadoFinal, typeof resultadoFinal);
+      console.log(`[CS-CREATE] - diferencia calculada:`, diferencia, typeof diferencia);
+      console.log(`[CS-CREATE] - resultadoFinal del DTO:`, createAgentClosingDto.resultadoFinal, typeof createAgentClosingDto.resultadoFinal);
+      
+      // Decidir qué valores usar para resultadoFinal y diferencia
+      // Si el DTO tiene valores válidos, usarlos; de lo contrario, usar los calculados
+      const finalResultadoFinal = createAgentClosingDto.resultadoFinal !== undefined && createAgentClosingDto.resultadoFinal !== null
+        ? Number(createAgentClosingDto.resultadoFinal)
+        : Number(resultadoFinal);
+        
+      const finalDiferencia = createAgentClosingDto.diferencia !== undefined && createAgentClosingDto.diferencia !== null
+        ? Number(createAgentClosingDto.diferencia)
+        : Number(diferencia);
+      
+      console.log(`[CS-CREATE] Valores finales a usar:`);
+      console.log(`[CS-CREATE] - resultadoFinal final:`, finalResultadoFinal);
+      console.log(`[CS-CREATE] - diferencia final:`, finalDiferencia);
+      
+      const newAgentClosing = this.agentClosingsRepository.create({
+        ...createAgentClosingDto,
+        // Asegurarse de que los campos numéricos sean números
+        proveedorId: Number(createAgentClosingDto.proveedorId),
+        saldoInicial: Number(createAgentClosingDto.saldoInicial) || 0,
+        adicionalCta: Number(createAgentClosingDto.adicionalCta) || 0,
+        resultadoFinal: finalResultadoFinal,
+        saldoFinal: Number(createAgentClosingDto.saldoFinal) || 0,
+        diferencia: finalDiferencia,
+        // La fecha se mantiene como string en formato 'YYYY-MM-DD'
+        fechaCierre: createAgentClosingDto.fechaCierre,
+      });
+      
+      console.log(`[CS-CREATE] Entidad de cierre creada:`, JSON.stringify(newAgentClosing, null, 2));
+      console.log(`[CS-CREATE] Guardando en base de datos...`);
+      
+      const savedClosing = await this.agentClosingsRepository.save(newAgentClosing);
       console.log(`[CS-CREATE] Cierre guardado exitosamente con ID: ${savedClosing.id}`);
       return savedClosing;
     } catch (error) {
@@ -101,23 +135,24 @@ export class AgentClosingsService {
   }
 
   async findAll(startDate?: string, endDate?: string): Promise<AgentClosing[]> {
-    let whereClause = {};
+    console.log(`[CS-FINDALL] Buscando cierres entre ${startDate || 'inicio'} y ${endDate || 'fin'}`);
     
-    // Si se proporcionan fechas, filtrar por rango de fechas
+    // Usar QueryBuilder para evitar problemas de zona horaria con las fechas
+    const queryBuilder = this.agentClosingsRepository
+      .createQueryBuilder('closing')
+      .leftJoinAndSelect('closing.proveedor', 'proveedor')
+      .orderBy('closing.fecha_cierre', 'DESC')
+      .addOrderBy('closing.proveedor_id', 'ASC');
+    
+    // Si se proporcionan fechas, filtrar por rango de fechas usando strings directamente
     if (startDate && endDate) {
-      whereClause = {
-        fechaCierre: Between(new Date(startDate), new Date(endDate)),
-      };
+      console.log(`[CS-FINDALL] Aplicando filtro de fechas: ${startDate} a ${endDate}`);
+      queryBuilder
+        .andWhere('closing.fecha_cierre >= :startDate', { startDate })
+        .andWhere('closing.fecha_cierre <= :endDate', { endDate });
     }
 
-    return this.agentClosingsRepository.find({
-      where: whereClause,
-      relations: ['proveedor'],
-      order: {
-        fechaCierre: 'DESC',
-        proveedorId: 'ASC',
-      },
-    });
+    return queryBuilder.getMany();
   }
 
   async findOne(id: number): Promise<AgentClosing> {
@@ -156,17 +191,21 @@ export class AgentClosingsService {
     }
 
     // Si se está actualizando la fecha, verificar que no exista otro cierre para el mismo proveedor en esa fecha
-    if (updateAgentClosingDto.fechaCierre && 
-        updateAgentClosingDto.fechaCierre.toString() !== closing.fechaCierre.toString()) {
-      const existingClosing = await this.agentClosingsRepository.findOne({
-        where: {
-          proveedorId: updateAgentClosingDto.proveedorId || closing.proveedorId,
-          fechaCierre: updateAgentClosingDto.fechaCierre ? new Date(updateAgentClosingDto.fechaCierre) : closing.fechaCierre,
-        },
-      });
+    if (updateAgentClosingDto.fechaCierre) {
+      console.log(`[CS-UPDATE] Verificando cierres existentes para fecha ${updateAgentClosingDto.fechaCierre}`);
+      // Usar QueryBuilder para evitar problemas de zona horaria
+      const existingClosing = await this.agentClosingsRepository
+        .createQueryBuilder('closing')
+        .where('closing.proveedor_id = :proveedorId', { 
+          proveedorId: updateAgentClosingDto.proveedorId || closing.proveedorId 
+        })
+        .andWhere('closing.fecha_cierre = :fechaCierre', { fechaCierre: updateAgentClosingDto.fechaCierre })
+        .andWhere('closing.id != :id', { id })
+        .getOne();
 
-      if (existingClosing && existingClosing.id !== id) {
-        throw new ConflictException(`Ya existe un cierre para este agente en la fecha ${updateAgentClosingDto.fechaCierre}`);
+      if (existingClosing) {
+        console.error(`[CS-UPDATE] Ya existe otro cierre para este agente en la fecha ${updateAgentClosingDto.fechaCierre}`);
+        throw new ConflictException(`Ya existe otro cierre para este agente en la fecha ${updateAgentClosingDto.fechaCierre}`);
       }
     }
     
@@ -202,10 +241,14 @@ export class AgentClosingsService {
     }
 
     // Actualizar el cierre
+    // IMPORTANTE: Mantener la fecha como string en formato 'YYYY-MM-DD' para evitar desfase de zona horaria
+    console.log(`[CS-UPDATE] Guardando cierre con fecha: ${updateAgentClosingDto.fechaCierre || format(closing.fechaCierre, 'yyyy-MM-dd')}`);
     return this.agentClosingsRepository.save({
       ...closing,
       ...updateAgentClosingDto,
-      fechaCierre: updateAgentClosingDto.fechaCierre ? new Date(updateAgentClosingDto.fechaCierre) : closing.fechaCierre,
+      // No convertir la fecha a Date para evitar el desfase de un día
+      // Si hay una nueva fecha, usarla directamente como string
+      fechaCierre: updateAgentClosingDto.fechaCierre || closing.fechaCierre,
     });
   }
 
