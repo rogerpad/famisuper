@@ -21,6 +21,7 @@ import {
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
 import turnosApi, { Turno } from '../../api/turnos/turnosApi';
 import usersApi from '../../api/users/usersApi';
+import { toValidId, isValidId } from '../../utils/validationUtils';
 
 interface AsignarUsuariosDialogProps {
   open: boolean;
@@ -42,7 +43,13 @@ const AsignarUsuariosDialog: React.FC<AsignarUsuariosDialogProps> = ({ open, onC
   // Cargar los usuarios ya asignados cuando se abre el diálogo
   useEffect(() => {
     if (open && turno && turno.usuarios) {
-      setSelectedUsuarios(turno.usuarios.map(u => u.id));
+      // Validar cada ID de usuario antes de agregarlo al array
+      const validUserIds = turno.usuarios
+        .map(u => toValidId(u.id))
+        .filter((id): id is number => id !== undefined);
+      
+      console.log('[ASIGNAR USUARIOS] IDs de usuarios cargados:', validUserIds);
+      setSelectedUsuarios(validUserIds);
     } else {
       setSelectedUsuarios([]);
     }
@@ -50,29 +57,64 @@ const AsignarUsuariosDialog: React.FC<AsignarUsuariosDialogProps> = ({ open, onC
 
   // Mutación para asignar usuarios
   const asignarUsuariosMutation = useMutation({
-    mutationFn: ({ turnoId, usuariosIds }: { turnoId: number; usuariosIds: number[] }) => 
-      turnosApi.asignarUsuarios(turnoId, usuariosIds),
+    mutationFn: ({ turnoId, usuariosIds }: { turnoId: number | string; usuariosIds: (number | string)[] }) => {
+      // Validar el ID del turno
+      const validTurnoId = toValidId(turnoId);
+      if (validTurnoId === undefined) {
+        console.error(`[ASIGNAR USUARIOS] ID de turno inválido: ${turnoId}`);
+        throw new Error(`ID de turno inválido: ${turnoId}`);
+      }
+      
+      // Validar los IDs de usuarios
+      const validUsuariosIds = usuariosIds
+        .map(id => toValidId(id))
+        .filter((id): id is number => id !== undefined);
+      
+      console.log(`[ASIGNAR USUARIOS] Asignando ${validUsuariosIds.length} usuarios al turno ${validTurnoId}`);
+      return turnosApi.asignarUsuarios(validTurnoId, validUsuariosIds);
+    },
     onSuccess: () => {
+      console.log('[ASIGNAR USUARIOS] Usuarios asignados correctamente');
       queryClient.invalidateQueries({ queryKey: ['turnos'] });
       onClose();
     },
     onError: (error: any) => {
-      console.error('Error al asignar usuarios:', error);
+      console.error('[ASIGNAR USUARIOS] Error al asignar usuarios:', error.message || error);
       setError(error.message || 'Error al asignar usuarios al turno');
     }
   });
 
   const handleChange = (event: any) => {
     const value = event.target.value;
-    setSelectedUsuarios(typeof value === 'string' ? value.split(',').map(Number) : value);
+    // Validar que los IDs seleccionados sean números válidos
+    let selectedIds: number[] = [];
+    
+    if (typeof value === 'string') {
+      // Si es un string, convertir a array de números y validar cada uno
+      selectedIds = value.split(',')
+        .map(id => toValidId(id))
+        .filter((id): id is number => id !== undefined);
+    } else if (Array.isArray(value)) {
+      // Si es un array, validar cada elemento
+      selectedIds = value
+        .map(id => toValidId(id))
+        .filter((id): id is number => id !== undefined);
+    }
+    
+    console.log('[ASIGNAR USUARIOS] IDs seleccionados:', selectedIds);
+    setSelectedUsuarios(selectedIds);
   };
 
   const handleSubmit = () => {
-    if (turno) {
+    if (turno && isValidId(turno.id)) {
+      console.log(`[ASIGNAR USUARIOS] Enviando asignación para turno ${turno.id} con ${selectedUsuarios.length} usuarios`);
       asignarUsuariosMutation.mutate({
         turnoId: turno.id,
         usuariosIds: selectedUsuarios
       });
+    } else if (turno) {
+      console.error(`[ASIGNAR USUARIOS] Intento de asignar usuarios a turno con ID inválido: ${turno.id}`);
+      setError(`ID de turno inválido: ${turno.id}`);
     }
   };
 

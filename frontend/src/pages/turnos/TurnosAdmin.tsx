@@ -112,12 +112,15 @@ const TurnosAdmin: React.FC = () => {
       setLoadingAction(true);
       await turnosApi.delete(id);
       setTurnos(turnos.filter(turno => turno.id !== id));
+      
+      // Actualizar el indicador de turno inmediatamente
+      refetchTurno(); 
+      
       setSnackbar({
         open: true,
         message: 'Turno eliminado correctamente',
         severity: 'success'
       });
-      refetchTurno(); // Actualizar el turno actual
     } catch (error) {
       console.error('Error al eliminar turno:', error);
       setSnackbar({
@@ -346,18 +349,23 @@ const TurnosAdmin: React.FC = () => {
     try {
       setLoadingAction(true);
       await turnosApi.iniciarTurno(id);
-      // Recargar los turnos para mostrar la hora de inicio actualizada
+      
+      // Actualizar la lista de turnos
       await loadTurnos();
+      
+      // Actualizar el indicador de turno inmediatamente
+      refetchTurno();
+      
       setSnackbar({
         open: true,
         message: 'Turno iniciado correctamente',
         severity: 'success'
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error al iniciar turno:', error);
       setSnackbar({
         open: true,
-        message: 'Error al iniciar el turno',
+        message: `Error al iniciar turno: ${error.message || 'Error desconocido'}`,
         severity: 'error'
       });
     } finally {
@@ -370,18 +378,23 @@ const TurnosAdmin: React.FC = () => {
     try {
       setLoadingAction(true);
       await turnosApi.finalizarTurno(id);
-      // Recargar los turnos para mostrar la hora de fin actualizada
+      
+      // Actualizar la lista de turnos
       await loadTurnos();
+      
+      // Actualizar el indicador de turno inmediatamente
+      refetchTurno();
+      
       setSnackbar({
         open: true,
         message: 'Turno finalizado correctamente',
         severity: 'success'
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error al finalizar turno:', error);
       setSnackbar({
         open: true,
-        message: 'Error al finalizar el turno',
+        message: `Error al finalizar turno: ${error.message || 'Error desconocido'}`,
         severity: 'error'
       });
     } finally {

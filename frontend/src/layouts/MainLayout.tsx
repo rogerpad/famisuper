@@ -39,7 +39,8 @@ import {
   PointOfSale as AgentClosingsIcon,
   Store as StoreIcon,
   Schedule as TurnosIcon,
-  AccessTime as AccessTimeIcon
+  AccessTime as AccessTimeIcon,
+  AttachMoney as CashCounterIcon
 } from '@mui/icons-material';
 
 const drawerWidth = 240;
@@ -78,8 +79,10 @@ const MENU_PERMISSIONS = {
   USERS: 'ver_usuarios',
   TURNOS: 'ver_turnos',
   ADMIN_TURNOS: 'admin_turnos',
+  REGISTRO_ACTIVIDAD_TURNOS: 'ver_registro_actividad_turnos',
   PROVIDER_TYPES: 'ver_tipos_proveedor',
   PROVIDERS: 'ver_proveedores',
+  DASHBOARD: 'ver_dashboard',
   
   // Permisos de Vendedor
   VENDEDOR_DASHBOARD: 'ver_dashboard_vendedor',
@@ -99,14 +102,17 @@ const ROLE_PERMISSIONS = {
     MENU_PERMISSIONS.USERS,
     MENU_PERMISSIONS.TURNOS,
     MENU_PERMISSIONS.ADMIN_TURNOS,
+    MENU_PERMISSIONS.REGISTRO_ACTIVIDAD_TURNOS,
     MENU_PERMISSIONS.PROVIDER_TYPES,
-    MENU_PERMISSIONS.PROVIDERS
+    MENU_PERMISSIONS.PROVIDERS,
+    MENU_PERMISSIONS.DASHBOARD
   ],
   VENDEDOR: [
     MENU_PERMISSIONS.VENDEDOR_DASHBOARD,
     MENU_PERMISSIONS.VENTAS,
     MENU_PERMISSIONS.CLIENTES,
-    MENU_PERMISSIONS.PRODUCTOS
+    MENU_PERMISSIONS.PRODUCTOS,
+    MENU_PERMISSIONS.DASHBOARD
   ]
 };
 
@@ -152,6 +158,12 @@ const menuItemsConfig = [
     permissionCode: MENU_PERMISSIONS.TURNOS 
   },
   { 
+    text: 'Registro de Actividad de Turnos', 
+    icon: <AccessTimeIcon />, 
+    path: '/turnos/registros-actividad', 
+    permissionCode: MENU_PERMISSIONS.REGISTRO_ACTIVIDAD_TURNOS 
+  },
+  { 
     text: 'Transacciones', 
     icon: <ReceiptIcon />, 
     path: '/transactions', 
@@ -174,6 +186,18 @@ const menuItemsConfig = [
     icon: <AssessmentIcon />, 
     path: '/reports', 
     permissionCode: MENU_PERMISSIONS.REPORTS 
+  },
+  { 
+    text: 'Contador de Efectivo', 
+    icon: <CashCounterIcon />, 
+    path: '/cash-counter', 
+    permissionCode: 'ver_contador_efectivo' 
+  },
+  { 
+    text: 'Historial de Conteos', 
+    icon: <CashCounterIcon />, 
+    path: '/cash-history', 
+    permissionCode: 'ver_contador_efectivo' 
   },
   { 
     text: 'Roles y Permisos', 
@@ -208,6 +232,7 @@ const menuItemsConfig = [
   console.log('Is Authenticated:', authState.isAuthenticated);
   console.log('User:', authState.user);
   console.log('Permissions:', authState.permissions);
+  console.log('Tiene permiso ver_registro_actividad_turnos:', hasPermission('ver_registro_actividad_turnos'));
   
   // Filtrar el menú según los permisos del usuario
   const menuItems = useMemo(() => {
@@ -308,15 +333,17 @@ const menuItemsConfig = [
             Sistema de Cierre
           </Typography>
           
+          {/* Indicador de turno - Posición destacada */}
+          <Box sx={{ flexGrow: 1, display: 'flex', justifyContent: 'center' }}>
+            <TurnoIndicator />
+          </Box>
+          
           {/* Información del usuario en la barra */}
           {authState.user && (
             <Box sx={{ display: { xs: 'none', md: 'flex' }, alignItems: 'center', mr: 2 }}>
               <Typography variant="body2" sx={{ mr: 1 }}>
                 {authState.user.nombre} {authState.user.apellido}
               </Typography>
-              {hasRole('Vendedor') && (
-                <TurnoIndicator />
-              )}
             </Box>
           )}
           

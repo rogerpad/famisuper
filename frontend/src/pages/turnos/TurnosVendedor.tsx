@@ -1,34 +1,59 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
-  Box,
-  Button,
-  Paper,
+  Container,
   Typography,
+  Grid,
   Card,
   CardContent,
   CardActions,
-  Grid,
-  Chip,
+  Button,
+  Box,
+  CircularProgress,
+  Divider,
+  Switch,
+  FormControlLabel,
   Alert,
   AlertTitle,
-  CircularProgress,
-  Divider
+  Chip,
+  Paper,
 } from '@mui/material';
 import { 
-  PlayArrow as PlayIcon,
-  Stop as StopIcon,
+  PlayArrow as PlayIcon, 
+  Stop as StopIcon, 
+  Refresh as RefreshIcon,
+  Warning as WarningIcon,
+  CheckCircle as CheckIcon,
+  Error as ErrorIcon,
   AccessTime as TimeIcon
 } from '@mui/icons-material';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import turnosApi, { Turno } from '../../api/turnos/turnosApi';
 import { useAuth } from '../../contexts/AuthContext';
+import { useTurno } from '../../contexts/TurnoContext';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
+import PermissionsDebug from '../../components/PermissionsDebug';
+import ConfirmationDialog from '../../components/ConfirmationDialog';
 
 const TurnosVendedor: React.FC = () => {
   const { state, hasPermission } = useAuth();
   const queryClient = useQueryClient();
   const userId = state.user?.id;
+  const [showDebug, setShowDebug] = useState(false);
+  
+  // Obtener la función refetchTurno del contexto de turno
+  const { refetchTurno } = useTurno();
+
+  // Estados para los diálogos de confirmación
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [dialogConfig, setDialogConfig] = useState({
+    title: '',
+    message: '',
+    confirmText: 'Confirmar',
+    confirmColor: 'primary' as 'primary' | 'secondary' | 'success' | 'error' | 'info' | 'warning',
+    icon: <WarningIcon color="warning" sx={{ fontSize: 40 }} />,
+    onConfirm: () => {}
+  });
 
   // Depuración de permisos
   console.log('Permisos disponibles:', state.permissions);
@@ -48,30 +73,116 @@ const TurnosVendedor: React.FC = () => {
     queryFn: turnosApi.getTurnoActual,
   });
 
-  // Mutaciones para iniciar y finalizar turnos
+  // Mutaciones para iniciar, finalizar y reiniciar turnos
   const iniciarTurnoMutation = useMutation({
-    mutationFn: (id: number) => turnosApi.iniciarTurno(id),
-    onSuccess: () => {
+    mutationFn: (id: number) => turnosApi.iniciarTurnoVendedor(id),
+    onSuccess: (data) => {
+      console.log('Turno iniciado exitosamente:', data);
+      // Invalidar todas las consultas relacionadas para forzar una actualización
+      // sin recargar la página completa
       queryClient.invalidateQueries({ queryKey: ['turnos'] });
       queryClient.invalidateQueries({ queryKey: ['turno', 'actual'] });
+      queryClient.invalidateQueries({ queryKey: ['turnos', 'usuario', userId] });
+      
+      // Actualizar el indicador de turno inmediatamente
+      refetchTurno();
     },
+    onError: (error: any) => {
+      console.error('Error al iniciar turno:', error);
+      alert(`Error al iniciar turno: ${error.message}`);
+    }
   });
 
   const finalizarTurnoMutation = useMutation({
-    mutationFn: (id: number) => turnosApi.finalizarTurno(id),
-    onSuccess: () => {
+    mutationFn: (id: number) => turnosApi.finalizarTurnoVendedor(id),
+    onSuccess: (data) => {
+      console.log('Turno finalizado exitosamente:', data);
+      // Invalidar todas las consultas relacionadas para forzar una actualización
+      // sin recargar la página completa
       queryClient.invalidateQueries({ queryKey: ['turnos'] });
       queryClient.invalidateQueries({ queryKey: ['turno', 'actual'] });
+      queryClient.invalidateQueries({ queryKey: ['turnos', 'usuario', userId] });
+      
+      // Actualizar el indicador de turno inmediatamente
+      refetchTurno();
     },
+    onError: (error: any) => {
+      console.error('Error al finalizar turno:', error);
+      alert(`Error al finalizar turno: ${error.message}`);
+    }
   });
 
-  // Manejadores para iniciar y finalizar turnos
+  const reiniciarTurnoMutation = useMutation({
+    mutationFn: (id: number) => turnosApi.reiniciarTurno(id),
+    onSuccess: (data) => {
+      console.log('Turno reiniciado exitosamente:', data);
+      // Invalidar todas las consultas relacionadas para forzar una actualización
+      // sin recargar la página completa
+      queryClient.invalidateQueries({ queryKey: ['turnos'] });
+      queryClient.invalidateQueries({ queryKey: ['turno', 'actual'] });
+      queryClient.invalidateQueries({ queryKey: ['turnos', 'usuario', userId] });
+      
+      // Actualizar el indicador de turno inmediatamente
+      refetchTurno();
+    },
+    onError: (error: any) => {
+      console.error('Error al reiniciar turno:', error);
+      alert(`Error al reiniciar turno: ${error.message}`);
+    }
+  });
+
+  // Manejadores para iniciar, finalizar y reiniciar turnos como vendedor
   const handleIniciarTurno = (id: number) => {
-    iniciarTurnoMutation.mutate(id);
+    // Configurar y mostrar el diálogo de confirmación
+    setDialogConfig({
+      title: 'Iniciar Turno',
+      message: '¿Estás seguro de que deseas iniciar este turno? Se registrará la hora actual como hora de inicio.',
+      confirmText: 'Iniciar',
+      confirmColor: 'success',
+      icon: <PlayIcon color="success" sx={{ fontSize: 40 }} />,
+      onConfirm: () => {
+        iniciarTurnoMutation.mutate(id);
+        setDialogOpen(false);
+      }
+    });
+    setDialogOpen(true);
   };
 
   const handleFinalizarTurno = (id: number) => {
-    finalizarTurnoMutation.mutate(id);
+    // Configurar y mostrar el diálogo de confirmación
+    setDialogConfig({
+      title: 'Finalizar Turno',
+      message: '¿Estás seguro de que deseas finalizar este turno? Se registrará la hora actual como hora de fin y el turno se marcará como inactivo.',
+      confirmText: 'Finalizar',
+      confirmColor: 'warning',
+      icon: <StopIcon color="warning" sx={{ fontSize: 40 }} />,
+      onConfirm: () => {
+        finalizarTurnoMutation.mutate(id);
+        setDialogOpen(false);
+      }
+    });
+    setDialogOpen(true);
+  };
+
+  const handleReiniciarTurno = (id: number) => {
+    // Configurar y mostrar el diálogo de confirmación
+    setDialogConfig({
+      title: 'Reiniciar Turno',
+      message: '¿Estás seguro de que deseas reiniciar este turno? Esta acción eliminará la hora de inicio y fin, permitiendo iniciar el turno nuevamente.',
+      confirmText: 'Reiniciar',
+      confirmColor: 'secondary',
+      icon: <RefreshIcon color="secondary" sx={{ fontSize: 40 }} />,
+      onConfirm: () => {
+        reiniciarTurnoMutation.mutate(id);
+        setDialogOpen(false);
+      }
+    });
+    setDialogOpen(true);
+  };
+  
+  // Manejador para cerrar el diálogo sin realizar la acción
+  const handleCloseDialog = () => {
+    setDialogOpen(false);
   };
 
   // Formatear hora para mostrar
@@ -127,9 +238,17 @@ const TurnosVendedor: React.FC = () => {
 
   return (
     <Box p={3}>
-      <Typography variant="h4" component="h1" gutterBottom>
-        Mis Turnos
-      </Typography>
+      <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
+        <Typography variant="h4" component="h1" gutterBottom>
+          Mis Turnos
+        </Typography>
+        <FormControlLabel
+          control={<Switch checked={showDebug} onChange={(e) => setShowDebug(e.target.checked)} />}
+          label="Mostrar depuración"
+        />
+      </Box>
+      
+      {showDebug && <PermissionsDebug />}
 
       {/* Turno actual (si existe) */}
       {turnoActual && (
@@ -266,50 +385,111 @@ const TurnosVendedor: React.FC = () => {
                     )}
                   </Box>
                   {/* Información de depuración */}
-                  <Box mt={1} p={1} bgcolor="#f5f5f5" borderRadius={1}>
-                    <Typography variant="caption" component="div">
-                      <strong>Debug:</strong> {' '}
-                      Permiso iniciar: {hasPermission('iniciar_turnos') ? '✅' : '❌'}, {' '}
-                      Sin hora inicio: {!turno.horaInicio ? '✅' : '❌'}, {' '}
-                      Activo: {turno.activo ? '✅' : '❌'}
-                    </Typography>
-                    <Typography variant="caption" component="div">
-                      Permiso finalizar: {hasPermission('finalizar_turnos') ? '✅' : '❌'}, {' '}
-                      Con hora inicio: {turno.horaInicio ? '✅' : '❌'}, {' '}
-                      Sin hora fin: {!turno.horaFin ? '✅' : '❌'}
-                    </Typography>
-                  </Box>
+                  {showDebug && (
+                    <Box mt={1} p={1} bgcolor="#f5f5f5" borderRadius={1}>
+                      <Typography variant="subtitle2" gutterBottom>Estado del Turno:</Typography>
+                      <Typography variant="caption" component="div">
+                        <strong>ID:</strong> {turno.id}, <strong>Activo:</strong> {turno.activo ? '✅' : '❌'}
+                      </Typography>
+                      <Typography variant="caption" component="div">
+                        <strong>Hora inicio:</strong> {turno.horaInicio || 'No establecida'}
+                      </Typography>
+                      <Typography variant="caption" component="div">
+                        <strong>Hora fin:</strong> {turno.horaFin || 'No establecida'}
+                      </Typography>
+                      
+                      <Divider sx={{ my: 1 }} />
+                      
+                      <Typography variant="subtitle2" gutterBottom>Condiciones de Botones:</Typography>
+                      <Typography variant="caption" component="div">
+                        <strong>Botón Iniciar deshabilitado si:</strong>
+                      </Typography>
+                      <Typography variant="caption" component="div">
+                        - Sin permiso iniciar_turnos: {!hasPermission('iniciar_turnos') ? '✅ (deshabilitado)' : '❌ (habilitado)'}
+                      </Typography>
+                      <Typography variant="caption" component="div">
+                        - Ya tiene hora inicio: {Boolean(turno.horaInicio) ? '✅ (deshabilitado)' : '❌ (habilitado)'}
+                      </Typography>
+                      <Typography variant="caption" component="div">
+                        - Mutación cargando: {iniciarTurnoMutation.isLoading ? '✅ (deshabilitado)' : '❌ (habilitado)'}
+                      </Typography>
+                      
+                      <Typography variant="caption" component="div" sx={{ mt: 1 }}>
+                        <strong>Botón Finalizar deshabilitado si:</strong>
+                      </Typography>
+                      <Typography variant="caption" component="div">
+                        - Sin permiso finalizar_turnos: {!hasPermission('finalizar_turnos') ? '✅ (deshabilitado)' : '❌ (habilitado)'}
+                      </Typography>
+                      <Typography variant="caption" component="div">
+                        - Sin hora inicio: {!turno.horaInicio ? '✅ (deshabilitado)' : '❌ (habilitado)'}
+                      </Typography>
+                      <Typography variant="caption" component="div">
+                        - Ya tiene hora fin: {Boolean(turno.horaFin) ? '✅ (deshabilitado)' : '❌ (habilitado)'}
+                      </Typography>
+                      <Typography variant="caption" component="div">
+                        - Mutación cargando: {finalizarTurnoMutation.isLoading ? '✅ (deshabilitado)' : '❌ (habilitado)'}
+                      </Typography>
+                    </Box>
+                  )}
                 </CardContent>
                 <CardActions sx={{ display: 'flex', justifyContent: 'center', gap: 2, mt: 1 }}>
-                  {/* Botón para iniciar turno - SIEMPRE visible */}
+                  {/* Botón para iniciar turno - Siempre visible pero deshabilitado si no tiene permiso */}
                   <Button
                     fullWidth
                     variant="contained"
                     color="success"
                     startIcon={<PlayIcon />}
                     onClick={() => handleIniciarTurno(turno.id)}
-                    disabled={Boolean(turno.horaInicio) || iniciarTurnoMutation.isLoading}
+                    disabled={!hasPermission('iniciar_turnos') || Boolean(turno.horaInicio) || iniciarTurnoMutation.isLoading}
+                    title={!hasPermission('iniciar_turnos') ? 'No tienes permiso para iniciar turnos' : ''}
                   >
-                    Iniciar
+                    {iniciarTurnoMutation.isLoading && iniciarTurnoMutation.variables === turno.id ? 'Iniciando...' : 'Iniciar'}
                   </Button>
                   
-                  {/* Botón para finalizar turno - SIEMPRE visible */}
+                  {/* Botón para finalizar turno - Siempre visible pero deshabilitado si no tiene permiso */}
                   <Button
                     fullWidth
                     variant="contained"
                     color="warning"
                     startIcon={<StopIcon />}
                     onClick={() => handleFinalizarTurno(turno.id)}
-                    disabled={!turno.horaInicio || Boolean(turno.horaFin) || finalizarTurnoMutation.isLoading}
+                    disabled={!hasPermission('finalizar_turnos') || !turno.horaInicio || Boolean(turno.horaFin) || finalizarTurnoMutation.isLoading}
+                    title={!hasPermission('finalizar_turnos') ? 'No tienes permiso para finalizar turnos' : ''}
                   >
-                    Finalizar
+                    {finalizarTurnoMutation.isLoading && finalizarTurnoMutation.variables === turno.id ? 'Finalizando...' : 'Finalizar'}
                   </Button>
+
+                  {/* Botón para reiniciar turno - Visible para usuarios con permiso reiniciar_turnos */}
+                  {hasPermission('reiniciar_turnos') && (
+                    <Button
+                      fullWidth
+                      variant="contained"
+                      color="secondary"
+                      onClick={() => handleReiniciarTurno(turno.id)}
+                      disabled={reiniciarTurnoMutation.isLoading}
+                      sx={{ mt: 1 }}
+                    >
+                      {reiniciarTurnoMutation.isLoading && reiniciarTurnoMutation.variables === turno.id ? 'Reiniciando...' : 'Reiniciar Turno'}
+                    </Button>
+                  )}
                 </CardActions>
               </Card>
             </Grid>
           ))}
         </Grid>
       </Box>
+      
+      {/* Diálogo de confirmación estilizado */}
+      <ConfirmationDialog
+        open={dialogOpen}
+        title={dialogConfig.title}
+        message={dialogConfig.message}
+        confirmText={dialogConfig.confirmText}
+        confirmColor={dialogConfig.confirmColor}
+        icon={dialogConfig.icon}
+        onConfirm={dialogConfig.onConfirm}
+        onCancel={handleCloseDialog}
+      />
     </Box>
   );
 };

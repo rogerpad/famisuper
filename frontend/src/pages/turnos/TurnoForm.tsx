@@ -23,6 +23,7 @@ import * as Yup from 'yup';
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
 import turnosApi, { Turno, CreateTurnoDto, UpdateTurnoDto } from '../../api/turnos/turnosApi';
 import usersApi from '../../api/users/usersApi';
+import { toValidId, isValidId } from '../../utils/validationUtils';
 
 interface TurnoFormProps {
   open: boolean;
@@ -63,14 +64,30 @@ const TurnoForm: React.FC<TurnoFormProps> = ({ open, onClose, turno, usuariosIds
 
   // Mutación para actualizar un turno
   const updateMutation = useMutation({
-    mutationFn: ({ id, turnoData }: { id: number; turnoData: UpdateTurnoDto }) => 
-      turnosApi.update(id, turnoData),
+    mutationFn: ({ id, turnoData }: { id: number | string; turnoData: UpdateTurnoDto }) => {
+      const validId = toValidId(id);
+      if (validId === undefined) {
+        console.error(`[TURNO FORM] ID de turno inválido para actualizar: ${id}`);
+        throw new Error(`ID de turno inválido: ${id}`);
+      }
+      
+      // Validar ID de usuario si existe
+      if (turnoData.usuariosIds) {
+        turnoData.usuariosIds = turnoData.usuariosIds
+          .map(id => toValidId(id))
+          .filter((id): id is number => id !== undefined);
+      }
+      
+      console.log(`[TURNO FORM] Actualizando turno ${validId} con datos:`, turnoData);
+      return turnosApi.update(validId, turnoData);
+    },
     onSuccess: () => {
+      console.log('[TURNO FORM] Turno actualizado correctamente');
       queryClient.invalidateQueries({ queryKey: ['turnos'] });
       onClose();
     },
     onError: (error: any) => {
-      console.error('Error en la mutación de actualización:', error);
+      console.error('[TURNO FORM] Error en la mutación de actualización:', error.message || error);
       // El error se maneja en el componente
     }
   });
@@ -82,7 +99,11 @@ const TurnoForm: React.FC<TurnoFormProps> = ({ open, onClose, turno, usuariosIds
     horaFin: turno?.horaFin || '16:00',
     descripcion: turno?.descripcion || '',
     activo: turno?.activo ?? true,
-    usuariosIds: turno?.usuarios?.map(u => u.id) || usuariosIds || [],
+    usuariosIds: turno?.usuarios
+      ? turno.usuarios
+          .map(u => toValidId(u.id))
+          .filter((id): id is number => id !== undefined)
+      : usuariosIds.filter(id => isValidId(id)) || [],
   };
 
   // Limpiar el error al cerrar el diálogo
@@ -127,22 +148,29 @@ const TurnoForm: React.FC<TurnoFormProps> = ({ open, onClose, turno, usuariosIds
       if (isNewTurno) {
         // Para crear un nuevo turno
         try {
+          console.log('[TURNO FORM] Creando nuevo turno con datos:', turnoData);
           await createMutation.mutateAsync(turnoData as CreateTurnoDto);
         } catch (error: any) {
-          console.error('Error al crear turno:', error);
+          console.error('[TURNO FORM] Error al crear turno:', error.message || error);
           setError(error.message || 'Error al crear el turno');
-          return;
         }
-      } else if (turno) {
+      } else if (turno && isValidId(turno.id)) {
         // Para actualizar un turno existente
         try {
-          await updateMutation.mutateAsync({ id: turno.id, turnoData });
+          console.log(`[TURNO FORM] Actualizando turno ${turno.id} con datos:`, turnoData);
+          await updateMutation.mutateAsync({
+            id: turno.id,
+            turnoData: turnoData as UpdateTurnoDto
+          });
         } catch (error: any) {
-          console.error('Error al actualizar turno:', error);
+          console.error('[TURNO FORM] Error al actualizar turno:', error.message || error);
           setError(error.message || 'Error al actualizar el turno');
-          return;
         }
+      } else if (turno) {
+        console.error(`[TURNO FORM] Intento de actualizar turno con ID inválido: ${turno.id}`);
+        setError(`ID de turno inválido: ${turno.id}`);
       }
+      return;
     } catch (error: any) {
       console.error('Error al procesar el formulario:', error);
       setError(error.message || 'Error al procesar el formulario');

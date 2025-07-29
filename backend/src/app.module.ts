@@ -14,6 +14,7 @@ import { FormulaConfigsModule } from './modules/formula-configs/formula-configs.
 import { MigrationModule } from './database/migrations/migration.module';
 import { PermisosModule } from './modules/permisos/permisos.module';
 import { TurnosModule } from './modules/turnos/turnos.module';
+import { CashModule } from './modules/cash/cash.module';
 
 @Module({
   imports: [
@@ -42,6 +43,7 @@ import { TurnosModule } from './modules/turnos/turnos.module';
     AgentClosingsModule,
     FormulaConfigsModule,
     TurnosModule,
+    CashModule,
   ],
 })
 export class AppModule {}

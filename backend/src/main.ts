@@ -9,12 +9,15 @@ async function bootstrap() {
       logger: ['error', 'warn', 'log', 'debug', 'verbose'],
     });
   
-  // Configuración de CORS
+  // Configuración de CORS - Permitimos cualquier origen durante desarrollo
   app.enableCors({
     origin: true, // Permitir solicitudes desde cualquier origen durante desarrollo
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
     credentials: true,
-    allowedHeaders: 'Content-Type,Authorization,Accept',
+    allowedHeaders: ['Content-Type', 'Authorization', 'Accept'],
+    exposedHeaders: ['Authorization'],
+    preflightContinue: false,
+    optionsSuccessStatus: 204,
   });
   
   // Configuración de validación global

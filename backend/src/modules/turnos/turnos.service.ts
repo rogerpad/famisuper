@@ -7,6 +7,7 @@ import { IniciarTurnoDto } from './dto/iniciar-turno.dto';
 import { FinalizarTurnoDto } from './dto/finalizar-turno.dto';
 import { Turno } from './entities/turno.entity';
 import { User } from '../users/entities/user.entity';
+import { RegistroActividad } from './entities/registro-actividad.entity';
 
 @Injectable()
 export class TurnosService {
@@ -15,6 +16,8 @@ export class TurnosService {
     private turnosRepository: Repository<Turno>,
     @InjectRepository(User)
     private usersRepository: Repository<User>,
+    @InjectRepository(RegistroActividad)
+    private registroActividadRepository: Repository<RegistroActividad>,
   ) {}
 
   async create(createTurnoDto: CreateTurnoDto): Promise<Turno> {
@@ -100,15 +103,29 @@ export class TurnosService {
 
   async findOne(id: number): Promise<Turno> {
     console.log(`[TURNOS] Buscando turno con ID ${id}`);
+    
+    // Validar que el ID sea un número válido
+    if (id === undefined || id === null || isNaN(Number(id))) {
+      console.error(`[TURNOS] ID de turno inválido: ${id}`);
+      throw new BadRequestException(`ID de turno inválido: ${id}`);
+    }
+    
     try {
+      // Convertir explícitamente a número entero para evitar problemas con NaN
+      const turnoId = parseInt(String(id), 10);
+      
+      if (isNaN(turnoId)) {
+        throw new BadRequestException(`ID de turno inválido: ${id}`);
+      }
+      
       const turno = await this.turnosRepository.findOne({ 
-        where: { id },
+        where: { id: turnoId },
         relations: ['usuarios']
       });
       
       if (!turno) {
-        console.log(`[TURNOS] Turno con ID ${id} no encontrado`);
-        throw new NotFoundException(`Turno con ID ${id} no encontrado`);
+        console.log(`[TURNOS] Turno con ID ${turnoId} no encontrado`);
+        throw new NotFoundException(`Turno con ID ${turnoId} no encontrado`);
       }
       
       console.log(`[TURNOS] Turno encontrado: ${turno.nombre}`);
@@ -312,25 +329,71 @@ export class TurnosService {
   
   // Método para obtener los usuarios asignados a un turno
   async getUsuariosPorTurno(turnoId: number): Promise<User[]> {
-    const turno = await this.turnosRepository.findOne({
-      where: { id: turnoId },
-      relations: ['usuarios']
-    });
+    console.log(`[TURNOS] Obteniendo usuarios para turno ID: ${turnoId}`);
     
-    if (!turno) {
-      throw new NotFoundException(`Turno con ID ${turnoId} no encontrado`);
+    // Validar que el ID sea un número válido
+    if (turnoId === undefined || turnoId === null || isNaN(Number(turnoId))) {
+      console.error(`[TURNOS] ID de turno inválido para getUsuariosPorTurno: ${turnoId}`);
+      throw new BadRequestException(`ID de turno inválido: ${turnoId}`);
     }
     
-    return turno.usuarios;
+    // Convertir explícitamente a número entero para evitar problemas con NaN
+    const validTurnoId = parseInt(String(turnoId), 10);
+    
+    if (isNaN(validTurnoId)) {
+      throw new BadRequestException(`ID de turno inválido: ${turnoId}`);
+    }
+    
+    try {
+      const turno = await this.turnosRepository.findOne({
+        where: { id: validTurnoId },
+        relations: ['usuarios']
+      });
+      
+      if (!turno) {
+        console.log(`[TURNOS] Turno con ID ${validTurnoId} no encontrado`);
+        throw new NotFoundException(`Turno con ID ${validTurnoId} no encontrado`);
+      }
+      
+      console.log(`[TURNOS] Encontrados ${turno.usuarios?.length || 0} usuarios para el turno ${turno.nombre}`);
+      return turno.usuarios || [];
+    } catch (error) {
+      console.error(`[TURNOS] Error al obtener usuarios por turno:`, error);
+      if (error instanceof NotFoundException || error instanceof BadRequestException) {
+        throw error;
+      }
+      throw new BadRequestException(`Error al obtener usuarios por turno: ${error.message}`);
+    }
   }
   
   // Método para obtener los turnos asignados a un usuario
   async getTurnosPorUsuario(usuarioId: number): Promise<Turno[]> {
-    const turnos = await this.turnosRepository.createQueryBuilder('turno')
-      .innerJoin('turno.usuarios', 'usuario', 'usuario.id = :usuarioId', { usuarioId })
-      .getMany();
+    console.log(`[TURNOS] Obteniendo turnos para usuario ID: ${usuarioId}`);
     
-    return turnos;
+    // Validar que el ID sea un número válido
+    if (usuarioId === undefined || usuarioId === null || isNaN(Number(usuarioId))) {
+      console.error(`[TURNOS] ID de usuario inválido para getTurnosPorUsuario: ${usuarioId}`);
+      throw new BadRequestException(`ID de usuario inválido: ${usuarioId}`);
+    }
+    
+    // Convertir explícitamente a número entero para evitar problemas con NaN
+    const validUsuarioId = parseInt(String(usuarioId), 10);
+    
+    if (isNaN(validUsuarioId)) {
+      throw new BadRequestException(`ID de usuario inválido: ${usuarioId}`);
+    }
+    
+    try {
+      const turnos = await this.turnosRepository.createQueryBuilder('turno')
+        .innerJoin('turno.usuarios', 'usuario', 'usuario.id = :usuarioId', { usuarioId: validUsuarioId })
+        .getMany();
+      
+      console.log(`[TURNOS] Encontrados ${turnos.length} turnos para el usuario ID ${validUsuarioId}`);
+      return turnos;
+    } catch (error) {
+      console.error(`[TURNOS] Error al obtener turnos por usuario:`, error);
+      throw new BadRequestException(`Error al obtener turnos por usuario: ${error.message}`);
+    }
   }
 
   // Método para iniciar un turno (actualizar la hora de inicio con la hora actual)
@@ -412,6 +475,334 @@ export class TurnosService {
       console.error(`[TURNOS] Error al finalizar turno:`, error);
       if (error instanceof NotFoundException) throw error;
       throw new BadRequestException(`Error al finalizar turno: ${error.message}`);
+    }
+  }
+
+  // Método para que un vendedor inicie su turno y registre la actividad
+  async iniciarTurnoVendedor(id: number, userId: number): Promise<Turno> {
+    console.log(`[TURNOS] Vendedor con ID ${userId} iniciando turno con ID ${id}`);
+    
+    try {
+      // Verificar que el turno existe
+      const turno = await this.findOne(id);
+      
+      if (!turno) {
+        console.log(`[TURNOS] Error: Turno con ID ${id} no encontrado`);
+        throw new NotFoundException(`Turno con ID ${id} no encontrado`);
+      }
+      
+      // Verificar que el usuario existe
+      const usuario = await this.usersRepository.findOne({ where: { id: userId } });
+      
+      if (!usuario) {
+        console.log(`[TURNOS] Error: Usuario con ID ${userId} no encontrado`);
+        throw new NotFoundException(`Usuario con ID ${userId} no encontrado`);
+      }
+      
+      // Obtener la hora actual en formato HH:MM
+      const now = new Date();
+      const currentHour = now.getHours().toString().padStart(2, '0');
+      const currentMinutes = now.getMinutes().toString().padStart(2, '0');
+      const currentTimeString = `${currentHour}:${currentMinutes}`;
+      
+      console.log(`[TURNOS] Actualizando hora de inicio del turno ${turno.nombre} a ${currentTimeString}`);
+      
+      // Actualizar el turno y marcarlo como activo
+      await this.turnosRepository.update(id, { 
+        horaInicio: currentTimeString,
+        activo: true // Al iniciar un turno, lo marcamos como activo
+      });
+      
+      // Registrar la actividad
+      await this.registroActividadRepository.save({
+        turno: { id },
+        usuario: { id: userId },
+        accion: 'iniciar',
+        descripcion: `Vendedor ${usuario.nombre} inició el turno ${turno.nombre} a las ${currentTimeString}`
+      });
+      
+      console.log(`[TURNOS] Turno ${turno.nombre} iniciado por vendedor ${usuario.nombre} y registrado en actividad`);
+      
+      // Retornar el turno actualizado
+      return this.findOne(id);
+    } catch (error) {
+      console.error(`[TURNOS] Error al iniciar turno por vendedor:`, error);
+      if (error instanceof NotFoundException) throw error;
+      throw new BadRequestException(`Error al iniciar turno: ${error.message}`);
+    }
+  }
+
+  // Método para que un vendedor finalice su turno y registre la actividad
+  async finalizarTurnoVendedor(id: number, userId: number): Promise<Turno> {
+    console.log(`[TURNOS] Vendedor con ID ${userId} finalizando turno con ID ${id}`);
+    
+    try {
+      // Verificar que el turno existe
+      const turno = await this.findOne(id);
+      
+      if (!turno) {
+        console.log(`[TURNOS] Error: Turno con ID ${id} no encontrado`);
+        throw new NotFoundException(`Turno con ID ${id} no encontrado`);
+      }
+      
+      // Verificar que el usuario existe
+      const usuario = await this.usersRepository.findOne({ where: { id: userId } });
+      
+      if (!usuario) {
+        console.log(`[TURNOS] Error: Usuario con ID ${userId} no encontrado`);
+        throw new NotFoundException(`Usuario con ID ${userId} no encontrado`);
+      }
+      
+      // Obtener la hora actual en formato HH:MM
+      const now = new Date();
+      const currentHour = now.getHours().toString().padStart(2, '0');
+      const currentMinutes = now.getMinutes().toString().padStart(2, '0');
+      const currentTimeString = `${currentHour}:${currentMinutes}`;
+      
+      console.log(`[TURNOS] Actualizando hora de fin del turno ${turno.nombre} a ${currentTimeString}`);
+      
+      // Actualizar el turno y marcarlo como inactivo
+      await this.turnosRepository.update(id, { 
+        horaFin: currentTimeString,
+        activo: false // Al finalizar un turno, lo marcamos como inactivo
+      });
+      
+      // Registrar la actividad
+      await this.registroActividadRepository.save({
+        turno: { id },
+        usuario: { id: userId },
+        accion: 'finalizar',
+        descripcion: `Vendedor ${usuario.nombre} finalizó el turno ${turno.nombre} a las ${currentTimeString}`
+      });
+      
+      console.log(`[TURNOS] Turno ${turno.nombre} finalizado por vendedor ${usuario.nombre} y registrado en actividad`);
+      
+      // Retornar el turno actualizado
+      return this.findOne(id);
+    } catch (error) {
+      console.error(`[TURNOS] Error al finalizar turno por vendedor:`, error);
+      if (error instanceof NotFoundException) throw error;
+      throw new BadRequestException(`Error al finalizar turno: ${error.message}`);
+    }
+  }
+
+  // Método para reiniciar un turno (eliminar hora de inicio y fin)
+  async reiniciarTurno(id: number, userId: number): Promise<Turno> {
+    console.log(`[TURNOS] Usuario con ID ${userId} reiniciando turno con ID ${id}`);
+    
+    try {
+      // Verificar que el turno existe
+      const turno = await this.findOne(id);
+      
+      if (!turno) {
+        console.log(`[TURNOS] Error: Turno con ID ${id} no encontrado`);
+        throw new NotFoundException(`Turno con ID ${id} no encontrado`);
+      }
+      
+      // Verificar que el usuario existe
+      const usuario = await this.usersRepository.findOne({ where: { id: userId } });
+      
+      if (!usuario) {
+        console.log(`[TURNOS] Error: Usuario con ID ${userId} no encontrado`);
+        throw new NotFoundException(`Usuario con ID ${userId} no encontrado`);
+      }
+      
+      console.log(`[TURNOS] Reiniciando turno ${turno.nombre}`);
+      
+      // Actualizar el turno: eliminar hora de inicio y fin, y marcarlo como inactivo
+      await this.turnosRepository.update(id, { 
+        horaInicio: null,
+        horaFin: null,
+        activo: false // Al reiniciar un turno, lo marcamos como inactivo
+      });
+      
+      // Registrar la actividad
+      await this.registroActividadRepository.save({
+        turno: { id },
+        usuario: { id: userId },
+        accion: 'reiniciar',
+        descripcion: `Usuario ${usuario.nombre} reinició el turno ${turno.nombre}`
+      });
+      
+      console.log(`[TURNOS] Turno ${turno.nombre} reiniciado por usuario ${usuario.nombre} y registrado en actividad`);
+      
+      // Retornar el turno actualizado
+      return this.findOne(id);
+    } catch (error) {
+      console.error(`[TURNOS] Error al reiniciar turno:`, error);
+      if (error instanceof NotFoundException) throw error;
+      throw new BadRequestException(`Error al reiniciar turno: ${error.message}`);
+    }
+  }
+
+  // Método para obtener los registros de actividad de turnos
+  async getRegistrosActividad(options?: { 
+    turnoId?: number, 
+    usuarioId?: number,
+    fechaInicio?: Date,
+    fechaFin?: Date,
+    limit?: number,
+    offset?: number
+  }): Promise<{ registros: RegistroActividad[], total: number }> {
+    console.log(`[TURNOS] Obteniendo registros de actividad con opciones:`, options);
+    
+    try {
+      // Validar opciones para evitar errores de conversión
+      const validatedOptions = {
+        ...options
+      };
+      
+      // Validación robusta para turnoId
+      if (validatedOptions?.turnoId !== undefined && validatedOptions?.turnoId !== null) {
+        const turnoIdNum = Number(validatedOptions.turnoId);
+        if (isNaN(turnoIdNum)) {
+          console.error(`[TURNOS] Error: turnoId inválido en servicio: ${validatedOptions.turnoId}`);
+          delete validatedOptions.turnoId;
+        } else {
+          // Asegurarse de que sea un entero válido
+          validatedOptions.turnoId = Math.floor(turnoIdNum);
+          console.log(`[TURNOS] turnoId validado: ${validatedOptions.turnoId}`);
+        }
+      } else {
+        delete validatedOptions.turnoId;
+      }
+      
+      // Validación robusta para usuarioId
+      if (validatedOptions?.usuarioId !== undefined && validatedOptions?.usuarioId !== null) {
+        const usuarioIdNum = Number(validatedOptions.usuarioId);
+        if (isNaN(usuarioIdNum)) {
+          console.error(`[TURNOS] Error: usuarioId inválido en servicio: ${validatedOptions.usuarioId}`);
+          delete validatedOptions.usuarioId;
+        } else {
+          // Asegurarse de que sea un entero válido
+          validatedOptions.usuarioId = Math.floor(usuarioIdNum);
+          console.log(`[TURNOS] usuarioId validado: ${validatedOptions.usuarioId}`);
+        }
+      } else {
+        delete validatedOptions.usuarioId;
+      }
+      
+      console.log(`[TURNOS] Opciones validadas:`, validatedOptions);
+      
+      // Construir query base con logging SQL
+      const queryBuilder = this.registroActividadRepository.createQueryBuilder('registro')
+        .leftJoinAndSelect('registro.turno', 'turno')
+        .leftJoinAndSelect('registro.usuario', 'usuario')
+        .orderBy('registro.fechaHora', 'DESC');
+      
+      // Imprimir la consulta SQL para depuración
+      console.log('[TURNOS] Consulta SQL base:', queryBuilder.getSql());
+      
+      // Verificar si hay registros en la tabla antes de aplicar filtros
+      const totalRegistros = await this.registroActividadRepository.count();
+      console.log(`[TURNOS] Total de registros en la tabla antes de filtrar: ${totalRegistros}`);
+      
+      // Aplicar filtros si se proporcionan y son válidos
+      if (validatedOptions?.turnoId !== undefined) {
+        queryBuilder.andWhere('registro.turno_id = :turnoId', { turnoId: validatedOptions.turnoId });
+      }
+      
+      if (validatedOptions?.usuarioId !== undefined) {
+        queryBuilder.andWhere('registro.usuario_id = :usuarioId', { usuarioId: validatedOptions.usuarioId });
+      }
+      
+      // Validar y aplicar filtros de fecha
+      if (validatedOptions?.fechaInicio && validatedOptions.fechaInicio instanceof Date && !isNaN(validatedOptions.fechaInicio.getTime())) {
+        queryBuilder.andWhere('registro.fecha_hora >= :fechaInicio', { 
+          fechaInicio: validatedOptions.fechaInicio 
+        });
+      }
+      
+      if (validatedOptions?.fechaFin && validatedOptions.fechaFin instanceof Date && !isNaN(validatedOptions.fechaFin.getTime())) {
+        queryBuilder.andWhere('registro.fecha_hora <= :fechaFin', { 
+          fechaFin: validatedOptions.fechaFin 
+        });
+      }
+      
+      // Obtener el total de registros para paginación
+      const total = await queryBuilder.getCount();
+      
+      // Validación robusta para limit
+      let limit = 10; // Valor predeterminado
+      if (validatedOptions?.limit !== undefined && validatedOptions?.limit !== null) {
+        const limitNum = Number(validatedOptions.limit);
+        if (!isNaN(limitNum) && limitNum > 0) {
+          limit = Math.min(Math.floor(limitNum), 100); // Limitar a máximo 100 registros por página
+          console.log(`[TURNOS] limit validado: ${limit}`);
+        } else {
+          console.error(`[TURNOS] Error: limit inválido en servicio: ${validatedOptions.limit}, usando valor por defecto`);
+        }
+      }
+      queryBuilder.take(limit);
+      
+      // Validación robusta para offset
+      let offset = 0; // Valor predeterminado
+      if (validatedOptions?.offset !== undefined && validatedOptions?.offset !== null) {
+        const offsetNum = Number(validatedOptions.offset);
+        if (!isNaN(offsetNum) && offsetNum >= 0) {
+          offset = Math.floor(offsetNum);
+          console.log(`[TURNOS] offset validado: ${offset}`);
+        } else {
+          console.error(`[TURNOS] Error: offset inválido en servicio: ${validatedOptions.offset}, usando valor por defecto`);
+        }
+      }
+      queryBuilder.skip(offset);
+      
+      // Imprimir la consulta SQL final con todos los filtros aplicados
+      console.log('[TURNOS] Consulta SQL final:', queryBuilder.getSql());
+      console.log('[TURNOS] Parámetros de la consulta:', queryBuilder.getParameters());
+      
+      // Ejecutar la consulta
+      const registros = await queryBuilder.getMany();
+      
+      console.log(`[TURNOS] Se encontraron ${registros.length} registros de actividad`);
+      
+      // Log detallado para depuración
+      if (registros.length === 0) {
+        console.log('[TURNOS] ALERTA: No se encontraron registros. Verificando si hay datos en la tabla...');
+        
+        // Consulta directa para verificar si hay datos en la tabla
+        const countQuery = this.registroActividadRepository.createQueryBuilder('registro')
+          .select('COUNT(*)', 'count');
+        
+        const countResult = await countQuery.getRawOne();
+        console.log(`[TURNOS] Total de registros en la tabla: ${countResult?.count || 0}`);
+        
+        // Si hay registros, obtener algunos ejemplos para diagnóstico
+        if (countResult?.count > 0) {
+          const sampleQuery = this.registroActividadRepository.createQueryBuilder('registro')
+            .leftJoinAndSelect('registro.turno', 'turno')
+            .leftJoinAndSelect('registro.usuario', 'usuario')
+            .orderBy('registro.fechaHora', 'DESC')
+            .take(3);
+          
+          const sampleRegistros = await sampleQuery.getMany();
+          console.log('[TURNOS] Ejemplos de registros en la tabla:');
+          sampleRegistros.forEach((registro, index) => {
+            console.log(`[TURNOS] Registro ${index + 1}:`, {
+              id: registro.id,
+              turnoId: registro.turno?.id,
+              usuarioId: registro.usuario?.id,
+              accion: registro.accion,
+              fechaHora: registro.fechaHora,
+              descripcion: registro.descripcion
+            });
+          });
+        }
+        
+        if (countResult?.count > 0) {
+          console.log('[TURNOS] Hay registros en la tabla pero no coinciden con los filtros aplicados');
+        } else {
+          console.log('[TURNOS] La tabla está vacía. No hay registros de actividad para mostrar.');
+        }
+      } else {
+        console.log('[TURNOS] Primeros registros encontrados:', registros.slice(0, 2));
+      }
+      
+      return { registros, total };
+    } catch (error) {
+      console.error(`[TURNOS] Error al obtener registros de actividad:`, error);
+      throw new BadRequestException(`Error al obtener registros de actividad: ${error.message}`);
     }
   }
 }

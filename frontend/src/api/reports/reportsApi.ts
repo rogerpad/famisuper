@@ -19,6 +19,11 @@ export interface TransactionReportData {
     [agenteId: string]: number;
   };
   totalEfectivo: number;
+  usuario?: {
+    id: number;
+    nombre: string;
+    username: string;
+  };
 }
 
 const reportsApi = {

@@ -31,7 +31,10 @@ import TurnosList from './pages/turnos/TurnosList';
 import TurnosVendedor from './pages/turnos/TurnosVendedor';
 import VendedorDashboard from './pages/vendedor/VendedorDashboard';
 import TurnosAdmin from './pages/turnos/TurnosAdmin';
+import RegistrosActividadTurnos from './pages/turnos/RegistrosActividadTurnos';
 import TurnosAdminDemo from './pages/turnos/TurnosAdminDemo';
+import CashCounterPage from './pages/cash/CashCounterPage';
+import CashCountHistoryPage from './pages/CashCountHistoryPage';
 import Login from './pages/auth/Login';
 import NotFound from './pages/NotFound';
 
@@ -192,6 +195,11 @@ function App() {
                     <TurnosVendedor />
                   </ProtectedRoute>
                 } />
+                <Route path="/turnos/registros-actividad" element={
+                  <ProtectedRoute requiredPermission="ver_registro_actividad_turnos">
+                    <RegistrosActividadTurnos />
+                  </ProtectedRoute>
+                } />
 
                 {/* Rutas de Vendedor con permisos específicos */}
                 <Route path="/vendedor" element={
@@ -212,6 +220,20 @@ function App() {
                 <Route path="/productos" element={
                   <ProtectedRoute requiredPermission="ver_productos">
                     <ProvidersList />
+                  </ProtectedRoute>
+                } />
+                
+                {/* Ruta para el contador de efectivo */}
+                <Route path="/cash-counter" element={
+                  <ProtectedRoute requiredPermission="ver_contador_efectivo">
+                    <CashCounterPage />
+                  </ProtectedRoute>
+                } />
+                
+                {/* Ruta para el historial de conteos de efectivo */}
+                <Route path="/cash-history" element={
+                  <ProtectedRoute requiredPermission="ver_contador_efectivo">
+                    <CashCountHistoryPage />
                   </ProtectedRoute>
                 } />
               </Route>

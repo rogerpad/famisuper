@@ -1,5 +1,9 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../../contexts/AuthContext';
+import { useTurno } from '../../contexts/TurnoContext';
+import { useQuery as useReactQuery } from '@tanstack/react-query';
+import turnosApi, { Turno } from '../../api/turnos/turnosApi';
 import {
   Box,
   Typography,
@@ -17,10 +21,7 @@ import {
   TextField,
   Alert
 } from '@mui/material';
-import {
-  FileDownload as ExportIcon,
-  Print as PrintIcon
-} from '@mui/icons-material';
+// Las importaciones de iconos han sido eliminadas ya que no se utilizan
 import { useQuery } from '@tanstack/react-query';
 import reportsApi, { TransactionReportData } from '../../api/reports/reportsApi';
 import { format } from 'date-fns';
@@ -31,7 +32,55 @@ const TransactionSummaryReport: React.FC = () => {
   const navigate = useNavigate();
   const [startDate, setStartDate] = useState<string>(format(new Date(), 'yyyy-MM-01')); // Primer día del mes actual
   const [endDate, setEndDate] = useState<string>(format(new Date(), 'yyyy-MM-dd')); // Día actual
+  const [turno, setTurno] = useState<string>(''); // Valor por defecto del turno
+  const [turnoId, setTurnoId] = useState<number | string>(''); // ID del turno seleccionado - usamos string vacío como valor por defecto
+  const [turnos, setTurnos] = useState<Turno[]>([]); // Lista de turnos disponibles
+  const [horaInicio, setHoraInicio] = useState<string>('08:00'); // Hora de inicio por defecto
+  const [horaFin, setHoraFin] = useState<string>('16:00'); // Hora de fin por defecto
+  const [usuario, setUsuario] = useState<string>(''); // Usuario que ingresó las transacciones
+  const { state: authState } = useAuth(); // Obtener el contexto de autenticación
+  const { turnoActual, loading: isLoadingTurno } = useTurno(); // Obtener el turno actual del contexto
   const reportRef = useRef<HTMLDivElement>(null);
+  
+  // Consulta para obtener los turnos disponibles
+  const { data: turnosData } = useReactQuery({
+    queryKey: ['turnos'],
+    queryFn: () => turnosApi.getAll(),
+    onSuccess: (data) => {
+      setTurnos(data);
+    }
+  });
+
+  // Efecto para establecer el usuario actual y su turno cuando se carga el componente
+  useEffect(() => {
+    if (authState.user) {
+      // Establecer el nombre del usuario
+      setUsuario(`${authState.user.nombre} ${authState.user.apellido || ''}`);
+    }
+  }, [authState.user]);
+  
+  // Efecto para establecer el turno actual desde el contexto TurnoContext
+  useEffect(() => {
+    if (turnoActual) {
+      // Usar el turno actual del contexto global
+      setTurno(turnoActual.nombre || '');
+      setTurnoId(turnoActual.id || '');
+      setHoraInicio(turnoActual.horaInicio || '08:00');
+      setHoraFin(turnoActual.horaFin || '16:00');
+    } else if (turnos.length > 0) {
+      // Si no hay turno activo pero hay turnos disponibles, usar el primero
+      setTurno(turnos[0].nombre || '');
+      setTurnoId(turnos[0].id || '');
+      setHoraInicio(turnos[0].horaInicio || '08:00');
+      setHoraFin(turnos[0].horaFin || '16:00');
+    } else {
+      // Si no hay turno activo ni turnos disponibles, usar valores por defecto
+      setTurno('');
+      setTurnoId('');
+      setHoraInicio('08:00');
+      setHoraFin('16:00');
+    }
+  }, [turnoActual, turnos]);
   
   // Consulta para obtener los datos del reporte
   const { data, isLoading, isError, refetch } = useQuery<TransactionReportData>({
@@ -39,25 +88,21 @@ const TransactionSummaryReport: React.FC = () => {
     queryFn: () => reportsApi.getTransactionSummary(startDate, endDate),
   });
 
-  // Función para exportar a Excel
-  const handleExportToExcel = async () => {
-    try {
-      const blob = await reportsApi.exportToExcel(startDate, endDate);
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `Reporte_Transacciones_${format(new Date(), 'yyyy-MM-dd')}.xlsx`;
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
-    } catch (error) {
-      console.error('Error al exportar a Excel:', error);
-    }
+  // Las funciones handleExportToExcel y handlePrint han sido eliminadas ya que no se utilizan
+
+  // Función para formatear valores monetarios
+  const formatCurrency = (value: number) => {
+    // Asegurarse de que el valor sea un número
+    const numValue = Number(value);
+    // Usar Intl.NumberFormat para formatear correctamente los números
+    return `L${new Intl.NumberFormat('es-HN', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    }).format(numValue)}`;
   };
 
-  // Función para imprimir (descargar PDF)
-  const handlePrint = async () => {
+  // Función para generar el reporte en PDF
+  const handleGenerateReport = async () => {
     try {
       if (!reportRef.current) {
         throw new Error('No se pudo encontrar el elemento del reporte');
@@ -66,10 +111,30 @@ const TransactionSummaryReport: React.FC = () => {
       // Crear una copia del elemento para no modificar el original
       const element = reportRef.current.cloneNode(true) as HTMLElement;
       
+      // Asegurarse de que los datos del usuario, turno y horario estén presentes en el reporte
+      const userInfoElement = element.querySelector('#user-info');
+      if (userInfoElement) {
+        // Actualizar la información del usuario en el elemento clonado
+        const userNameElement = userInfoElement.querySelector('#user-name');
+        if (userNameElement) {
+          userNameElement.textContent = `Usuario: ${usuario || 'No especificado'}`;
+        }
+        
+        const turnoElement = userInfoElement.querySelector('#turno-info');
+        if (turnoElement) {
+          turnoElement.textContent = `Turno: ${turno}`;
+        }
+        
+        const horarioElement = userInfoElement.querySelector('#horario-info');
+        if (horarioElement) {
+          horarioElement.textContent = `Horario: ${horaInicio} - ${horaFin}`;
+        }
+      }
+      
       // Configurar opciones para el PDF
       const opt = {
         margin: [10, 10, 10, 10],
-        filename: `Reporte_Transacciones_${format(new Date(), 'yyyy-MM-dd')}.pdf`,
+        filename: `Reporte_Transacciones_${format(new Date(), 'yyyy-MM-dd')}_${turno}.pdf`,
         image: { type: 'jpeg', quality: 0.98 },
         html2canvas: { scale: 2, useCORS: true },
         jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' }
@@ -92,22 +157,6 @@ const TransactionSummaryReport: React.FC = () => {
       console.error('Error al generar el PDF:', error);
       alert('Error al generar el PDF. Por favor, intente nuevamente.');
     }
-  };
-
-  // Función para formatear valores monetarios
-  const formatCurrency = (value: number) => {
-    // Asegurarse de que el valor sea un número
-    const numValue = Number(value);
-    // Usar Intl.NumberFormat para formatear correctamente los números
-    return `L${new Intl.NumberFormat('es-HN', {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2
-    }).format(numValue)}`;
-  };
-
-  // Función para generar el reporte
-  const handleGenerateReport = () => {
-    refetch();
   };
   
   // Función para navegar al formulario de nuevo cierre
@@ -253,8 +302,15 @@ const TransactionSummaryReport: React.FC = () => {
           Filtros del Reporte
         </Typography>
         
-        <Grid container spacing={3} alignItems="center">
-          <Grid item xs={12} md={4}>
+        {/* Definimos un estilo común para todos los campos */}
+        <Box sx={{ mb: 2 }}>
+          <Typography variant="caption" color="textSecondary">
+            * Todos los campos tienen la misma altura para mantener la alineación horizontal
+          </Typography>
+        </Box>
+        
+        <Grid container spacing={3} alignItems="flex-start">
+          <Grid item xs={12} md={3}>
             <TextField
               fullWidth
               label="Fecha Inicial"
@@ -262,10 +318,21 @@ const TransactionSummaryReport: React.FC = () => {
               value={startDate}
               onChange={(e) => setStartDate(e.target.value)}
               InputLabelProps={{ shrink: true }}
+              sx={{
+                '& .MuiInputBase-root': {
+                  bgcolor: 'rgba(255, 255, 255, 0.9)',
+                  height: '56px' // Altura fija para todos los campos
+                },
+                '& .MuiOutlinedInput-root': {
+                  '&.Mui-focused fieldset': {
+                    borderColor: '#dc7633'
+                  }
+                }
+              }}
             />
           </Grid>
           
-          <Grid item xs={12} md={4}>
+          <Grid item xs={12} md={3}>
             <TextField
               fullWidth
               label="Fecha Final"
@@ -273,6 +340,147 @@ const TransactionSummaryReport: React.FC = () => {
               value={endDate}
               onChange={(e) => setEndDate(e.target.value)}
               InputLabelProps={{ shrink: true }}
+              sx={{
+                '& .MuiInputBase-root': {
+                  bgcolor: 'rgba(255, 255, 255, 0.9)',
+                  height: '56px' // Altura fija para todos los campos
+                },
+                '& .MuiOutlinedInput-root': {
+                  '&.Mui-focused fieldset': {
+                    borderColor: '#dc7633'
+                  }
+                }
+              }}
+            />
+          </Grid>
+          
+          <Grid item xs={12} md={2}>
+            <TextField
+              fullWidth
+              label="Turno"
+              select
+              value={turnoId || ''}
+              onChange={(e) => {
+                const selectedId = e.target.value;
+                const selectedTurno = turnos.find(t => t.id === Number(selectedId));
+                if (selectedTurno) {
+                  setTurnoId(selectedTurno.id);
+                  setTurno(selectedTurno.nombre);
+                  setHoraInicio(selectedTurno.horaInicio);
+                  setHoraFin(selectedTurno.horaFin);
+                } else {
+                  setTurnoId('');
+                  setTurno('');
+                }
+              }}
+              disabled={true} // Siempre deshabilitado para usar el turno actual
+              InputLabelProps={{ shrink: true }}
+              helperText={turnoActual ? "Turno actual activo" : "No hay turno activo"}
+              sx={{
+                '& .MuiInputBase-root': {
+                  bgcolor: turnoActual ? 'rgba(76, 175, 80, 0.1)' : 'rgba(255, 255, 255, 0.9)',
+                  height: '56px' // Altura fija para todos los campos
+                },
+                '& .MuiOutlinedInput-root': {
+                  '&.Mui-focused fieldset': {
+                    borderColor: '#dc7633'
+                  }
+                },
+                '& .MuiFormHelperText-root': {
+                  color: turnoActual ? 'green' : 'inherit',
+                  position: 'absolute',
+                  top: '100%',
+                  marginTop: '2px'
+                }
+              }}
+            >
+              {turnos.map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.nombre}
+                </option>
+              ))}
+            </TextField>
+          </Grid>
+          
+          <Grid item xs={12} md={2}>
+            <TextField
+              fullWidth
+              label="Hora Inicio"
+              type="time"
+              value={horaInicio}
+              disabled={true} // Siempre deshabilitado
+              InputLabelProps={{ shrink: true }}
+              inputProps={{ step: 300 }}
+              helperText="Hora inicio del turno"
+              sx={{
+                '& .MuiInputBase-root': {
+                  bgcolor: turnoActual ? 'rgba(76, 175, 80, 0.1)' : 'rgba(255, 255, 255, 0.9)',
+                  height: '56px' // Altura fija para todos los campos
+                },
+                '& .MuiOutlinedInput-root': {
+                  '&.Mui-focused fieldset': {
+                    borderColor: '#dc7633'
+                  }
+                },
+                '& .MuiFormHelperText-root': {
+                  color: turnoActual ? 'green' : 'inherit',
+                  position: 'absolute',
+                  top: '100%',
+                  marginTop: '2px'
+                }
+              }}
+            />
+          </Grid>
+          
+          <Grid item xs={12} md={2}>
+            <TextField
+              fullWidth
+              label="Hora Fin"
+              type="time"
+              value={horaFin}
+              disabled={true} // Siempre deshabilitado
+              InputLabelProps={{ shrink: true }}
+              inputProps={{ step: 300 }}
+              helperText="Hora fin del turno"
+              sx={{
+                '& .MuiInputBase-root': {
+                  bgcolor: turnoActual ? 'rgba(76, 175, 80, 0.1)' : 'rgba(255, 255, 255, 0.9)',
+                  height: '56px' // Altura fija para todos los campos
+                },
+                '& .MuiOutlinedInput-root': {
+                  '&.Mui-focused fieldset': {
+                    borderColor: '#dc7633'
+                  }
+                },
+                '& .MuiFormHelperText-root': {
+                  color: turnoActual ? 'green' : 'inherit',
+                  position: 'absolute',
+                  top: '100%',
+                  marginTop: '2px'
+                }
+              }}
+            />
+          </Grid>
+          
+          <Grid item xs={12} md={2}>
+            <TextField
+              fullWidth
+              label="Usuario"
+              value={usuario}
+              disabled={true}
+              InputLabelProps={{ shrink: true }}
+              helperText="Usuario actual del sistema"
+              sx={{
+                '& .MuiInputBase-root': {
+                  bgcolor: 'rgba(255, 255, 255, 0.9)',
+                  height: '56px' // Altura fija para todos los campos
+                },
+                '& .MuiOutlinedInput-root': {
+                  '&.Mui-focused fieldset': {
+                    borderColor: '#dc7633'
+                  }
+                }
+              }}
             />
           </Grid>
           
@@ -282,7 +490,15 @@ const TransactionSummaryReport: React.FC = () => {
               variant="contained"
               onClick={handleGenerateReport}
               disabled={isLoading}
-              color="primary"
+              sx={{ 
+                bgcolor: '#ff9800', // Naranja
+                '&:hover': { bgcolor: '#f57c00' },
+                height: '48px',
+                fontWeight: 'medium',
+                textTransform: 'none',
+                fontSize: '1rem',
+                boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
+              }}
             >
               {isLoading ? <CircularProgress size={24} /> : 'Generar Reporte'}
             </Button>
@@ -292,9 +508,17 @@ const TransactionSummaryReport: React.FC = () => {
               fullWidth
               variant="contained"
               onClick={handleGenerarCierre}
-              sx={{ bgcolor: '#dc7633', '&:hover': { bgcolor: '#c56a2d' } }}
+              sx={{ 
+                bgcolor: '#4caf50', // Verde
+                '&:hover': { bgcolor: '#388e3c' },
+                height: '48px',
+                fontWeight: 'medium',
+                textTransform: 'none',
+                fontSize: '1rem',
+                boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
+              }}
             >
-              Generar Cierre
+              Crear Cierre
             </Button>
           </Grid>
         </Grid>
@@ -311,23 +535,6 @@ const TransactionSummaryReport: React.FC = () => {
           <Typography variant="h6">
             Resumen de Transacciones
           </Typography>
-          <Box>
-            <Button
-              variant="outlined"
-              startIcon={<ExportIcon />}
-              onClick={handleExportToExcel}
-              sx={{ mr: 1 }}
-            >
-              Exportar a Excel
-            </Button>
-            <Button
-              variant="outlined"
-              startIcon={<PrintIcon />}
-              onClick={handlePrint}
-            >
-              Imprimir
-            </Button>
-          </Box>
         </Box>
         
         <div ref={reportRef}>
@@ -335,65 +542,74 @@ const TransactionSummaryReport: React.FC = () => {
             <Typography variant="h6" align="center" gutterBottom>
               Reporte de Transacciones
             </Typography>
-            <Typography variant="subtitle1" align="center" gutterBottom>
-              Período: {startDate && startDate.match(/^\d{4}-\d{2}-\d{2}$/) 
-                ? `${startDate.split('-')[2]}/${startDate.split('-')[1]}/${startDate.split('-')[0]}` 
-                : format(new Date(startDate), 'dd/MM/yyyy')} - 
-              {endDate && endDate.match(/^\d{4}-\d{2}-\d{2}$/) 
-                ? `${endDate.split('-')[2]}/${endDate.split('-')[1]}/${endDate.split('-')[0]}` 
-                : format(new Date(endDate), 'dd/MM/yyyy')}
-            </Typography>
+            {/* Se ha eliminado el periodo de fechas del reporte */}
+            <Box id="user-info" sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 4, mt: 1, flexWrap: 'wrap' }}>
+              <Typography id="turno-info" variant="body1" sx={{ fontWeight: 'medium' }}>
+                Turno: {turno}
+              </Typography>
+              <Typography id="fecha-info" variant="body1" sx={{ fontWeight: 'medium' }}>
+                Fecha: {format(new Date(), 'dd/MM/yyyy')}
+              </Typography>
+              <Typography id="horario-info" variant="body1" sx={{ fontWeight: 'medium' }}>
+                Horario: {horaInicio} - {horaFin}
+              </Typography>
+            </Box>
+            <Box sx={{ display: 'flex', justifyContent: 'center', mt: 1 }}>
+              <Typography id="user-name" variant="body1" sx={{ fontWeight: 'medium' }}>
+                Usuario: {usuario || 'No especificado'}
+              </Typography>
+            </Box>
           </Box>
           
           <TableContainer>
-          <Table>
-            <TableHead>
-              <TableRow sx={{ bgcolor: '#dc7633' }}>
-                <TableCell sx={{ fontWeight: 'bold', color: 'white' }}>Tipo de Transacción</TableCell>
-                {filteredAgentes.map((agente) => (
-                  <TableCell key={agente.id} align="right" sx={{ fontWeight: 'bold', color: 'white' }}>
-                    {agente.nombre}
-                  </TableCell>
-                ))}
-                <TableCell align="right" sx={{ fontWeight: 'bold', color: 'white' }}>
-                  Efectivo
-                </TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {reportData.transactionTypes.map((row) => (
-                <TableRow key={row.tipoTransaccionId}>
-                  <TableCell>{row.tipoTransaccion}</TableCell>
+            <Table size="small" sx={{ '& .MuiTableCell-root': { py: 0.8 } }}>
+              <TableHead>
+                <TableRow sx={{ bgcolor: '#dc7633', '& > *': { fontSize: '0.875rem', lineHeight: 1.2, py: 0.8 } }}>
+                  <TableCell sx={{ fontWeight: 'bold', color: 'white' }}>Tipo de Transacción</TableCell>
                   {filteredAgentes.map((agente) => (
-                    <TableCell key={agente.id} align="right">
-                      {row.agentes[agente.id] > 0 
-                        ? formatCurrency(row.agentes[agente.id]) 
-                        : '-'}
+                    <TableCell key={agente.id} align="right" sx={{ fontWeight: 'bold', color: 'white' }}>
+                      {agente.nombre}
                     </TableCell>
                   ))}
-                  <TableCell align="right" sx={{ bgcolor: 'hsl(23, 40%, 73%)' }}>
-                    {calcularTotalPorTipo(row) > 0 ? formatCurrency(calcularTotalPorTipo(row)) : '-'}
+                  <TableCell align="right" sx={{ fontWeight: 'bold', color: 'white' }}>
+                    Efectivo
                   </TableCell>
                 </TableRow>
-              ))}
-            </TableBody>
-            <TableFooter>
-              <TableRow sx={{ '& .MuiTableCell-root': { fontWeight: 'bold', bgcolor: 'primary.light', color: 'white' } }}>
-                <TableCell>TOTAL</TableCell>
-                {filteredAgentes.map((agente) => (
-                  <TableCell key={agente.id} align="right">
-                    {calcularTotalPorAgente(agente.id) > 0 
-                      ? formatCurrency(calcularTotalPorAgente(agente.id)) 
-                      : 'L0.00'}
-                  </TableCell>
+              </TableHead>
+              <TableBody>
+                {reportData.transactionTypes.map((row) => (
+                  <TableRow key={row.tipoTransaccionId} sx={{ '& > *': { fontSize: '0.875rem', lineHeight: 1.2 } }}>
+                    <TableCell>{row.tipoTransaccion}</TableCell>
+                    {filteredAgentes.map((agente) => (
+                      <TableCell key={agente.id} align="right">
+                        {row.agentes[agente.id] > 0 
+                          ? formatCurrency(row.agentes[agente.id]) 
+                          : '-'}
+                      </TableCell>
+                    ))}
+                    <TableCell align="right" sx={{ bgcolor: 'hsl(23, 40%, 73%)' }}>
+                      {calcularTotalPorTipo(row) > 0 ? formatCurrency(calcularTotalPorTipo(row)) : '-'}
+                    </TableCell>
+                  </TableRow>
                 ))}
-                <TableCell align="right" sx={{ bgcolor: 'hsl(23, 40%, 73%)', color: 'black', fontWeight: 'bold' }}>
-                  {formatCurrency(calcularTotalEfectivo())}
-                </TableCell>
-              </TableRow>
-            </TableFooter>
-          </Table>
-        </TableContainer>
+              </TableBody>
+              <TableFooter>
+                <TableRow sx={{ '& .MuiTableCell-root': { fontWeight: 'bold', bgcolor: 'primary.light', color: 'white', fontSize: '0.875rem', lineHeight: 1.2, py: 0.8 } }}>
+                  <TableCell>TOTAL</TableCell>
+                  {filteredAgentes.map((agente) => (
+                    <TableCell key={agente.id} align="right">
+                      {calcularTotalPorAgente(agente.id) > 0 
+                        ? formatCurrency(calcularTotalPorAgente(agente.id)) 
+                        : 'L0.00'}
+                    </TableCell>
+                  ))}
+                  <TableCell align="right" sx={{ bgcolor: 'hsl(23, 40%, 73%)', color: 'black', fontWeight: 'bold' }}>
+                    {formatCurrency(calcularTotalEfectivo())}
+                  </TableCell>
+                </TableRow>
+              </TableFooter>
+            </Table>
+          </TableContainer>
         </div>
       </Paper>
     </Box>

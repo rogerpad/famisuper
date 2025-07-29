@@ -177,7 +177,7 @@ const FormulaConfigForm: React.FC = () => {
         </Alert>
         
         <TableContainer>
-          <Table>
+          <Table size="small" sx={{ '& .MuiTableCell-root': { py: 1 } }}>
             <TableHead>
               <TableRow>
                 <TableCell>Tipo de Transacción</TableCell>
@@ -202,6 +202,8 @@ const FormulaConfigForm: React.FC = () => {
                         checked={config.incluirEnCalculo}
                         onChange={(e) => handleIncluirChange(config.tipoTransaccionId, e.target.checked)}
                         color="primary"
+                        size="small"
+                        sx={{ p: 0 }}
                       />
                     </TableCell>
                     <TableCell align="center">
@@ -216,8 +218,8 @@ const FormulaConfigForm: React.FC = () => {
                         </Select>
                       </FormControl>
                       <Tooltip title="Este factor determina si el valor de la transacción se suma o resta en el cálculo del Resultado Final">
-                        <IconButton size="small" sx={{ ml: 1 }}>
-                          <InfoIcon fontSize="small" />
+                        <IconButton size="small" sx={{ ml: 0.5, p: 0.5 }}>
+                          <InfoIcon sx={{ fontSize: '0.9rem' }} />
                         </IconButton>
                       </Tooltip>
                     </TableCell>
@@ -227,10 +229,12 @@ const FormulaConfigForm: React.FC = () => {
                         onChange={(e) => handleSumaTotalChange(config.tipoTransaccionId, e.target.checked)}
                         color="secondary"
                         disabled={!config.incluirEnCalculo}
+                        size="small"
+                        sx={{ p: 0 }}
                       />
                       <Tooltip title="Si está activado, se sumarán todas las transacciones de este tipo sin importar a qué agente pertenecen, y con ese valor total se realizará el cálculo del Resultado Final">
-                        <IconButton size="small" sx={{ ml: 1 }}>
-                          <InfoIcon fontSize="small" />
+                        <IconButton size="small" sx={{ ml: 0.5, p: 0.5 }}>
+                          <InfoIcon sx={{ fontSize: '0.9rem' }} />
                         </IconButton>
                       </Tooltip>
                     </TableCell>

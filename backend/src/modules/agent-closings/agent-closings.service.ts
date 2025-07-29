@@ -209,8 +209,14 @@ export class AgentClosingsService {
       }
     }
     
-    // Si se actualiza la fecha o el proveedor, recalcular el resultado final
-    if (updateAgentClosingDto.fechaCierre || updateAgentClosingDto.proveedorId) {
+    // Verificar si resultadoFinal viene definido explícitamente desde el frontend
+    const resultadoFinalExplicito = updateAgentClosingDto.resultadoFinal !== undefined;
+    console.log(`[CS-UPDATE] resultadoFinal explícito desde frontend: ${resultadoFinalExplicito ? 'SÍ' : 'NO'}`);
+    
+    // Si se actualiza la fecha o el proveedor Y no viene resultadoFinal explícito, recalcular el resultado final
+    if ((updateAgentClosingDto.fechaCierre || updateAgentClosingDto.proveedorId) && !resultadoFinalExplicito) {
+      console.log(`[CS-UPDATE] Recalculando resultadoFinal en backend porque no viene explícito desde frontend`);
+      
       const proveedorId = updateAgentClosingDto.proveedorId || closing.proveedorId;
       const fechaCierre = updateAgentClosingDto.fechaCierre 
         ? new Date(updateAgentClosingDto.fechaCierre) 
@@ -226,14 +232,24 @@ export class AgentClosingsService {
         endDate
       );
       
-      // Actualizar el resultado final
+      // Actualizar el resultado final solo si no viene explícito desde el frontend
       updateAgentClosingDto.resultadoFinal = resultadoFinal;
+      console.log(`[CS-UPDATE] resultadoFinal recalculado en backend: ${resultadoFinal}`);
       
       // Calcular la diferencia si tenemos saldoFinal
       if (updateAgentClosingDto.saldoFinal !== undefined) {
         updateAgentClosingDto.diferencia = updateAgentClosingDto.saldoFinal - resultadoFinal;
       } else if (closing.saldoFinal !== undefined) {
         updateAgentClosingDto.diferencia = closing.saldoFinal - resultadoFinal;
+      }
+    } else if (resultadoFinalExplicito) {
+      console.log(`[CS-UPDATE] Respetando resultadoFinal enviado desde frontend: ${updateAgentClosingDto.resultadoFinal}`);
+      
+      // Si viene resultadoFinal explícito, calcular la diferencia si tenemos saldoFinal
+      if (updateAgentClosingDto.saldoFinal !== undefined) {
+        updateAgentClosingDto.diferencia = updateAgentClosingDto.saldoFinal - updateAgentClosingDto.resultadoFinal;
+      } else if (closing.saldoFinal !== undefined) {
+        updateAgentClosingDto.diferencia = closing.saldoFinal - updateAgentClosingDto.resultadoFinal;
       }
     } else if (updateAgentClosingDto.saldoFinal !== undefined && closing.resultadoFinal !== undefined) {
       // Si solo se actualiza el saldo final, recalcular la diferencia
@@ -243,13 +259,80 @@ export class AgentClosingsService {
     // Actualizar el cierre
     // IMPORTANTE: Mantener la fecha como string en formato 'YYYY-MM-DD' para evitar desfase de zona horaria
     console.log(`[CS-UPDATE] Guardando cierre con fecha: ${updateAgentClosingDto.fechaCierre || format(closing.fechaCierre, 'yyyy-MM-dd')}`);
-    return this.agentClosingsRepository.save({
+    
+    // Asegurar que proveedorId se actualice correctamente si viene definido
+    const proveedorIdExplicito = updateAgentClosingDto.proveedorId !== undefined;
+    if (proveedorIdExplicito) {
+      console.log(`[CS-UPDATE] Respetando proveedorId enviado desde frontend: ${updateAgentClosingDto.proveedorId}`);
+    }
+    
+    // Crear un objeto de actualización limpio para evitar sobrescrituras no deseadas
+    const updateData = {};
+    
+    // Si no se está actualizando la fecha, mantener la fecha original
+    // Esto evita que la fecha interfiera con otras actualizaciones
+    if (updateAgentClosingDto.fechaCierre) {
+      updateData['fechaCierre'] = updateAgentClosingDto.fechaCierre;
+    } else {
+      updateData['fechaCierre'] = closing.fechaCierre;
+    }
+    
+    // SOLUCIÓN ESPECÍFICA PARA PROVEEDORID
+    // Si se está actualizando el proveedorId, asegurarse de que se guarde como número
+    if (proveedorIdExplicito) {
+      const newProveedorId = Number(updateAgentClosingDto.proveedorId);
+      updateData['proveedorId'] = newProveedorId;
+      console.warn(`[CS-UPDATE] PROVEEDOR ID EXPLÍCITO: ${newProveedorId} (tipo: ${typeof newProveedorId})`);
+      
+      // Actualizar directamente en la base de datos para asegurar que se actualice
+      // PostgreSQL usa $1, $2, etc. para los parámetros, no signos de interrogación
+      await this.agentClosingsRepository.query(
+        `UPDATE tbl_cierre_final_agentes SET proveedor_id = $1 WHERE id = $2`,
+        [newProveedorId, id]
+      );
+      console.warn(`[CS-UPDATE] PROVEEDOR ID ACTUALIZADO DIRECTAMENTE EN LA BASE DE DATOS`);
+    }
+    
+    // Si se está actualizando el resultadoFinal, asegurarse de que se guarde como número
+    if (resultadoFinalExplicito) {
+      updateData['resultadoFinal'] = Number(updateAgentClosingDto.resultadoFinal);
+      console.log(`[CS-UPDATE] Guardando resultadoFinal: ${updateData['resultadoFinal']}`);
+    }
+    
+    // Copiar otros campos del DTO de actualización
+    if (updateAgentClosingDto.saldoFinal !== undefined) {
+      updateData['saldoFinal'] = Number(updateAgentClosingDto.saldoFinal);
+    }
+    
+    if (updateAgentClosingDto.diferencia !== undefined) {
+      updateData['diferencia'] = Number(updateAgentClosingDto.diferencia);
+    }
+    
+    if (updateAgentClosingDto.adicionalCta !== undefined) {
+      updateData['adicionalCta'] = Number(updateAgentClosingDto.adicionalCta);
+    }
+    
+    if (updateAgentClosingDto.saldoInicial !== undefined) {
+      updateData['saldoInicial'] = Number(updateAgentClosingDto.saldoInicial);
+    }
+    
+    console.log(`[CS-UPDATE] Objeto final para actualizar:`, JSON.stringify(updateData, null, 2));
+    
+    // Guardar la actualización con los campos explícitamente definidos
+    const updatedClosing = await this.agentClosingsRepository.save({
       ...closing,
-      ...updateAgentClosingDto,
-      // No convertir la fecha a Date para evitar el desfase de un día
-      // Si hay una nueva fecha, usarla directamente como string
-      fechaCierre: updateAgentClosingDto.fechaCierre || closing.fechaCierre,
+      ...updateData,
     });
+    
+    // Verificar que el proveedor se haya actualizado correctamente
+    if (proveedorIdExplicito) {
+      const verifiedClosing = await this.agentClosingsRepository.findOne({
+        where: { id }
+      });
+      console.warn(`[CS-UPDATE] VERIFICACIÓN FINAL - proveedorId en base de datos: ${verifiedClosing.proveedorId}`);
+    }
+    
+    return updatedClosing;
   }
 
   async remove(id: number): Promise<void> {

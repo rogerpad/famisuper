@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
+import { useTurno } from '../../contexts/TurnoContext';
+import turnosApi from '../../api/turnos/turnosApi';
 import {
   Box, Button, Typography, Paper, Table, TableBody, TableCell,
   TableContainer, TableHead, TableRow, IconButton, Chip,
@@ -20,10 +22,12 @@ import { agentClosingsApi } from '../../api/agent-closings/agentClosingsApi';
 const AgentClosingsList = () => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const { turnoActual, refetchTurno } = useTurno();
   const [startDate, setStartDate] = useState<Date | null>(null);
   const [endDate, setEndDate] = useState<Date | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [selectedClosingId, setSelectedClosingId] = useState<number | null>(null);
+  const [finalizarTurnoDialogOpen, setFinalizarTurnoDialogOpen] = useState(false);
 
   // Formatear fechas para la API
   const formattedStartDate = startDate ? format(startDate, 'yyyy-MM-dd') : undefined;
@@ -44,6 +48,21 @@ const AgentClosingsList = () => {
       queryClient.invalidateQueries({ queryKey: ['agentClosings'] });
     },
   });
+  
+  // Mutación para finalizar turno
+  const finalizarTurnoMutation = useMutation({
+    mutationFn: (id: number) => turnosApi.finalizarTurno(id),
+    onSuccess: () => {
+      setFinalizarTurnoDialogOpen(false);
+      refetchTurno(); // Actualizar el contexto de turno
+      queryClient.invalidateQueries({ queryKey: ['turnos'] });
+      alert('Turno finalizado con éxito');
+    },
+    onError: (error) => {
+      console.error('Error al finalizar turno:', error);
+      alert('Error al finalizar el turno. Por favor, inténtelo de nuevo.');
+    }
+  });
 
   // Manejadores de eventos
   const handleAddClick = () => {
@@ -51,7 +70,7 @@ const AgentClosingsList = () => {
   };
 
   const handleEditClick = (id: number) => {
-    navigate(`/agent-closings/${id}`);
+    navigate(`/agent-closings/edit/${id}`);
   };
 
   const handleDeleteClick = (id: number) => {
@@ -68,6 +87,24 @@ const AgentClosingsList = () => {
   const handleDeleteCancel = () => {
     setDeleteDialogOpen(false);
     setSelectedClosingId(null);
+  };
+
+  // Manejadores para finalizar turno
+  const handleFinalizarTurnoClick = () => {
+    setFinalizarTurnoDialogOpen(true);
+  };
+
+  const handleFinalizarTurnoConfirm = () => {
+    if (turnoActual?.id) {
+      finalizarTurnoMutation.mutate(turnoActual.id);
+    } else {
+      alert('No hay un turno activo para finalizar');
+      setFinalizarTurnoDialogOpen(false);
+    }
+  };
+
+  const handleFinalizarTurnoCancel = () => {
+    setFinalizarTurnoDialogOpen(false);
   };
 
   // Formatear moneda
@@ -95,20 +132,38 @@ const AgentClosingsList = () => {
           <span role="img" aria-label="closings-icon" style={{ fontSize: '1.2em' }}>📊</span>
           Cierres Finales de Agentes
         </Typography>
-        <Button
-          variant="contained"
-          startIcon={<AddIcon />}
-          onClick={() => navigate('/agent-closings/new')}
-          sx={{
-            backgroundColor: '#dc7633',
-            '&:hover': {
-              backgroundColor: '#b35c20'
-            },
-            boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
-          }}
-        >
-          Nuevo Cierre
-        </Button>
+        <Box display="flex" gap={2}>
+          {turnoActual && (
+            <Button
+              variant="contained"
+              color="secondary"
+              onClick={handleFinalizarTurnoClick}
+              disabled={finalizarTurnoMutation.isLoading || !turnoActual}
+              sx={{
+                backgroundColor: '#2e86c1',
+                '&:hover': {
+                  backgroundColor: '#1a5276'
+                },
+              }}
+            >
+              {finalizarTurnoMutation.isLoading ? 'Finalizando...' : 'Finalizar Turno'}
+            </Button>
+          )}
+          <Button
+            variant="contained"
+            startIcon={<AddIcon />}
+            onClick={() => navigate('/agent-closings/new')}
+            sx={{
+              backgroundColor: '#dc7633',
+              '&:hover': {
+                backgroundColor: '#b35c20'
+              },
+              boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+            }}
+          >
+            Nuevo Cierre
+          </Button>
+        </Box>
       </Box>
 
       <Paper sx={{ 
@@ -174,7 +229,18 @@ const AgentClosingsList = () => {
           borderRadius: '8px',
           boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
           border: '1px solid rgba(0,0,0,0.05)',
-          overflow: 'hidden'
+          overflow: 'auto',  // Cambiado de 'hidden' a 'auto' para permitir scroll
+          maxWidth: '100%',  // Asegurar que no exceda el ancho del contenedor padre
+          '&::-webkit-scrollbar': {
+            height: '8px',  // Altura de la barra de desplazamiento horizontal
+          },
+          '&::-webkit-scrollbar-thumb': {
+            backgroundColor: '#dc7633',  // Color del pulgar de la barra de desplazamiento
+            borderRadius: '4px',
+          },
+          '&::-webkit-scrollbar-track': {
+            backgroundColor: '#f5f5f5',  // Color de la pista de la barra de desplazamiento
+          }
         }}>
           <Table>
             <TableHead sx={{ backgroundColor: '#f5f5f5' }}>
@@ -214,7 +280,7 @@ const AgentClosingsList = () => {
                       <IconButton
                         size="small"
                         color="primary"
-                        onClick={() => navigate(`/agent-closings/${closing.id}`)}
+                        onClick={() => handleEditClick(closing.id)}
                       >
                         <EditIcon fontSize="small" />
                       </IconButton>
@@ -248,7 +314,7 @@ const AgentClosingsList = () => {
         <DialogTitle>Confirmar eliminación</DialogTitle>
         <DialogContent>
           <DialogContentText>
-            ¿Está seguro de que desea eliminar este cierre final? Esta acción no se puede deshacer.
+            ¿Está seguro de que desea eliminar este cierre? Esta acción no se puede deshacer.
           </DialogContentText>
         </DialogContent>
         <DialogActions>
@@ -256,11 +322,43 @@ const AgentClosingsList = () => {
             Cancelar
           </Button>
           <Button 
-            onClick={handleDeleteConfirm} 
-            color="error" 
+            onClick={() => selectedClosingId && deleteMutation.mutate(selectedClosingId)}
+            color="error"
             disabled={deleteMutation.isLoading}
           >
             {deleteMutation.isLoading ? 'Eliminando...' : 'Eliminar'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Diálogo de confirmación para finalizar turno */}
+      <Dialog
+        open={finalizarTurnoDialogOpen}
+        onClose={handleFinalizarTurnoCancel}
+      >
+        <DialogTitle>Confirmar finalización de turno</DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            ¿Está seguro de que desea finalizar el turno actual? Esta acción no se puede deshacer.
+            {turnoActual && (
+              <Box mt={2}>
+                <Typography variant="subtitle2">Detalles del turno:</Typography>
+                <Typography variant="body2">ID: {turnoActual.id}</Typography>
+                <Typography variant="body2">Nombre: {turnoActual.nombre}</Typography>
+                <Typography variant="body2">Hora inicio: {turnoActual.horaInicio || 'No registrada'}</Typography>
+                <Typography variant="body2">Hora fin programada: {turnoActual.horaFin || 'No definida'}</Typography>
+              </Box>
+            )}
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleFinalizarTurnoCancel}>Cancelar</Button>
+          <Button 
+            onClick={handleFinalizarTurnoConfirm}
+            color="primary"
+            disabled={finalizarTurnoMutation.isLoading}
+          >
+            {finalizarTurnoMutation.isLoading ? 'Finalizando...' : 'Finalizar Turno'}
           </Button>
         </DialogActions>
       </Dialog>

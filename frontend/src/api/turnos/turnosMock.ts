@@ -129,6 +129,64 @@ const turnosMockApi = {
   // Obtener turnos por usuario (mock)
   getTurnosPorUsuario: async (usuarioId: number): Promise<Turno[]> => {
     return Promise.resolve([]);
+  },
+  
+  // Iniciar un turno (actualizar la hora de inicio con la hora actual)
+  iniciarTurno: async (id: number): Promise<Turno> => {
+    const index = mockTurnos.findIndex(t => t.id === id);
+    if (index === -1) {
+      return Promise.reject(new Error('Turno no encontrado'));
+    }
+    
+    mockTurnos[index] = {
+      ...mockTurnos[index],
+      horaInicio: new Date().toTimeString().slice(0, 5)
+    };
+    
+    return Promise.resolve({...mockTurnos[index]});
+  },
+  
+  // Finalizar un turno (actualizar la hora de fin con la hora actual)
+  finalizarTurno: async (id: number): Promise<Turno> => {
+    const index = mockTurnos.findIndex(t => t.id === id);
+    if (index === -1) {
+      return Promise.reject(new Error('Turno no encontrado'));
+    }
+    
+    mockTurnos[index] = {
+      ...mockTurnos[index],
+      horaFin: new Date().toTimeString().slice(0, 5)
+    };
+    
+    return Promise.resolve({...mockTurnos[index]});
+  },
+  
+  // Iniciar un turno como vendedor (actualizar la hora de inicio con la hora actual)
+  iniciarTurnoVendedor: async (id: number): Promise<Turno> => {
+    // Reutilizamos la lógica de iniciarTurno
+    return turnosMockApi.iniciarTurno(id);
+  },
+  
+  // Finalizar un turno como vendedor (actualizar la hora de fin con la hora actual)
+  finalizarTurnoVendedor: async (id: number): Promise<Turno> => {
+    // Reutilizamos la lógica de finalizarTurno
+    return turnosMockApi.finalizarTurno(id);
+  },
+  
+  // Reiniciar un turno (eliminar hora de inicio y fin)
+  reiniciarTurno: async (id: number): Promise<Turno> => {
+    const index = mockTurnos.findIndex(t => t.id === id);
+    if (index === -1) {
+      return Promise.reject(new Error('Turno no encontrado'));
+    }
+    
+    mockTurnos[index] = {
+      ...mockTurnos[index],
+      horaInicio: '',
+      horaFin: ''
+    };
+    
+    return Promise.resolve({...mockTurnos[index]});
   }
 };
 

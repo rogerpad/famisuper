@@ -9,6 +9,8 @@ const api = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
+  // Habilitar credenciales para solicitudes CORS
+  withCredentials: true,
   // Asegurar que los datos se serialicen correctamente
   transformRequest: [(data, headers) => {
     // Si los datos ya son una cadena (probablemente ya JSON.stringify), devolverlos tal cual
@@ -63,6 +65,32 @@ api.interceptors.response.use(
     } else if (error.request) {
       console.error('Error de red, no se recibió respuesta:', error.request);
     } else {
+      console.error('Error al configurar la solicitud:', error.message);
+    }
+    
+    return Promise.reject(error);
+  }
+);
+
+// Interceptor para manejar errores
+api.interceptors.response.use(
+  (response) => {
+    return response;
+  },
+  (error) => {
+    // Mostrar información detallada sobre el error en la consola para depuración
+    console.error('Error en la solicitud API:', error);
+    
+    if (error.response) {
+      // El servidor respondió con un código de estado fuera del rango 2xx
+      console.error('Respuesta del servidor:', error.response.data);
+      console.error('Código de estado:', error.response.status);
+      console.error('Cabeceras:', error.response.headers);
+    } else if (error.request) {
+      // La solicitud se realizó pero no se recibió respuesta
+      console.error('No se recibió respuesta del servidor', error.request);
+    } else {
+      // Algo ocurrió al configurar la solicitud que desencadenó un error
       console.error('Error al configurar la solicitud:', error.message);
     }
     

@@ -21,6 +21,7 @@ export interface AgentClosing {
   estado: string;
   fechaCreacion: string;
   fechaActualizacion: string;
+  turnoId?: number; // ID del turno asociado al cierre
 }
 
 export interface CreateAgentClosingDto {
@@ -33,6 +34,7 @@ export interface CreateAgentClosingDto {
   diferencia: number;
   observaciones?: string;
   estado?: string;
+  turnoId?: number; // ID del turno asociado al cierre
 }
 
 export interface UpdateAgentClosingDto extends Partial<CreateAgentClosingDto> {}
@@ -96,14 +98,43 @@ export const agentClosingsApi = {
     }
   },
 
-  // Actualizar un cierre final de agente existente
+  // Actualizar un cierre final de agente
   updateAgentClosing: async (id: number, data: UpdateAgentClosingDto): Promise<AgentClosing> => {
-    if (USE_MOCK) {
-      return agentClosingsMockApi.updateAgentClosing(id, data);
+    console.log('[AGENT_CLOSINGS_API] Actualizando cierre final con ID:', id);
+    console.log('[AGENT_CLOSINGS_API] Datos recibidos:', data);
+    
+    // Validar el ID
+    if (!id || isNaN(id) || id <= 0) {
+      console.error('[AGENT_CLOSINGS_API] ID de cierre final inválido:', id);
+      throw new Error(`ID de cierre final inválido: ${id}`);
     }
     
-    const response = await api.patch(`/agent-closings/${id}`, data);
-    return response.data;
+    try {
+      // SOLUCIÓN SIMPLIFICADA: Asegurar que proveedorId y resultadoFinal sean números válidos
+      const updateData = {
+        ...data,
+        // Convertir explícitamente a número si están presentes
+        proveedorId: data.proveedorId !== undefined ? Number(data.proveedorId) : undefined,
+        resultadoFinal: data.resultadoFinal !== undefined ? Number(data.resultadoFinal) : undefined
+      };
+      
+      // Logs detallados para verificar los valores críticos - Usando console.warn para que sean más visibles
+      console.warn('======== VERIFICACIÓN DE VALORES CRÍTICOS ANTES DE ENVIAR AL BACKEND ========');
+      console.warn(`[AGENT_CLOSINGS_API] ID del cierre: ${id}`);
+      console.warn(`[AGENT_CLOSINGS_API] Proveedor ID original: ${data.proveedorId} (${typeof data.proveedorId})`);
+      console.warn(`[AGENT_CLOSINGS_API] Proveedor ID convertido: ${updateData.proveedorId} (${typeof updateData.proveedorId})`);
+      console.warn(`[AGENT_CLOSINGS_API] Resultado Final original: ${data.resultadoFinal} (${typeof data.resultadoFinal})`);
+      console.warn(`[AGENT_CLOSINGS_API] Resultado Final convertido: ${updateData.resultadoFinal} (${typeof updateData.resultadoFinal})`);
+      console.warn('======== FIN DE VERIFICACIÓN ========');
+      
+      console.log('[AGENT_CLOSINGS_API] Datos completos a enviar:', updateData);
+      
+      const response = await api.patch<AgentClosing>(`/agent-closings/${id}`, updateData);
+      return response.data;
+    } catch (error: any) {
+      console.error('[AGENT_CLOSINGS_API] Error al actualizar cierre:', error.response?.data || error.message);
+      throw error;
+    }
   },
 
   // Eliminar un cierre final de agente

@@ -39,6 +39,7 @@ import turnosApi, { Turno } from '../../api/turnos/turnosApi';
 // Importación local del componente UserForm que está en el mismo directorio
 import UserForm from './UserForm';
 import TurnoForm from '../turnos/TurnoForm';
+import { useTurno } from '../../contexts/TurnoContext';
 
 const UsersList: React.FC = () => {
   const queryClient = useQueryClient();
@@ -46,6 +47,9 @@ const UsersList: React.FC = () => {
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [openDeleteDialog, setOpenDeleteDialog] = useState(false);
   const [userToDelete, setUserToDelete] = useState<User | null>(null);
+  
+  // Obtener la función refetchTurno del contexto de turno
+  const { refetchTurno } = useTurno();
   
   // Estados para la gestión de turnos
   const [expandedUser, setExpandedUser] = useState<number | null>(null);
@@ -62,9 +66,19 @@ const UsersList: React.FC = () => {
   });
 
   // Obtener los turnos del usuario expandido
-  const { data: userTurnos, isLoading: isLoadingTurnos, error: turnosError } = useQuery({
+  const { data: userTurnos = [], isLoading: isLoadingTurnos, error: turnosError } = useQuery({
     queryKey: ['turnos', expandedUser],
-    queryFn: () => expandedUser ? turnosApi.getByUsuarioId(expandedUser) : Promise.resolve([]),
+    queryFn: async () => {
+      if (expandedUser) {
+        try {
+          return await turnosApi.getByUsuarioId(expandedUser);
+        } catch (error) {
+          console.error('Error al obtener turnos del usuario:', error);
+          return [];
+        }
+      }
+      return [];
+    },
     enabled: expandedUser !== null,
   });
 
@@ -80,7 +94,15 @@ const UsersList: React.FC = () => {
   
   // Mutación para eliminar un turno
   const deleteTurnoMutation = useMutation({
-    mutationFn: (id: number) => turnosApi.delete(id),
+    mutationFn: async (id: number) => {
+      try {
+        // Usar una función anónima async para evitar problemas de tipo
+        await turnosApi.delete(id);
+      } catch (error) {
+        console.error(`Error al eliminar turno ${id}:`, error);
+        throw error;
+      }
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['turnos', expandedUser] });
       setOpenDeleteTurnoDialog(false);
@@ -90,17 +112,45 @@ const UsersList: React.FC = () => {
   
   // Mutación para iniciar un turno
   const iniciarTurnoMutation = useMutation({
-    mutationFn: (id: number) => turnosApi.iniciarTurno(id),
+    mutationFn: async (id: number) => {
+      try {
+        // Usar una función anónima async para evitar problemas de tipo
+        return await turnosApi.iniciarTurno(id);
+      } catch (error) {
+        console.error(`Error al iniciar turno ${id}:`, error);
+        throw error;
+      }
+    },
     onSuccess: () => {
+      // Invalidar consultas para actualizar la UI
       queryClient.invalidateQueries({ queryKey: ['turnos', expandedUser] });
+      queryClient.invalidateQueries({ queryKey: ['turnos'] });
+      queryClient.invalidateQueries({ queryKey: ['turno', 'actual'] });
+      
+      // Actualizar el indicador de turno inmediatamente
+      refetchTurno();
     },
   });
   
   // Mutación para finalizar un turno
   const finalizarTurnoMutation = useMutation({
-    mutationFn: (id: number) => turnosApi.finalizarTurno(id),
+    mutationFn: async (id: number) => {
+      try {
+        // Usar una función anónima async para evitar problemas de tipo
+        return await turnosApi.finalizarTurno(id);
+      } catch (error) {
+        console.error(`Error al finalizar turno ${id}:`, error);
+        throw error;
+      }
+    },
     onSuccess: () => {
+      // Invalidar consultas para actualizar la UI
       queryClient.invalidateQueries({ queryKey: ['turnos', expandedUser] });
+      queryClient.invalidateQueries({ queryKey: ['turnos'] });
+      queryClient.invalidateQueries({ queryKey: ['turno', 'actual'] });
+      
+      // Actualizar el indicador de turno inmediatamente
+      refetchTurno();
     },
   });
 
@@ -339,7 +389,7 @@ const UsersList: React.FC = () => {
                               </TableRow>
                             </TableHead>
                             <TableBody>
-                              {userTurnos.map((turno) => (
+                              {userTurnos.map((turno: Turno) => (
                                 <TableRow key={turno.id}>
                                   <TableCell>{turno.id}</TableCell>
                                   <TableCell>{turno.nombre}</TableCell>

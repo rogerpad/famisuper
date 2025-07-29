@@ -47,4 +47,9 @@ export class CreateAgentClosingDto {
   @IsOptional()
   @IsString({ message: 'El estado debe ser texto' })
   estado?: string = 'activo';
+
+  @ApiProperty({ description: 'ID del turno asociado al cierre', required: false })
+  @IsOptional()
+  @IsNumber({}, { message: 'El ID del turno debe ser un número' })
+  turnoId?: number;
 }

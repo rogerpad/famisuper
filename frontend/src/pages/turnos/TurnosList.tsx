@@ -34,6 +34,7 @@ import turnosApi, { Turno } from '../../api/turnos/turnosApi';
 import { useAuth } from '../../contexts/AuthContext';
 import TurnoForm from '../turnos/TurnoForm';
 import AsignarUsuariosDialog from './AsignarUsuariosDialog';
+import { toValidId, isValidId } from '../../utils/validationUtils';
 
 const TurnosList: React.FC = () => {
   const { state, hasPermission } = useAuth();
@@ -47,14 +48,28 @@ const TurnosList: React.FC = () => {
 
   // Mutaciones para iniciar y finalizar turnos
   const iniciarTurnoMutation = useMutation({
-    mutationFn: (id: number) => turnosApi.iniciarTurno(id),
+    mutationFn: (id: number | string) => {
+      const validId = toValidId(id);
+      if (validId === undefined) {
+        console.error(`[TURNOS LIST] ID de turno inválido para iniciar: ${id}`);
+        throw new Error(`ID de turno inválido: ${id}`);
+      }
+      return turnosApi.iniciarTurno(validId);
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['turnos'] });
     },
   });
 
   const finalizarTurnoMutation = useMutation({
-    mutationFn: (id: number) => turnosApi.finalizarTurno(id),
+    mutationFn: (id: number | string) => {
+      const validId = toValidId(id);
+      if (validId === undefined) {
+        console.error(`[TURNOS LIST] ID de turno inválido para finalizar: ${id}`);
+        throw new Error(`ID de turno inválido: ${id}`);
+      }
+      return turnosApi.finalizarTurno(validId);
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['turnos'] });
     },
@@ -68,8 +83,14 @@ const TurnosList: React.FC = () => {
 
   // Mutación para eliminar un turno
   const deleteMutation = useMutation({
-
-    mutationFn: (id: number) => turnosApi.delete(id),
+    mutationFn: (id: number | string) => {
+      const validId = toValidId(id);
+      if (validId === undefined) {
+        console.error(`[TURNOS LIST] ID de turno inválido para eliminar: ${id}`);
+        throw new Error(`ID de turno inválido: ${id}`);
+      }
+      return turnosApi.delete(validId);
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['turnos'] });
       setOpenDeleteDialog(false);
@@ -99,8 +120,11 @@ const TurnosList: React.FC = () => {
   };
 
   const handleDeleteTurno = () => {
-    if (turnoToDelete) {
+    if (turnoToDelete && isValidId(turnoToDelete.id)) {
+      console.log(`[TURNOS LIST] Eliminando turno con ID: ${turnoToDelete.id}`);
       deleteMutation.mutate(turnoToDelete.id);
+    } else if (turnoToDelete) {
+      console.error(`[TURNOS LIST] Intento de eliminar turno con ID inválido: ${turnoToDelete.id}`);
     }
   };
 
@@ -116,12 +140,22 @@ const TurnosList: React.FC = () => {
   };
 
   // Manejadores para iniciar y finalizar turnos
-  const handleIniciarTurno = (id: number) => {
-    iniciarTurnoMutation.mutate(id);
+  const handleIniciarTurno = (id: number | string) => {
+    if (isValidId(id)) {
+      console.log(`[TURNOS LIST] Iniciando turno con ID: ${id}`);
+      iniciarTurnoMutation.mutate(id);
+    } else {
+      console.error(`[TURNOS LIST] Intento de iniciar turno con ID inválido: ${id}`);
+    }
   };
 
-  const handleFinalizarTurno = (id: number) => {
-    finalizarTurnoMutation.mutate(id);
+  const handleFinalizarTurno = (id: number | string) => {
+    if (isValidId(id)) {
+      console.log(`[TURNOS LIST] Finalizando turno con ID: ${id}`);
+      finalizarTurnoMutation.mutate(id);
+    } else {
+      console.error(`[TURNOS LIST] Intento de finalizar turno con ID inválido: ${id}`);
+    }
   };
 
   // Renderizado condicional para estados de carga y error

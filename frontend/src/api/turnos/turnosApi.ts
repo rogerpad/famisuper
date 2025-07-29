@@ -1,5 +1,6 @@
 import api from '../api';
 import turnosMockApi from './turnosMock';
+import { isValidId, toValidId, isValidDate, validatePaginationParams } from '../../utils/validationUtils';
 
 // Bandera para usar mock o API real
 const USE_MOCK = false; // Usando la API real conectada a la base de datos
@@ -23,6 +24,20 @@ export interface Usuario {
   username: string;
   nombre: string;
   apellido?: string;
+}
+
+export interface RegistroActividad {
+  id: number;
+  turno: Turno;
+  usuario: Usuario;
+  accion: string;
+  fechaHora: Date;
+  descripcion?: string;
+}
+
+export interface RegistrosActividadResponse {
+  registros: RegistroActividad[];
+  total: number;
 }
 
 export interface CreateTurnoDto {
@@ -56,21 +71,51 @@ const turnosApi = {
   },
 
   // Obtener un turno por ID
-  getById: async (id: number): Promise<Turno> => {
-    if (USE_MOCK) {
-      return turnosMockApi.getById(id);
+  getById: async (id: number | string): Promise<Turno> => {
+    // Utilizar la función toValidId para validar el ID
+    const validId = toValidId(id);
+    
+    if (validId === undefined) {
+      console.error(`[TURNOS API] ID de turno inválido para getById: ${id}`);
+      throw new Error(`ID de turno inválido: ${id}`);
     }
-    const response = await api.get(`/turnos/${id}`);
-    return response.data;
+    
+    if (USE_MOCK) {
+      return turnosMockApi.getById(validId);
+    }
+    
+    try {
+      console.log(`[TURNOS API] Obteniendo turno con ID validado: ${validId}`);
+      const response = await api.get(`/turnos/${validId}`);
+      return response.data;
+    } catch (error: any) {
+      console.error(`[TURNOS API] Error al obtener turno por ID ${validId}:`, error);
+      throw new Error(`Error al obtener turno: ${error.message || 'Error desconocido'}`);
+    }
   },
 
   // Obtener turnos por usuario_id
-  getByUsuarioId: async (usuarioId: number): Promise<Turno[]> => {
-    if (USE_MOCK) {
-      return turnosMockApi.getByUsuarioId(usuarioId);
+  getByUsuarioId: async (usuarioId: number | string): Promise<Turno[]> => {
+    // Validar el ID de usuario
+    const validUsuarioId = toValidId(usuarioId);
+    
+    if (validUsuarioId === undefined) {
+      console.error(`[TURNOS API] ID de usuario inválido para getByUsuarioId: ${usuarioId}`);
+      throw new Error(`ID de usuario inválido: ${usuarioId}`);
     }
-    const response = await api.get(`/turnos/usuario/${usuarioId}`);
-    return response.data;
+    
+    if (USE_MOCK) {
+      return turnosMockApi.getByUsuarioId(validUsuarioId);
+    }
+    
+    try {
+      console.log(`[TURNOS API] Obteniendo turnos para usuario con ID validado: ${validUsuarioId}`);
+      const response = await api.get(`/turnos/usuario/${validUsuarioId}`);
+      return response.data;
+    } catch (error: any) {
+      console.error(`[TURNOS API] Error al obtener turnos por usuario ID ${validUsuarioId}:`, error);
+      throw new Error(`Error al obtener turnos: ${error.message || 'Error desconocido'}`);
+    }
   },
 
   // Crear un nuevo turno
@@ -83,10 +128,18 @@ const turnosApi = {
   },
 
   // Actualizar un turno existente
-  update: async (id: number, turnoData: UpdateTurnoDto): Promise<Turno> => {
+  update: async (id: number | string, turnoData: UpdateTurnoDto): Promise<Turno> => {
     try {
+      // Validar el ID del turno
+      const validId = toValidId(id);
+      
+      if (validId === undefined) {
+        console.error(`[TURNOS API] ID de turno inválido para update: ${id}`);
+        throw new Error(`ID de turno inválido: ${id}`);
+      }
+      
       if (USE_MOCK) {
-        return turnosMockApi.update(id, turnoData);
+        return turnosMockApi.update(validId, turnoData);
       }
       
       // Validar datos antes de enviar
@@ -96,76 +149,165 @@ const turnosApi = {
         }
       }
       
+      // Validar usuarioId si está presente
+      if (turnoData.usuarioId !== undefined) {
+        const validUsuarioId = toValidId(turnoData.usuarioId);
+        if (validUsuarioId === undefined) {
+          console.error(`[TURNOS API] ID de usuario inválido en update: ${turnoData.usuarioId}`);
+          delete turnoData.usuarioId; // Eliminar el ID inválido
+        } else {
+          turnoData.usuarioId = validUsuarioId; // Usar el ID validado
+        }
+      }
+      
       // Limpiar datos indefinidos o nulos
       const cleanData = Object.fromEntries(
         Object.entries(turnoData).filter(([_, v]) => v !== undefined && v !== null && v !== '')
       );
       
-      console.log(`Enviando petición PATCH a /turnos/${id} con datos:`, JSON.stringify(cleanData, null, 2));
-      const response = await api.patch(`/turnos/${id}`, cleanData);
-      console.log('Respuesta exitosa:', response.data);
+      console.log(`[TURNOS API] Enviando petición PATCH a /turnos/${validId} con datos:`, JSON.stringify(cleanData, null, 2));
+      const response = await api.patch(`/turnos/${validId}`, cleanData);
+      console.log('[TURNOS API] Respuesta exitosa:', response.data);
       return response.data;
     } catch (error: any) {
-      console.error('Error al actualizar turno:', error);
+      console.error('[TURNOS API] Error al actualizar turno:', error);
       
       // Mostrar detalles más específicos del error
       const errorDetails = {
-        status: error.response?.status,
-        statusText: error.response?.statusText,
-        data: error.response?.data,
         message: error.message,
-        requestData: turnoData
+        status: error.response?.status,
+        data: error.response?.data
       };
       
-      console.error('Detalles del error:', errorDetails);
+      console.error('[TURNOS API] Detalles del error:', errorDetails);
       
-      // Crear un mensaje de error más descriptivo
-      let errorMessage = 'Error al actualizar turno';
-      
+      // Lanzar un error con mensaje más informativo
       if (error.response?.data?.message) {
-        errorMessage = `Error: ${error.response.data.message}`;
-      } else if (error.message) {
-        errorMessage = `Error: ${error.message}`;
+        throw new Error(`Error al actualizar turno: ${error.response.data.message}`);
+      } else {
+        throw new Error(`Error al actualizar turno: ${error.message}`);
       }
-      
-      const enhancedError = new Error(errorMessage);
-      (enhancedError as any).details = errorDetails;
-      throw enhancedError;
     }
   },
 
   // Eliminar un turno
-  delete: async (id: number): Promise<void> => {
-    if (USE_MOCK) {
-      return turnosMockApi.delete(id);
+  delete: async (id: number | string): Promise<void> => {
+    // Validar el ID del turno
+    const validId = toValidId(id);
+    
+    if (validId === undefined) {
+      console.error(`[TURNOS API] ID de turno inválido para delete: ${id}`);
+      throw new Error(`ID de turno inválido: ${id}`);
     }
-    await api.delete(`/turnos/${id}`);
+    
+    if (USE_MOCK) {
+      return turnosMockApi.delete(validId);
+    }
+    
+    try {
+      console.log(`[TURNOS API] Eliminando turno con ID validado: ${validId}`);
+      await api.delete(`/turnos/${validId}`);
+    } catch (error: any) {
+      console.error(`[TURNOS API] Error al eliminar turno ID ${validId}:`, error);
+      throw new Error(`Error al eliminar turno: ${error.message || 'Error desconocido'}`);
+    }
   },
 
   // Asignar usuarios a un turno
-  asignarUsuarios: async (turnoId: number, usuariosIds: number[]): Promise<void> => {
-    if (USE_MOCK) {
-      return;
+  asignarUsuarios: async (turnoId: number | string, usuariosIds: (number | string)[]): Promise<void> => {
+    // Validar el ID del turno
+    const validTurnoId = toValidId(turnoId);
+    
+    if (validTurnoId === undefined) {
+      console.error(`[TURNOS API] ID de turno inválido para asignarUsuarios: ${turnoId}`);
+      throw new Error(`ID de turno inválido: ${turnoId}`);
     }
-    await api.post(`/turnos/${turnoId}/usuarios`, { usuariosIds });
+    
+    // Validar los IDs de usuarios
+    const validUsuariosIds = usuariosIds
+      .map(id => toValidId(id))
+      .filter((id): id is number => id !== undefined);
+    
+    if (validUsuariosIds.length === 0 && usuariosIds.length > 0) {
+      console.error(`[TURNOS API] Todos los IDs de usuarios son inválidos: ${usuariosIds.join(', ')}`);
+      throw new Error(`IDs de usuarios inválidos`);
+    }
+    
+    if (USE_MOCK) {
+      return turnosMockApi.asignarUsuarios(validTurnoId, validUsuariosIds);
+    }
+    
+    try {
+      console.log(`[TURNOS API] Asignando usuarios ${validUsuariosIds.join(', ')} al turno ${validTurnoId}`);
+      await api.post(`/turnos/${validTurnoId}/usuarios`, { usuariosIds: validUsuariosIds });
+    } catch (error: any) {
+      console.error(`[TURNOS API] Error al asignar usuarios al turno ID ${validTurnoId}:`, error);
+      throw new Error(`Error al asignar usuarios: ${error.message || 'Error desconocido'}`);
+    }
   },
 
   // Obtener usuarios asignados a un turno
-  getUsuariosPorTurno: async (turnoId: number): Promise<Usuario[]> => {
+  getUsuariosPorTurno: async (turnoId: number | string): Promise<Usuario[]> => {
+    // Validar el ID del turno
+    const validTurnoId = toValidId(turnoId);
+    
+    if (validTurnoId === undefined) {
+      console.error(`[TURNOS API] ID de turno inválido para getUsuariosPorTurno: ${turnoId}`);
+      throw new Error(`ID de turno inválido: ${turnoId}`);
+    }
+    
     if (USE_MOCK) {
       return [];
     }
-    const response = await api.get(`/turnos/${turnoId}/usuarios`);
-    return response.data;
+    
+    try {
+      console.log(`[TURNOS API] Obteniendo usuarios para el turno con ID validado: ${validTurnoId}`);
+      const response = await api.get(`/turnos/${validTurnoId}/usuarios`);
+      return response.data;
+    } catch (error: any) {
+      console.error(`[TURNOS API] Error al obtener usuarios del turno ${validTurnoId}:`, error);
+      
+      // Si el error es 404, devolver array vacío en lugar de lanzar error
+      if (error.response && error.response.status === 404) {
+        console.log(`[TURNOS API] No se encontraron usuarios para el turno ${validTurnoId}`);
+        return [];
+      }
+      
+      // Para otros errores, lanzar excepción
+      throw new Error(`Error al obtener usuarios del turno: ${error.message || 'Error desconocido'}`);
+    }
   },
 
   // Obtener turnos asignados a un usuario
-  getTurnosPorUsuario: async (usuarioId: number): Promise<Turno[]> => {
+  getTurnosPorUsuario: async (usuarioId: number | string): Promise<Turno[]> => {
+    // Validar el ID del usuario
+    const validUsuarioId = toValidId(usuarioId);
+    
+    if (validUsuarioId === undefined) {
+      console.error(`[TURNOS API] ID de usuario inválido para getTurnosPorUsuario: ${usuarioId}`);
+      throw new Error(`ID de usuario inválido: ${usuarioId}`);
+    }
+    
     if (USE_MOCK) {
       return [];
     }
-    const response = await api.get(`/turnos/usuario/${usuarioId}`);
-    return response.data;
+    
+    try {
+      console.log(`[TURNOS API] Obteniendo turnos para el usuario con ID validado: ${validUsuarioId}`);
+      const response = await api.get(`/turnos/usuario/${validUsuarioId}`);
+      return response.data;
+    } catch (error: any) {
+      console.error(`[TURNOS API] Error al obtener turnos del usuario ${validUsuarioId}:`, error);
+      
+      // Si el error es 404, devolver array vacío en lugar de lanzar error
+      if (error.response && error.response.status === 404) {
+        console.log(`[TURNOS API] No se encontraron turnos para el usuario ${validUsuarioId}`);
+        return [];
+      }
+      
+      // Para otros errores, lanzar excepción
+      throw new Error(`Error al obtener turnos del usuario: ${error.message || 'Error desconocido'}`);
+    }
   },
 
   // Obtener el turno actual
@@ -174,38 +316,304 @@ const turnosApi = {
       return null;
     }
     try {
+      console.log('[TURNOS API] Consultando turno actual');
       const response = await api.get('/turnos/actual');
+      
+      // Verificar si la respuesta es null o undefined
+      if (!response.data) {
+        console.log('[TURNOS API] No hay turno actual activo');
+        return null;
+      }
+      
+      // Verificar que el ID del turno sea un número válido usando isValidId
+      if (!isValidId(response.data.id)) {
+        console.error('[TURNOS API] Turno actual con ID inválido:', response.data);
+        return null;
+      }
+      
+      // Asegurarse de que el ID sea un número válido
+      const validId = toValidId(response.data.id);
+      if (validId !== undefined) {
+        response.data.id = validId; // Asegurar que el ID sea un número válido
+      }
+      
+      console.log('[TURNOS API] Turno actual obtenido:', response.data);
       return response.data;
-    } catch (error) {
+    } catch (error: any) {
+      console.error('[TURNOS API] Error al obtener turno actual:', error.message || error);
       return null;
     }
   },
 
   // Iniciar un turno (actualizar la hora de inicio con la hora actual)
-  iniciarTurno: async (id: number): Promise<Turno> => {
-    if (USE_MOCK) {
-      return turnosMockApi.getById(id);
+  iniciarTurno: async (id: number | string): Promise<Turno> => {
+    // Validar el ID del turno
+    const validId = toValidId(id);
+    
+    if (validId === undefined) {
+      console.error(`[TURNOS API] ID de turno inválido para iniciarTurno: ${id}`);
+      throw new Error(`ID de turno inválido: ${id}`);
     }
+    
+    if (USE_MOCK) {
+      return turnosMockApi.iniciarTurno(validId);
+    }
+    
     try {
-      const response = await api.patch(`/turnos/${id}/iniciar`, {});
+      console.log(`[TURNOS API] Iniciando turno con ID validado: ${validId}`);
+      const response = await api.patch(`/turnos/${validId}/iniciar`, {});
       return response.data;
     } catch (error: any) {
-      console.error('Error al iniciar turno:', error);
-      throw new Error(error.response?.data?.message || 'Error al iniciar turno');
+      console.error(`[TURNOS API] Error al iniciar turno ID ${validId}:`, error);
+      throw new Error(`Error al iniciar turno: ${error.message || 'Error desconocido'}`);
     }
   },
 
   // Finalizar un turno (actualizar la hora de fin con la hora actual)
-  finalizarTurno: async (id: number): Promise<Turno> => {
-    if (USE_MOCK) {
-      return turnosMockApi.getById(id);
+  finalizarTurno: async (id: number | string): Promise<Turno> => {
+    // Validar el ID del turno
+    const validId = toValidId(id);
+    
+    if (validId === undefined) {
+      console.error(`[TURNOS API] ID de turno inválido para finalizarTurno: ${id}`);
+      throw new Error(`ID de turno inválido: ${id}`);
     }
+    
+    if (USE_MOCK) {
+      return turnosMockApi.finalizarTurno(validId);
+    }
+    
     try {
-      const response = await api.patch(`/turnos/${id}/finalizar`, {});
+      console.log(`[TURNOS API] Finalizando turno con ID validado: ${validId}`);
+      const response = await api.patch(`/turnos/${validId}/finalizar`, {});
       return response.data;
     } catch (error: any) {
-      console.error('Error al finalizar turno:', error);
-      throw new Error(error.response?.data?.message || 'Error al finalizar turno');
+      console.error(`[TURNOS API] Error al finalizar turno ID ${validId}:`, error);
+      throw new Error(`Error al finalizar turno: ${error.message || 'Error desconocido'}`);
+    }
+  },
+
+  // Iniciar un turno como vendedor (actualizar la hora de inicio con la hora actual)
+  iniciarTurnoVendedor: async (id: number | string): Promise<Turno> => {
+    // Validar el ID del turno
+    const validId = toValidId(id);
+    
+    if (validId === undefined) {
+      console.error(`[TURNOS API] ID de turno inválido para iniciarTurnoVendedor: ${id}`);
+      throw new Error(`ID de turno inválido: ${id}`);
+    }
+    
+    if (USE_MOCK) {
+      return turnosMockApi.iniciarTurno(validId);
+    }
+    
+    try {
+      console.log(`[TURNOS API] Iniciando turno como vendedor con ID validado: ${validId}`);
+      const response = await api.patch(`/turnos/${validId}/iniciar-vendedor`, {});
+      return response.data;
+    } catch (error: any) {
+      console.error(`[TURNOS API] Error al iniciar turno como vendedor ID ${validId}:`, error);
+      throw new Error(`Error al iniciar turno como vendedor: ${error.message || 'Error desconocido'}`);
+    }
+  },
+
+  // Finalizar un turno como vendedor (actualizar la hora de fin con la hora actual)
+  finalizarTurnoVendedor: async (id: number | string): Promise<Turno> => {
+    // Validar el ID del turno
+    const validId = toValidId(id);
+    
+    if (validId === undefined) {
+      console.error(`[TURNOS API] ID de turno inválido para finalizarTurnoVendedor: ${id}`);
+      throw new Error(`ID de turno inválido: ${id}`);
+    }
+    
+    if (USE_MOCK) {
+      return turnosMockApi.finalizarTurno(validId);
+    }
+    
+    try {
+      console.log(`[TURNOS API] Finalizando turno como vendedor con ID validado: ${validId}`);
+      const response = await api.patch(`/turnos/${validId}/finalizar-vendedor`, {});
+      return response.data;
+    } catch (error: any) {
+      console.error(`[TURNOS API] Error al finalizar turno como vendedor ID ${validId}:`, error);
+      throw new Error(`Error al finalizar turno como vendedor: ${error.message || 'Error desconocido'}`);
+    }
+  },
+
+  // Reiniciar un turno (eliminar hora de inicio y fin)
+  reiniciarTurno: async (id: number | string): Promise<Turno> => {
+    // Validar el ID del turno
+    const validId = toValidId(id);
+    
+    if (validId === undefined) {
+      console.error(`[TURNOS API] ID de turno inválido para reiniciarTurno: ${id}`);
+      throw new Error(`ID de turno inválido: ${id}`);
+    }
+    
+    if (USE_MOCK) {
+      return turnosMockApi.getById(validId);
+    }
+    
+    try {
+      console.log(`[TURNOS API] Reiniciando turno con ID validado: ${validId}`);
+      const response = await api.patch(`/turnos/${validId}/reiniciar`, {});
+      return response.data;
+    } catch (error: any) {
+      console.error(`[TURNOS API] Error al reiniciar turno ID ${validId}:`, error);
+      throw new Error(`Error al reiniciar turno: ${error.message || 'Error desconocido'}`);
+    }
+  },
+  
+  // Verificar y crear registros de actividad de prueba si no existen
+  verificarRegistrosActividad: async (): Promise<{ success: boolean; message: string; count: number }> => {
+    if (USE_MOCK) {
+      return { success: true, message: 'Modo mock: No se verificaron registros', count: 0 };
+    }
+
+    try {
+      console.log('[TURNOS API] Verificando registros de actividad...');
+      const response = await api.get('/turnos/verificar-registros-actividad');
+      console.log('[TURNOS API] Respuesta de verificación:', response.data);
+      return response.data;
+    } catch (error: any) {
+      console.error('[TURNOS API] Error al verificar registros de actividad:', error);
+      throw new Error(`Error al verificar registros de actividad: ${error.message || 'Error desconocido'}`);
+    }
+  },
+  
+  // Obtener registros de actividad de turnos con filtros opcionales
+  getRegistrosActividad: async (options?: {
+    turnoId?: number | string;
+    usuarioId?: number | string;
+    fechaInicio?: Date;
+    fechaFin?: Date;
+    limit?: number;
+    offset?: number;
+  }): Promise<RegistrosActividadResponse> => {
+    // Crear un objeto para almacenar las opciones validadas
+    const validatedOptions: {
+      turnoId?: number;
+      usuarioId?: number;
+      fechaInicio?: Date;
+      fechaFin?: Date;
+      limit: number;
+      offset: number;
+    } = {
+      limit: 10,
+      offset: 0
+    };
+    
+    // Si no hay opciones, usar valores predeterminados
+    if (!options) {
+      console.log('[TURNOS API] No se proporcionaron opciones para getRegistrosActividad, usando valores predeterminados');
+      options = {};
+    }
+    
+    // Validar IDs si se proporcionan
+    if (options?.turnoId !== undefined) {
+      const validTurnoId = toValidId(options.turnoId);
+      if (validTurnoId !== undefined) {
+        validatedOptions.turnoId = validTurnoId;
+        console.log(`[TURNOS API] ID de turno válido: ${validTurnoId}`);
+      } else {
+        console.error(`[TURNOS API] ID de turno inválido:`, options.turnoId);
+      }
+    }
+    
+    if (options?.usuarioId !== undefined) {
+      const validUsuarioId = toValidId(options.usuarioId);
+      if (validUsuarioId !== undefined) {
+        validatedOptions.usuarioId = validUsuarioId;
+        console.log(`[TURNOS API] ID de usuario válido: ${validUsuarioId}`);
+      } else {
+        console.error(`[TURNOS API] ID de usuario inválido:`, options.usuarioId);
+      }
+    }
+    
+    // Validar fechas si se proporcionan
+    if (options?.fechaInicio && isValidDate(options.fechaInicio)) {
+      validatedOptions.fechaInicio = options.fechaInicio;
+      console.log(`[TURNOS API] Fecha inicio válida: ${options.fechaInicio}`);
+    } else if (options?.fechaInicio) {
+      console.error(`[TURNOS API] Fecha inicio inválida:`, options.fechaInicio);
+    }
+    
+    if (options?.fechaFin && isValidDate(options.fechaFin)) {
+      validatedOptions.fechaFin = options.fechaFin;
+      console.log(`[TURNOS API] Fecha fin válida: ${options.fechaFin}`);
+    } else if (options?.fechaFin) {
+      console.error(`[TURNOS API] Fecha fin inválida:`, options.fechaFin);
+    }
+    
+    // Validar parámetros de paginación
+    const { limit, offset } = validatePaginationParams(options?.limit, options?.offset);
+    validatedOptions.limit = limit;
+    validatedOptions.offset = offset;
+    
+    console.log(`[TURNOS API] Opciones validadas:`, validatedOptions);
+    
+    // Construir parámetros de consulta para la URL
+    const params: Record<string, string> = {};
+    
+    // Añadir IDs validados a los parámetros
+    if (validatedOptions.turnoId !== undefined) {
+      params.turnoId = validatedOptions.turnoId.toString();
+    }
+    
+    if (validatedOptions.usuarioId !== undefined) {
+      params.usuarioId = validatedOptions.usuarioId.toString();
+    }
+    
+    // Añadir fechas validadas a los parámetros con validación adicional para evitar errores de serialización
+    if (validatedOptions.fechaInicio) {
+      try {
+        // Verificar que la fecha es válida antes de serializar
+        if (validatedOptions.fechaInicio instanceof Date && !isNaN(validatedOptions.fechaInicio.getTime())) {
+          params.fechaInicio = validatedOptions.fechaInicio.toISOString();
+          console.log(`[TURNOS API] Fecha inicio serializada correctamente: ${params.fechaInicio}`);
+        } else {
+          console.error(`[TURNOS API] Fecha inicio no válida para serialización:`, validatedOptions.fechaInicio);
+        }
+      } catch (error) {
+        console.error(`[TURNOS API] Error al serializar fecha inicio:`, error);
+      }
+    }
+    
+    if (validatedOptions.fechaFin) {
+      try {
+        // Verificar que la fecha es válida antes de serializar
+        if (validatedOptions.fechaFin instanceof Date && !isNaN(validatedOptions.fechaFin.getTime())) {
+          params.fechaFin = validatedOptions.fechaFin.toISOString();
+          console.log(`[TURNOS API] Fecha fin serializada correctamente: ${params.fechaFin}`);
+        } else {
+          console.error(`[TURNOS API] Fecha fin no válida para serialización:`, validatedOptions.fechaFin);
+        }
+      } catch (error) {
+        console.error(`[TURNOS API] Error al serializar fecha fin:`, error);
+      }
+    }
+    
+    // Añadir parámetros de paginación validados
+    params.limit = validatedOptions.limit.toString();
+    params.offset = validatedOptions.offset.toString();
+    
+    console.log(`[TURNOS API] Consultando registros de actividad con parámetros:`, params);
+    
+    try {
+      const response = await api.get('/turnos/registros-actividad', { params });
+      
+      // Verificar que la respuesta tenga la estructura esperada
+      if (!response.data || typeof response.data !== 'object') {
+        console.error('[TURNOS API] Respuesta inválida al obtener registros de actividad:', response.data);
+        return { registros: [], total: 0 };
+      }
+      
+      return response.data;
+    } catch (error: any) {
+      console.error('[TURNOS API] Error al obtener registros de actividad:', error);
+      // En lugar de lanzar un error, devolvemos un objeto vacío para evitar que la UI se rompa
+      return { registros: [], total: 0 };
     }
   }
 };
