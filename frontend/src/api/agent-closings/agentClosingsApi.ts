@@ -39,6 +39,29 @@ export interface CreateAgentClosingDto {
 
 export interface UpdateAgentClosingDto extends Partial<CreateAgentClosingDto> {}
 
+export interface AdjustClosingDto {
+  adjustmentAmount: number;
+  justification: string;
+}
+
+export interface ClosingAdjustment {
+  id: number;
+  closingId: number;
+  userId: number;
+  user?: {
+    id: number;
+    nombre: string;
+    apellido: string;
+  };
+  adjustmentAmount: number;
+  previousFinalResult: number;
+  newFinalResult: number;
+  previousDifference: number;
+  newDifference: number;
+  justification: string;
+  createdAt: string;
+}
+
 export const agentClosingsApi = {
   // Obtener todos los cierres finales de agentes
   getAllAgentClosings: async (startDate?: string, endDate?: string): Promise<AgentClosing[]> => {
@@ -144,6 +167,28 @@ export const agentClosingsApi = {
     }
     
     await api.delete(`/agent-closings/${id}`);
+  },
+
+  // Realizar un ajuste a un cierre inactivo
+  adjustClosing: async (id: number, adjustData: AdjustClosingDto): Promise<AgentClosing> => {
+    if (USE_MOCK) {
+      throw new Error('Ajustes de cierre no disponibles en modo mock');
+    }
+    
+    console.log(`[AGENT_CLOSINGS_API] Realizando ajuste para cierre ${id}:`, adjustData);
+    const response = await api.post(`/agent-closings/${id}/adjust`, adjustData);
+    return response.data;
+  },
+
+  // Obtener historial de ajustes de un cierre
+  getClosingAdjustments: async (id: number): Promise<ClosingAdjustment[]> => {
+    if (USE_MOCK) {
+      return [];
+    }
+    
+    console.log(`[AGENT_CLOSINGS_API] Obteniendo historial de ajustes para cierre ${id}`);
+    const response = await api.get(`/agent-closings/${id}/adjustments`);
+    return response.data;
   },
 
   // Obtener todos los proveedores de tipo agente

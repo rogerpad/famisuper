@@ -175,8 +175,13 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ open, onClose, transa
       // Asegurarse de que el estado sea un número
       const estadoValue = typeof transaction.estado === 'number' ? transaction.estado : 1;
       
+      // Corregir el problema de zona horaria al procesar la fecha
+      // Usar directamente el string de fecha sin convertirlo a Date para evitar el desfase
+      console.log('Fecha original de la transacción:', transaction.fecha);
+      
       formik.setValues({
-        fecha: format(new Date(transaction.fecha), 'yyyy-MM-dd'),
+        // Usar la fecha tal como viene de la API, sin convertirla a Date
+        fecha: transaction.fecha,
         hora: transaction.hora,
         usuarioId: transaction.usuarioId,
         // Mantener los tipos como string para el formulario
@@ -186,6 +191,8 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ open, onClose, transa
         observacion: transaction.observacion || '',
         estado: estadoValue,
       });
+      
+      console.log('Fecha establecida en el formulario:', transaction.fecha);
       
       // Verificar el valor establecido
       console.log('Valor establecido en formik:', formik.values.estado);

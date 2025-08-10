@@ -11,33 +11,18 @@ import {
   CardContent,
   Divider
 } from '@mui/material';
-import { DatePicker } from '@mui/x-date-pickers/DatePicker';
-import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
-import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
-import { es } from 'date-fns/locale';
-import { format } from 'date-fns';
 import { useQuery } from '@tanstack/react-query';
 import { Search as SearchIcon } from '@mui/icons-material';
 import transactionsApi from '../../api/transactions/transactionsApi';
 
 const TransactionSummary: React.FC = () => {
-  const [startDate, setStartDate] = useState<Date | null>(null);
-  const [endDate, setEndDate] = useState<Date | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
 
-  // Formatear fechas para la API
-  const formattedStartDate = startDate ? format(startDate, 'yyyy-MM-dd') : undefined;
-  const formattedEndDate = endDate ? format(endDate, 'yyyy-MM-dd') : undefined;
-
-  // Consulta para obtener las transacciones usando los endpoints específicos para el resumen
+  // Consulta para obtener las transacciones usando el endpoint para el resumen
   const { data: transactions = [], isLoading } = useQuery({
-    queryKey: ['transactions-summary', formattedStartDate, formattedEndDate],
+    queryKey: ['transactions-summary'],
     queryFn: async () => {
-      // Si ambas fechas están definidas, usar getByDateRangeForSummary
-      if (formattedStartDate && formattedEndDate) {
-        return transactionsApi.getByDateRangeForSummary(formattedStartDate, formattedEndDate);
-      } 
-      // Si no hay fechas, obtener todas las transacciones activas para el resumen
+      // Obtener todas las transacciones activas para el resumen
       return transactionsApi.getForSummary();
     },
   });
@@ -96,39 +81,7 @@ const TransactionSummary: React.FC = () => {
       
       <Paper sx={{ p: 2, mb: 3 }}>
         <Grid container spacing={2} alignItems="center">
-          <Grid item xs={12} md={3}>
-            <LocalizationProvider dateAdapter={AdapterDateFns} adapterLocale={es}>
-              <DatePicker
-                label="Fecha Inicio"
-                value={startDate}
-                onChange={(date) => setStartDate(date)}
-                slotProps={{
-                  textField: {
-                    fullWidth: true,
-                    variant: 'outlined',
-                    size: 'small',
-                  },
-                }}
-              />
-            </LocalizationProvider>
-          </Grid>
-          <Grid item xs={12} md={3}>
-            <LocalizationProvider dateAdapter={AdapterDateFns} adapterLocale={es}>
-              <DatePicker
-                label="Fecha Fin"
-                value={endDate}
-                onChange={(date) => setEndDate(date)}
-                slotProps={{
-                  textField: {
-                    fullWidth: true,
-                    variant: 'outlined',
-                    size: 'small',
-                  },
-                }}
-              />
-            </LocalizationProvider>
-          </Grid>
-          <Grid item xs={12} md={6}>
+          <Grid item xs={12}>
             <TextField
               fullWidth
               variant="outlined"

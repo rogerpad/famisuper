@@ -66,6 +66,23 @@ const AgentClosingForm: React.FC = () => {
   const queryClient = useQueryClient();
   const { turnoActual, loading: turnoLoading } = useTurno(); // Obtener el turno activo del contexto
   const { state: authState } = useAuth(); // Obtener el estado de autenticación para acceder al usuario actual
+  
+  // Estado para el Snackbar
+  const [snackbarOpen, setSnackbarOpen] = useState(false);
+  const [snackbarMessage, setSnackbarMessage] = useState('');
+  const [snackbarSeverity, setSnackbarSeverity] = useState<'success' | 'error' | 'info' | 'warning'>('info');
+  
+  // Función para mostrar mensajes en el Snackbar
+  const showSnackbar = (message: string, severity: 'success' | 'error' | 'info' | 'warning') => {
+    setSnackbarMessage(message);
+    setSnackbarSeverity(severity);
+    setSnackbarOpen(true);
+  };
+  
+  // Función para cerrar el Snackbar
+  const handleSnackbarClose = () => {
+    setSnackbarOpen(false);
+  };
   const [initialValues, setInitialValues] = useState<AgentClosingFormValues>({
     proveedorId: 0,
     fechaCierre: new Date(),
@@ -83,9 +100,7 @@ const AgentClosingForm: React.FC = () => {
   const [openConfirmDialog, setOpenConfirmDialog] = useState(false);
   const [formValuesToSubmit, setFormValuesToSubmit] = useState<AgentClosingFormValues | null>(null);
   
-  // Estado para el snackbar
-  const [snackbarOpen, setSnackbarOpen] = useState(false);
-  const [snackbarMessage, setSnackbarMessage] = useState('');
+  // El estado para el snackbar ya está declarado arriba
   
   // Efecto para actualizar el turnoId cuando el turno activo cambie
   useEffect(() => {
@@ -170,7 +185,16 @@ const AgentClosingForm: React.FC = () => {
       const dataToSend = {
         ...formattedValues,
         turnoId: turnoIdValidado || (turnoActual ? Number(turnoActual.id) : undefined),
+        usuarioId: Number(authState.user?.id), // Agregar el ID del usuario actual como número
       };
+      
+      // Validar que usuarioId sea un número válido
+      if (!dataToSend.usuarioId || isNaN(dataToSend.usuarioId)) {
+        console.error('[AGENT_CLOSING_FORM] ID de usuario no disponible o inválido:', authState.user);
+        throw new Error('No se pudo obtener un ID de usuario válido');
+      }
+      
+      console.log('[AGENT_CLOSING_FORM] ID de usuario a enviar:', dataToSend.usuarioId, typeof dataToSend.usuarioId);
       
       console.log('[AGENT_CLOSING_FORM] Datos formateados para crear:', dataToSend);
       
@@ -433,6 +457,12 @@ const AgentClosingForm: React.FC = () => {
       // Crear una copia de los valores del formulario para procesarlos
       const dataToSend: any = { ...formValuesToSubmit };
       
+      // Eliminar campos auxiliares que no deben enviarse al backend
+      if ('saldoInicialFromPreviousClosing' in dataToSend) {
+        console.log('[AGENT_CLOSING_FORM] Eliminando campo auxiliar saldoInicialFromPreviousClosing antes de enviar al backend');
+        delete dataToSend.saldoInicialFromPreviousClosing;
+      }
+      
       // Formatear la fecha a string con formato yyyy-MM-dd
       if (dataToSend.fechaCierre instanceof Date) {
         dataToSend.fechaCierre = format(dataToSend.fechaCierre, 'yyyy-MM-dd');
@@ -529,6 +559,12 @@ const AgentClosingForm: React.FC = () => {
             turnoId: dataToSend.turnoId ? Number(dataToSend.turnoId) : undefined
           };
           
+          // Eliminar campos auxiliares que no deben enviarse al backend
+          if ('saldoInicialFromPreviousClosing' in updateData) {
+            console.log('[AGENT_CLOSING_FORM] Eliminando campo auxiliar saldoInicialFromPreviousClosing del objeto updateData');
+            delete updateData.saldoInicialFromPreviousClosing;
+          }
+          
           // Log detallado de los valores críticos
           console.log('[AGENT_CLOSING_FORM] Valores críticos validados en handleConfirmedSubmit:');
           console.log('- proveedorId:', proveedorIdValue, typeof proveedorIdValue);
@@ -584,25 +620,43 @@ const AgentClosingForm: React.FC = () => {
           navigate('/agent-closings');
         }
       } catch (mutationError: any) {
-        console.error('[AGENT_CLOSING_FORM] Error en la mutación:', mutationError);
+        // Reducimos los logs de consola para evitar sobrecarga
+        // Solo registramos información esencial para depuración
         
         // Extraer mensaje de error detallado de la respuesta
         let errorMessage = 'Error desconocido';
+        let errorDetails = '';
+        
         if (mutationError.response) {
-          console.error('[AGENT_CLOSING_FORM] Detalles de la respuesta de error:', {
-            status: mutationError.response.status,
-            statusText: mutationError.response.statusText,
-            data: mutationError.response.data
-          });
+          // Solo registramos el código de estado y el mensaje principal
+          console.error(`[AGENT_CLOSING_FORM] Error API ${mutationError.response.status}: ${mutationError.response.data?.message || mutationError.response.statusText}`);
           
           // Intentar obtener mensaje detallado del backend
           errorMessage = mutationError.response.data?.message || 
                         mutationError.response.data?.error || 
                         `Error ${mutationError.response.status}: ${mutationError.response.statusText}`;
+          
+          // Verificar si es un error de cierre duplicado
+          if (errorMessage.includes('Ya existe un cierre para este agente') || 
+              errorMessage.includes('mismo día') || 
+              errorMessage.includes('mismo turno')) {
+            
+            // Mensaje más amigable para el usuario
+            errorDetails = 'Ya existe un cierre para este agente en esta fecha y turno. ' + 
+                          'Por favor, seleccione otro turno o modifique la fecha.';
+            
+            // Mostrar mensaje específico en Snackbar
+            showSnackbar(errorDetails, 'warning');
+          } else {
+            // Otros errores
+            showSnackbar(`Error al guardar el cierre final: ${errorMessage}`, 'error');
+          }
         } else if (mutationError.message) {
           errorMessage = mutationError.message;
+          showSnackbar(`Error al guardar el cierre final: ${errorMessage}`, 'error');
+        } else {
+          showSnackbar('Error desconocido al guardar el cierre final', 'error');
         }
-        alert(`Error al guardar el cierre final: ${errorMessage}`);
       }
 
       // Cerrar el diálogo de confirmación
@@ -635,11 +689,60 @@ const AgentClosingForm: React.FC = () => {
     // Validar que el ID del proveedor sea válido
     if (!isValidId(proveedorId)) {
       console.warn('[AGENT_CLOSING_FORM] ID de proveedor inválido para obtener saldo inicial:', proveedorId);
-      return;
+      return { fromPreviousClosing: false };
     }
+    
+    // Verificar si el agente es EFECTIVO AGENTE
+    const selectedProvider = providers?.find(provider => provider.id === proveedorId);
+    const isEfectivoAgente = selectedProvider?.nombre === 'EFECTIVO AGENTE';
+    
+    console.log(`[AGENT_CLOSING_FORM] Agente seleccionado: ${selectedProvider?.nombre}, Es EFECTIVO AGENTE: ${isEfectivoAgente ? 'Sí' : 'No'}`);
 
     try {
       console.log(`[AGENT_CLOSING_FORM] Obteniendo saldo inicial para proveedor ID: ${proveedorId}`);
+      
+      // 1. Primero verificar si hay un cierre anterior del mismo agente en el mismo día
+      const today = new Date();
+      const formattedDate = format(today, 'yyyy-MM-dd');
+      
+      // Obtener todos los cierres de hoy
+      console.log(`[AGENT_CLOSING_FORM] Buscando cierres previos para la fecha: ${formattedDate}`);
+      const closings = await agentClosingsApi.getAllAgentClosings(formattedDate, formattedDate);
+      
+      // Filtrar por el mismo agente y ordenar por ID (asumiendo que IDs mayores son más recientes)
+      const agentClosings = closings
+        .filter(closing => closing.proveedorId === proveedorId)
+        .sort((a, b) => b.id - a.id); // Ordenar de más reciente a más antiguo
+      
+      // Si hay cierres previos del mismo agente hoy, usar el resultado final o saldo final según corresponda
+      if (agentClosings.length > 0) {
+        const previousClosing = agentClosings[0]; // El más reciente
+        
+        // Si es EFECTIVO AGENTE, usar el saldo final; de lo contrario, usar el resultado final
+        let valorInicial;
+        if (isEfectivoAgente) {
+          valorInicial = Number(previousClosing.saldoFinal) || 0;
+          console.log(`[AGENT_CLOSING_FORM] Agente EFECTIVO AGENTE: usando Saldo Final (${valorInicial}) del cierre previo ID: ${previousClosing.id}`);
+        } else {
+          valorInicial = Number(previousClosing.resultadoFinal) || 0;
+          console.log(`[AGENT_CLOSING_FORM] Agente regular: usando Resultado Final (${valorInicial}) del cierre previo ID: ${previousClosing.id}`);
+        }
+        
+        setFieldValue('saldoInicial', valorInicial);
+        
+        // Indicar que el saldo inicial proviene de un cierre previo
+        setFieldValue('saldoInicialFromPreviousClosing', true, false);
+        console.log('[AGENT_CLOSING_FORM] Saldo inicial proviene de un cierre previo');
+        
+        return { fromPreviousClosing: true, value: valorInicial };
+      }
+      
+      // 2. Si no hay cierres previos hoy, seguir con la lógica original
+      console.log('[AGENT_CLOSING_FORM] No se encontraron cierres previos hoy, buscando transacción de Saldo Inicial');
+      
+      // Indicar que el saldo inicial NO proviene de un cierre previo
+      setFieldValue('saldoInicialFromPreviousClosing', false, false);
+      
       // Obtener todas las transacciones del agente
       const transactions = await transactionsApi.getByAgent(proveedorId);
       
@@ -663,27 +766,29 @@ const AgentClosingForm: React.FC = () => {
           const saldoValue = Number(saldoInicialByIdTransaction.valor) || 0;
           setFieldValue('saldoInicial', saldoValue);
           console.log('[AGENT_CLOSING_FORM] Saldo Inicial encontrado por ID:', saldoValue);
-          return;
+          return { fromPreviousClosing: false, value: saldoValue };
         }
       } else {
         // Si se encuentra por nombre, actualizar el campo saldoInicial
         const saldoValue = Number(saldoInicialTransaction.valor) || 0;
         setFieldValue('saldoInicial', saldoValue);
         console.log('[AGENT_CLOSING_FORM] Saldo Inicial encontrado por nombre:', saldoValue);
-        return;
+        return { fromPreviousClosing: false, value: saldoValue };
       }
       
       // Si llegamos aquí, no se encontró ninguna transacción de Saldo Inicial
       console.log('[AGENT_CLOSING_FORM] No se encontró transacción de Saldo Inicial para este agente');
       setFieldValue('saldoInicial', 0);
+      return { fromPreviousClosing: false, value: 0 };
       
     } catch (error) {
       console.error('[AGENT_CLOSING_FORM] Error al obtener el saldo inicial:', error);
       setFieldValue('saldoInicial', 0);
+      return { fromPreviousClosing: false, value: 0 };
     }
   };
 
-  // Función para obtener el conteo de efectivo de la fecha actual, turno actual y usuario actual
+  // Función para obtener el conteo de efectivo de la fecha seleccionada, turno actual y usuario actual
   const getCashCountForCurrentUser = async (
     fechaCierre: Date | string,
     setFieldValue: any
@@ -703,10 +808,21 @@ const AgentClosingForm: React.FC = () => {
       const usuarioId = authState.user.id;
       const turnoId = turnoActual.id;
       
-      // Obtener la fecha actual en formato YYYY-MM-DD
-      const fechaActual = format(new Date(), 'yyyy-MM-dd');
+      // Obtener la fecha de cierre seleccionada en formato YYYY-MM-DD
+      let fechaSeleccionada = '';
+      if (typeof fechaCierre === 'string') {
+        // Si es string, extraer la parte de la fecha (antes de la T)
+        const partes = fechaCierre.split('T');
+        fechaSeleccionada = partes.length > 0 ? partes[0] : '';
+      } else if (fechaCierre instanceof Date) {
+        // Si es Date, formatear a yyyy-MM-dd
+        fechaSeleccionada = format(fechaCierre, 'yyyy-MM-dd');
+      } else {
+        // Si no es un formato válido, usar la fecha actual
+        fechaSeleccionada = format(new Date(), 'yyyy-MM-dd');
+      }
       
-      console.log(`[AGENT_CLOSING_FORM] Buscando conteo de efectivo para fecha ${fechaActual}, usuario ${usuarioId}, turno ${turnoId}`);
+      console.log(`[AGENT_CLOSING_FORM] Buscando conteo de efectivo para fecha ${fechaSeleccionada}, usuario ${usuarioId}, turno ${turnoId}`);
 
       // Obtener todos los conteos de efectivo (sin filtrar por turno inicialmente)
       const todosLosBilletes = await cashApi.getAllBilletes();
@@ -718,33 +834,51 @@ const AgentClosingForm: React.FC = () => {
       
       console.log(`[AGENT_CLOSING_FORM] Se encontraron ${todosLosBilletes.length} conteos en total`);
       
-      // Filtrar por usuario actual y fecha actual (ignorando la hora)
+      // Filtrar por usuario actual, fecha seleccionada (ignorando la hora) y estado activo
       const billetesFiltrados = todosLosBilletes.filter(billete => {
         // Verificar que el conteo pertenece al usuario actual
         const esDelUsuario = billete.usuarioId === usuarioId;
         
-        // Verificar que la fecha coincide con la fecha actual (solo la parte de fecha, no la hora)
+        // Verificar que el conteo está activo (si el campo existe)
+        // Si el campo estado no existe, asumimos que está activo por defecto
+        const estaActivo = billete.estado === undefined ? true : billete.estado === true;
+        
+        // Verificar que la fecha coincide con la fecha seleccionada (solo la parte de fecha, no la hora)
         let fechaBillete = '';
         
-        // Función segura para extraer la fecha de un string o Date
+        // Función segura para extraer la fecha de un string o Date, considerando la zona horaria local
         const extraerFecha = (valor: any): string => {
           if (!valor) return '';
           
-          if (typeof valor === 'string') {
-            // Si es string, extraer la parte de la fecha (antes de la T)
-            const partes = valor.split('T');
-            return partes.length > 0 ? partes[0] : '';
-          } else if (valor instanceof Date) {
-            // Si es Date, formatear a yyyy-MM-dd
-            return format(valor, 'yyyy-MM-dd');
-          } else {
-            // Intentar convertir a Date si es otro tipo
-            try {
-              return format(new Date(valor), 'yyyy-MM-dd');
-            } catch (error) {
-              console.error('[AGENT_CLOSING_FORM] Error al formatear fecha:', error);
+          try {
+            let fecha;
+            
+            if (typeof valor === 'string') {
+              // Crear un objeto Date a partir del string
+              fecha = new Date(valor);
+            } else if (valor instanceof Date) {
+              fecha = valor;
+            } else {
+              // Intentar convertir a Date si es otro tipo
+              fecha = new Date(valor);
+            }
+            
+            // Verificar si la fecha es válida
+            if (isNaN(fecha.getTime())) {
+              console.error('[AGENT_CLOSING_FORM] Fecha inválida:', valor);
               return '';
             }
+            
+            // Obtener la fecha en la zona horaria local (sin ajustar por UTC)
+            const year = fecha.getFullYear();
+            const month = String(fecha.getMonth() + 1).padStart(2, '0');
+            const day = String(fecha.getDate()).padStart(2, '0');
+            
+            // Formatear como YYYY-MM-DD
+            return `${year}-${month}-${day}`;
+          } catch (error) {
+            console.error('[AGENT_CLOSING_FORM] Error al formatear fecha:', error, valor);
+            return '';
           }
         };
         
@@ -755,7 +889,8 @@ const AgentClosingForm: React.FC = () => {
           fechaBillete = extraerFecha(billete.fecha);
         }
         
-        const coincideFecha = fechaBillete === fechaActual;
+        // Verificar si la fecha del billete coincide con la fecha seleccionada
+        const coincideFecha = fechaBillete === fechaSeleccionada;
         
         // Verificar si el conteo pertenece al turno actual
         // Puede ser que el turnoId esté directamente en el billete o que no esté
@@ -764,21 +899,59 @@ const AgentClosingForm: React.FC = () => {
         // Mostrar información detallada para depuración
         if (esDelUsuario) {
           console.log(`[AGENT_CLOSING_FORM] Conteo ID ${billete.id}: Usuario ${esDelUsuario ? 'coincide' : 'no coincide'}, ` +
-                    `Fecha billete ${fechaBillete}, fecha actual ${fechaActual}, coincide fecha: ${coincideFecha}, ` +
-                    `Turno billete: ${billete.turnoId || 'no definido'}, turno actual: ${turnoId}, coincide turno: ${coincideTurno}`);
+                    `Fecha billete ${fechaBillete}, fecha seleccionada ${fechaSeleccionada}, coincide fecha: ${coincideFecha}, ` +
+                    `Turno billete: ${billete.turnoId || 'no definido'}, turno actual: ${turnoId}, coincide turno: ${coincideTurno}, ` +
+                    `Estado: ${billete.estado === undefined ? 'no definido (asumido activo)' : billete.estado ? 'activo' : 'inactivo'}, ` +
+                    `Está activo: ${estaActivo ? 'sí' : 'no'}`);
         }
         
-        return esDelUsuario && coincideFecha;
+        return esDelUsuario && coincideFecha && estaActivo;
       });
       
-      console.log(`[AGENT_CLOSING_FORM] Se encontraron ${billetesFiltrados.length} conteos para este usuario en la fecha actual`);
+      console.log(`[AGENT_CLOSING_FORM] Se encontraron ${billetesFiltrados.length} conteos activos para este usuario en la fecha seleccionada`);
       
+      // Si no hay conteos para la fecha seleccionada, intentar buscar el más reciente sin importar la fecha
       if (billetesFiltrados.length === 0) {
-        console.log('[AGENT_CLOSING_FORM] No se encontró conteo de efectivo para la fecha actual y usuario actual');
-        return null;
+        console.log('[AGENT_CLOSING_FORM] No se encontró conteo de efectivo para la fecha seleccionada. Buscando el más reciente...');
+        
+        // Filtrar por usuario y estado activo
+        const billetesPorUsuario = todosLosBilletes.filter(billete => {
+          const esDelUsuario = billete.usuarioId === usuarioId;
+          const estaActivo = billete.estado === undefined ? true : billete.estado === true;
+          return esDelUsuario && estaActivo;
+        });
+        
+        if (billetesPorUsuario.length === 0) {
+          console.log('[AGENT_CLOSING_FORM] No se encontraron conteos de efectivo para este usuario');
+          return null;
+        }
+        
+        // Ordenar por fecha de registro (más reciente primero)
+        billetesPorUsuario.sort((a, b) => {
+          const fechaA = a.fechaRegistro ? new Date(a.fechaRegistro).getTime() : 
+                      a.fecha ? new Date(a.fecha).getTime() : 0;
+          const fechaB = b.fechaRegistro ? new Date(b.fechaRegistro).getTime() : 
+                      b.fecha ? new Date(b.fecha).getTime() : 0;
+          return fechaB - fechaA; // Orden descendente (más reciente primero)
+        });
+        
+        // Tomar el conteo más reciente
+        const conteoMasReciente = billetesPorUsuario[0];
+        
+        if (conteoMasReciente && isValidId(conteoMasReciente.id)) {
+          console.log(`[AGENT_CLOSING_FORM] Se encontró el conteo más reciente: ID ${conteoMasReciente.id}, ` +
+                    `Total General: ${conteoMasReciente.totalGeneral}, ` +
+                    `Fecha: ${conteoMasReciente.fechaRegistro || conteoMasReciente.fecha}, ` +
+                    `Usuario: ${conteoMasReciente.usuarioId}, ` +
+                    `Turno: ${conteoMasReciente.turnoId || 'no definido'}`);
+          return conteoMasReciente;
+        } else {
+          console.log('[AGENT_CLOSING_FORM] No se encontró un conteo de efectivo válido');
+          return null;
+        }
       }
       
-      // Si hay varios conteos, ordenar por fecha de registro (más reciente primero)
+      // Si hay varios conteos para la fecha seleccionada, ordenar por fecha de registro (más reciente primero)
       billetesFiltrados.sort((a, b) => {
         const fechaA = a.fechaRegistro ? new Date(a.fechaRegistro).getTime() : 
                      a.fecha ? new Date(a.fecha).getTime() : 0;
@@ -852,12 +1025,25 @@ const AgentClosingForm: React.FC = () => {
       
       console.log(`[AGENT_CLOSING_FORM] Calculando resultado final para agente ${proveedorId} desde ${startDate} hasta ${endDate}`);
 
-      // Obtener el resultado final calculado
+      // Primero, obtener el saldo inicial y verificar si proviene de un cierre previo
+      const saldoInicialResult = await getSaldoInicial(proveedorId, setFieldValue);
+      const saldoInicial = saldoInicialResult.value || 0;
+      const fromPreviousClosing = saldoInicialResult.fromPreviousClosing || false;
+      
+      console.log(`[AGENT_CLOSING_FORM] Saldo inicial: ${saldoInicial}, Proviene de cierre previo: ${fromPreviousClosing}`);
+
+      // Obtener el resultado final calculado para el turno actual
       const resultadoFinalResponse = await agentClosingsApi.calculateResultadoFinal(proveedorId, startDate, endDate);
       
       // Asegurar que el resultado sea un número válido
-      const resultadoFinal = Number(resultadoFinalResponse) || 0;
-      console.log(`[AGENT_CLOSING_FORM] Resultado final calculado: ${resultadoFinal}`);
+      let resultadoFinal = Number(resultadoFinalResponse) || 0;
+      console.log(`[AGENT_CLOSING_FORM] Resultado final calculado para el turno actual: ${resultadoFinal}`);
+      
+      // Si el saldo inicial proviene de un cierre previo, sumarlo al resultado final
+      if (fromPreviousClosing) {
+        resultadoFinal += saldoInicial;
+        console.log(`[AGENT_CLOSING_FORM] Sumando saldo inicial (${saldoInicial}) al resultado final. Nuevo resultado final: ${resultadoFinal}`);
+      }
 
       // Actualizar el campo resultadoFinal y luego la diferencia
       console.log(`[AGENT_CLOSING_FORM] Actualizando resultadoFinal a ${resultadoFinal}`);
@@ -878,9 +1064,6 @@ const AgentClosingForm: React.FC = () => {
       
       // Actualizar el campo diferencia
       setFieldValue('diferencia', diferencia);
-
-      // Obtener y actualizar el saldo inicial
-      await getSaldoInicial(proveedorId, setFieldValue);
     } catch (error) {
       console.error('[AGENT_CLOSING_FORM] Error al calcular el resultado final:', error);
       setFieldValue('resultadoFinal', 0);
@@ -1351,12 +1534,12 @@ const AgentClosingForm: React.FC = () => {
       <Snackbar
         open={snackbarOpen}
         autoHideDuration={6000}
-        onClose={() => setSnackbarOpen(false)}
+        onClose={handleSnackbarClose}
         anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
       >
         <Alert 
-          onClose={() => setSnackbarOpen(false)} 
-          severity="success" 
+          onClose={handleSnackbarClose} 
+          severity={snackbarSeverity}
           sx={{ width: '100%' }}
         >
           {snackbarMessage}

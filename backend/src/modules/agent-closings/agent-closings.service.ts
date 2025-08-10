@@ -1,7 +1,9 @@
-import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
+import { Injectable, NotFoundException, ConflictException, UnauthorizedException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, Between } from 'typeorm';
+import { Repository, Between, DataSource } from 'typeorm';
 import { AgentClosing } from './entities/agent-closing.entity';
+import { ClosingAdjustment } from './entities/closing-adjustment.entity';
+import { AdjustClosingDto } from './dto/adjust-closing.dto';
 import { CreateAgentClosingDto } from './dto/create-agent-closing.dto';
 import { UpdateAgentClosingDto } from './dto/update-agent-closing.dto';
 import { Provider } from '../providers/entities/provider.entity';
@@ -14,10 +16,13 @@ export class AgentClosingsService {
   constructor(
     @InjectRepository(AgentClosing)
     private agentClosingsRepository: Repository<AgentClosing>,
+    @InjectRepository(ClosingAdjustment)
+    private closingAdjustmentsRepository: Repository<ClosingAdjustment>,
     @InjectRepository(Provider)
     private providersRepository: Repository<Provider>,
     private formulaConfigsService: FormulaConfigsService,
     private transactionsService: TransactionsService,
+    private dataSource: DataSource,
   ) {}
 
   async create(createAgentClosingDto: CreateAgentClosingDto): Promise<AgentClosing> {
@@ -25,6 +30,9 @@ export class AgentClosingsService {
     console.log(`[CS-CREATE] Valores específicos recibidos:`);
     console.log(`[CS-CREATE] - resultadoFinal:`, createAgentClosingDto.resultadoFinal, typeof createAgentClosingDto.resultadoFinal);
     console.log(`[CS-CREATE] - diferencia:`, createAgentClosingDto.diferencia, typeof createAgentClosingDto.diferencia);
+    
+    // Verificar si el usuario tiene un turno activo
+    await this.verificarTurnoActivo(createAgentClosingDto.usuarioId);
     try {
       // Verificar si el proveedor existe y es de tipo agente
       const provider = await this.providersRepository.findOne({
@@ -47,20 +55,36 @@ export class AgentClosingsService {
       }
       console.log(`[CS-CREATE] Proveedor es de tipo agente: ${provider.tipoProveedor.nombre}`);
 
-      // Verificar si ya existe un cierre para este proveedor en la misma fecha
+      // Verificar si ya existe un cierre para este proveedor en la misma fecha y turno
       // Usar la fecha directamente como string para evitar problemas de zona horaria
-      console.log(`[CS-CREATE] Verificando cierres existentes para fecha ${createAgentClosingDto.fechaCierre}`);
-      const existingClosing = await this.agentClosingsRepository
+      console.log(`[CS-CREATE] Verificando cierres existentes para fecha ${createAgentClosingDto.fechaCierre} y turno ${createAgentClosingDto.turnoId}`);
+      
+      // Construir la consulta base
+      const queryBuilder = this.agentClosingsRepository
         .createQueryBuilder('closing')
         .where('closing.proveedor_id = :proveedorId', { proveedorId: createAgentClosingDto.proveedorId })
-        .andWhere('closing.fecha_cierre = :fechaCierre', { fechaCierre: createAgentClosingDto.fechaCierre })
-        .getOne();
+        .andWhere('closing.fecha_cierre = :fechaCierre', { fechaCierre: createAgentClosingDto.fechaCierre });
+      
+      // Si se proporciona un turnoId, añadirlo a la consulta
+      if (createAgentClosingDto.turnoId) {
+        queryBuilder.andWhere('closing.turno_id = :turnoId', { turnoId: createAgentClosingDto.turnoId });
+        console.log(`[CS-CREATE] Añadiendo filtro por turnoId: ${createAgentClosingDto.turnoId}`);
+      } else {
+        console.log(`[CS-CREATE] No se proporcionó turnoId, verificando cualquier cierre para esta fecha y agente`);
+      }
+      
+      const existingClosing = await queryBuilder.getOne();
 
       if (existingClosing) {
-        console.error(`[CS-CREATE] Ya existe un cierre para este agente en la fecha ${createAgentClosingDto.fechaCierre}`);
-        throw new ConflictException(`Ya existe un cierre para este agente en la fecha ${createAgentClosingDto.fechaCierre}`);
+        if (createAgentClosingDto.turnoId) {
+          console.error(`[CS-CREATE] Ya existe un cierre para este agente en la fecha ${createAgentClosingDto.fechaCierre} y turno ${createAgentClosingDto.turnoId}`);
+          throw new ConflictException(`Ya existe un cierre para este agente en la fecha ${createAgentClosingDto.fechaCierre} y turno ${createAgentClosingDto.turnoId}`);
+        } else {
+          console.error(`[CS-CREATE] Ya existe un cierre para este agente en la fecha ${createAgentClosingDto.fechaCierre}`);
+          throw new ConflictException(`Ya existe un cierre para este agente en la fecha ${createAgentClosingDto.fechaCierre}. Por favor, especifique un turno diferente.`);
+        }
       }
-      console.log(`[CS-CREATE] No existe cierre previo para esta fecha, continuando...`);
+      console.log(`[CS-CREATE] No existe cierre previo para esta fecha y turno, continuando...`);
       
       // Calcular el resultado final basado en las transacciones y la configuración de fórmulas
       const fechaCierre = new Date(createAgentClosingDto.fechaCierre);
@@ -133,6 +157,40 @@ export class AgentClosingsService {
       throw error;
     }
   }
+  
+  /**
+   * Verifica si el usuario tiene un turno activo asignado
+   * @param usuarioId ID del usuario
+   * @throws UnauthorizedException si el usuario no tiene un turno activo
+   */
+  private async verificarTurnoActivo(usuarioId: number): Promise<void> {
+    console.log(`[CS] Verificando turno activo para usuario ${usuarioId}`);
+    
+    try {
+      // Consultar si el usuario tiene un turno activo asignado
+      const turnoActivo = await this.dataSource
+        .createQueryBuilder()
+        .select('ut.usuario_id')
+        .from('tbl_usuarios_turnos', 'ut')
+        .innerJoin('tbl_turnos', 't', 'ut.turno_id = t.id')
+        .where('ut.usuario_id = :usuarioId', { usuarioId })
+        .andWhere('t.activo = :activo', { activo: true })
+        .getRawOne();
+      
+      if (!turnoActivo) {
+        console.log(`[CS] El usuario ${usuarioId} no tiene un turno activo asignado`);
+        throw new UnauthorizedException('No puede crear cierres sin un turno activo. Por favor, active un turno primero.');
+      }
+      
+      console.log(`[CS] Usuario ${usuarioId} tiene turno activo`);
+    } catch (error) {
+      if (error instanceof UnauthorizedException) {
+        throw error;
+      }
+      console.error(`[CS] Error al verificar turno activo: ${error.message}`);
+      throw new BadRequestException(`Error al verificar turno activo: ${error.message}`);
+    }
+  }
 
   async findAll(startDate?: string, endDate?: string): Promise<AgentClosing[]> {
     console.log(`[CS-FINDALL] Buscando cierres entre ${startDate || 'inicio'} y ${endDate || 'fin'}`);
@@ -190,22 +248,38 @@ export class AgentClosingsService {
       }
     }
 
-    // Si se está actualizando la fecha, verificar que no exista otro cierre para el mismo proveedor en esa fecha
+    // Si se está actualizando la fecha, verificar que no exista otro cierre para el mismo proveedor en esa fecha y turno
     if (updateAgentClosingDto.fechaCierre) {
-      console.log(`[CS-UPDATE] Verificando cierres existentes para fecha ${updateAgentClosingDto.fechaCierre}`);
-      // Usar QueryBuilder para evitar problemas de zona horaria
-      const existingClosing = await this.agentClosingsRepository
+      console.log(`[CS-UPDATE] Verificando cierres existentes para fecha ${updateAgentClosingDto.fechaCierre} y turno ${updateAgentClosingDto.turnoId || closing.turnoId}`);
+      
+      // Construir la consulta base
+      const queryBuilder = this.agentClosingsRepository
         .createQueryBuilder('closing')
         .where('closing.proveedor_id = :proveedorId', { 
           proveedorId: updateAgentClosingDto.proveedorId || closing.proveedorId 
         })
         .andWhere('closing.fecha_cierre = :fechaCierre', { fechaCierre: updateAgentClosingDto.fechaCierre })
-        .andWhere('closing.id != :id', { id })
-        .getOne();
+        .andWhere('closing.id != :id', { id });
+      
+      // Si se proporciona o existe un turnoId, añadirlo a la consulta
+      const turnoId = updateAgentClosingDto.turnoId || closing.turnoId;
+      if (turnoId) {
+        queryBuilder.andWhere('closing.turno_id = :turnoId', { turnoId });
+        console.log(`[CS-UPDATE] Añadiendo filtro por turnoId: ${turnoId}`);
+      } else {
+        console.log(`[CS-UPDATE] No se proporcionó turnoId, verificando cualquier cierre para esta fecha y agente`);
+      }
+      
+      const existingClosing = await queryBuilder.getOne();
 
       if (existingClosing) {
-        console.error(`[CS-UPDATE] Ya existe otro cierre para este agente en la fecha ${updateAgentClosingDto.fechaCierre}`);
-        throw new ConflictException(`Ya existe otro cierre para este agente en la fecha ${updateAgentClosingDto.fechaCierre}`);
+        if (turnoId) {
+          console.error(`[CS-UPDATE] Ya existe otro cierre para este agente en la fecha ${updateAgentClosingDto.fechaCierre} y turno ${turnoId}`);
+          throw new ConflictException(`Ya existe otro cierre para este agente en la fecha ${updateAgentClosingDto.fechaCierre} y turno ${turnoId}`);
+        } else {
+          console.error(`[CS-UPDATE] Ya existe otro cierre para este agente en la fecha ${updateAgentClosingDto.fechaCierre}`);
+          throw new ConflictException(`Ya existe otro cierre para este agente en la fecha ${updateAgentClosingDto.fechaCierre}. Por favor, especifique un turno diferente.`);
+        }
       }
     }
     
@@ -366,7 +440,8 @@ export class AgentClosingsService {
       return result[0].id;
     }
     
-    throw new NotFoundException('No se encontró el tipo de proveedor "Agente"');
+    // Si no se encuentra, devolver un valor por defecto
+    return 0;
   }
   
   // Método para calcular el resultado final basado en las transacciones y la configuración de fórmulas
@@ -449,6 +524,159 @@ export class AgentClosingsService {
     } catch (error) {
       console.error(`[CS] Error al calcular el resultado final para proveedor ${proveedorId}:`, error);
       return 0;
+    }
+  }
+
+  /**
+   * Realiza un ajuste al resultado final de un cierre inactivo
+   * @param id ID del cierre a ajustar
+   * @param userId ID del usuario que realiza el ajuste
+   * @param adjustDto Datos del ajuste (monto y justificación)
+   * @returns El cierre actualizado
+   */
+  async adjustClosing(id: number, userId: number, adjustDto: AdjustClosingDto): Promise<AgentClosing> {
+    console.log(`[CS-ADJUST] Iniciando ajuste para cierre ${id} por usuario ${userId}`);
+    console.log(`[CS-ADJUST] Datos recibidos:`, JSON.stringify(adjustDto));
+    
+    try {
+      // Buscar el cierre
+      const closing = await this.findOne(id);
+      
+      // Verificar que el cierre esté inactivo
+      if (closing.estado !== 'inactivo') {
+        console.error(`[CS-ADJUST] El cierre ${id} no está inactivo, estado actual: ${closing.estado}`);
+        throw new ConflictException('Solo se pueden ajustar cierres inactivos');
+      }
+
+      // Asegurarse de que los valores sean números válidos
+      const adjustmentAmount = adjustDto.adjustmentAmount !== null && adjustDto.adjustmentAmount !== undefined 
+        ? Number(adjustDto.adjustmentAmount) 
+        : 0;
+
+      // Guardar el resultado final anterior
+      const previousFinalResult = closing.resultadoFinal !== null && closing.resultadoFinal !== undefined 
+        ? Number(closing.resultadoFinal) 
+        : 0;
+      
+      // Calcular el nuevo resultado final
+      const newFinalResult = previousFinalResult + adjustmentAmount;
+      console.log(`[CS-ADJUST] Resultado final anterior: ${previousFinalResult}, ajuste: ${adjustmentAmount}, nuevo: ${newFinalResult}`);
+      
+      // Obtener el saldo final para calcular diferencias
+      const saldoFinal = closing.saldoFinal !== null && closing.saldoFinal !== undefined 
+        ? Number(closing.saldoFinal) 
+        : 0;
+      
+      // Calcular diferencia anterior y nueva
+      const previousDifference = saldoFinal - previousFinalResult;
+      const newDifference = saldoFinal - newFinalResult;
+      
+      console.log(`[CS-ADJUST] Saldo final: ${saldoFinal}`);
+      console.log(`[CS-ADJUST] Diferencia anterior: ${previousDifference}, nueva diferencia: ${newDifference}`);
+      
+      // Crear registro de ajuste primero para asegurar que se guarde
+      console.log(`[CS-ADJUST] Creando objeto de ajuste para cierre ${id} y usuario ${userId}`);
+      const adjustment = new ClosingAdjustment();
+      adjustment.closingId = id;
+      adjustment.userId = userId;
+      adjustment.adjustmentAmount = adjustmentAmount;
+      adjustment.previousFinalResult = previousFinalResult;
+      adjustment.newFinalResult = newFinalResult;
+      adjustment.previousDifference = previousDifference;
+      adjustment.newDifference = newDifference;
+      adjustment.justification = adjustDto.justification || '';
+      adjustment.createdAt = new Date(); // Asignar explícitamente la fecha de creación
+      
+      console.log(`[CS-ADJUST] Objeto de ajuste creado:`, JSON.stringify(adjustment));
+      
+      // Guardar el registro de ajuste antes de actualizar el cierre
+      console.log(`[CS-ADJUST] Intentando guardar el registro de ajuste en la base de datos...`);
+      let savedAdjustment;
+      try {
+        savedAdjustment = await this.closingAdjustmentsRepository.save(adjustment);
+        console.log(`[CS-ADJUST] Registro de ajuste guardado correctamente con ID: ${savedAdjustment.id}`);
+      } catch (adjustmentError) {
+        console.error(`[CS-ADJUST] Error al guardar el registro de ajuste:`, adjustmentError);
+        console.error(`[CS-ADJUST] Detalles del error:`, JSON.stringify(adjustmentError, Object.getOwnPropertyNames(adjustmentError)));
+        throw new Error(`Error al guardar el registro de ajuste: ${adjustmentError.message}`);
+      }
+      
+      // Actualizar el resultado final y la diferencia en el cierre
+      closing.resultadoFinal = newFinalResult;
+      closing.diferencia = newDifference;
+      
+      // Guardar el cierre actualizado
+      const updatedClosing = await this.agentClosingsRepository.save(closing);
+      console.log(`[CS-ADJUST] Cierre ${id} actualizado correctamente`);
+      
+      return updatedClosing;
+    } catch (error) {
+      console.error(`[CS-ADJUST] Error al realizar ajuste para cierre ${id}:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Obtiene el historial de ajustes de un cierre
+   * @param closingId ID del cierre
+   * @returns Lista de ajustes realizados al cierre
+   */
+  async getClosingAdjustments(closingId: number): Promise<ClosingAdjustment[]> {
+    console.log(`[CS-ADJUST] Obteniendo historial de ajustes para cierre ${closingId}`);
+    
+    try {
+      // Verificar que el cierre existe
+      await this.findOne(closingId);
+      
+      // Buscar todos los ajustes asociados a este cierre
+      const adjustments = await this.closingAdjustmentsRepository.find({
+        where: { closingId },
+        relations: ['user'],
+        order: { createdAt: 'DESC' }
+      });
+      
+      console.log(`[CS-ADJUST] ${adjustments.length} ajustes encontrados para cierre ${closingId}`);
+      return adjustments;
+    } catch (error) {
+      console.error(`[CS-ADJUST] Error al obtener ajustes para cierre ${closingId}:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Actualiza el estado de todos los cierres asociados a un turno específico
+   * @param turnoId ID del turno
+   * @param estado Nuevo estado para los cierres ('activo', 'inactivo', 'anulado')
+   */
+  async updateClosingStatusByTurno(turnoId: number, estado: string): Promise<void> {
+    console.log(`[CS-UPDATE-STATUS] Actualizando estado a "${estado}" para cierres del turno ${turnoId}`);
+    
+    try {
+      // Validar que el turnoId sea un número válido
+      if (!turnoId || isNaN(Number(turnoId))) {
+        console.error(`[CS-UPDATE-STATUS] ID de turno inválido: ${turnoId}`);
+        throw new Error(`ID de turno inválido: ${turnoId}`);
+      }
+      
+      // Validar que el estado sea válido
+      const estadosValidos = ['activo', 'inactivo', 'anulado'];
+      if (!estadosValidos.includes(estado.toLowerCase())) {
+        console.error(`[CS-UPDATE-STATUS] Estado inválido: ${estado}. Debe ser uno de: ${estadosValidos.join(', ')}`);
+        throw new Error(`Estado inválido: ${estado}. Debe ser uno de: ${estadosValidos.join(', ')}`);
+      }
+      
+      // Actualizar todos los cierres asociados al turno especificado
+      const result = await this.agentClosingsRepository
+        .createQueryBuilder()
+        .update(AgentClosing)
+        .set({ estado: estado.toLowerCase() })
+        .where('turno_id = :turnoId', { turnoId })
+        .execute();
+      
+      console.log(`[CS-UPDATE-STATUS] ${result.affected} cierres actualizados a estado "${estado}"`);
+    } catch (error) {
+      console.error(`[CS-UPDATE-STATUS] Error al actualizar estado de cierres:`, error);
+      throw error;
     }
   }
 }

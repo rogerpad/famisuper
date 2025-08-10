@@ -1,7 +1,8 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, Query, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, Query, UseGuards, Request } from '@nestjs/common';
 import { AgentClosingsService } from './agent-closings.service';
 import { CreateAgentClosingDto } from './dto/create-agent-closing.dto';
 import { UpdateAgentClosingDto } from './dto/update-agent-closing.dto';
+import { AdjustClosingDto } from './dto/adjust-closing.dto';
 import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiQuery } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 
@@ -59,6 +60,33 @@ export class AgentClosingsController {
   @ApiResponse({ status: 404, description: 'Cierre no encontrado' })
   remove(@Param('id') id: string) {
     return this.agentClosingsService.remove(+id);
+  }
+
+  @Post(':id/adjust')
+  @ApiOperation({ summary: 'Realizar un ajuste a un cierre inactivo' })
+  @ApiParam({ name: 'id', description: 'ID del cierre' })
+  @ApiResponse({ status: 200, description: 'Ajuste realizado exitosamente' })
+  @ApiResponse({ status: 400, description: 'Datos inválidos' })
+  @ApiResponse({ status: 404, description: 'Cierre no encontrado' })
+  @ApiResponse({ status: 409, description: 'Solo se pueden ajustar cierres inactivos' })
+  adjustClosing(
+    @Param('id') id: string,
+    @Body() adjustClosingDto: AdjustClosingDto,
+    @Request() req
+  ) {
+    console.log('[ADJUST-CONTROLLER] User object:', JSON.stringify(req.user));
+    const userId = req.user.id; // Usar id en lugar de userId
+    console.log('[ADJUST-CONTROLLER] Using userId:', userId);
+    return this.agentClosingsService.adjustClosing(+id, userId, adjustClosingDto);
+  }
+
+  @Get(':id/adjustments')
+  @ApiOperation({ summary: 'Obtener historial de ajustes de un cierre' })
+  @ApiParam({ name: 'id', description: 'ID del cierre' })
+  @ApiResponse({ status: 200, description: 'Historial de ajustes obtenido exitosamente' })
+  @ApiResponse({ status: 404, description: 'Cierre no encontrado' })
+  getClosingAdjustments(@Param('id') id: string) {
+    return this.agentClosingsService.getClosingAdjustments(+id);
   }
 
   @Get('providers/agents')

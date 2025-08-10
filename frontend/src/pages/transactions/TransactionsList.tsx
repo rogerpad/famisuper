@@ -20,7 +20,9 @@ import {
   MenuItem,
   InputLabel,
   Grid,
-  SelectChangeEvent
+  SelectChangeEvent,
+  Snackbar,
+  Alert
 } from '@mui/material';
 import { DataGrid, GridColDef } from '@mui/x-data-grid';
 import { 
@@ -36,16 +38,21 @@ import transactionsApi, { Transaction } from '../../api/transactions/transaction
 import { format, startOfDay, endOfDay } from 'date-fns';
 import { es } from 'date-fns/locale';
 import TransactionForm from './TransactionForm';
+import { useTurno } from '../../contexts/TurnoContext';
 
-const TransactionsList: React.FC = () => {
+const TransactionsList: React.FC<{}> = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [openForm, setOpenForm] = useState(false);
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<number | null>(null);
   const [filterOption, setFilterOption] = useState<string>('active');
   const [filteredData, setFilteredData] = useState<Transaction[]>([]);
+  const [showNoTurnoAlert, setShowNoTurnoAlert] = useState(false);
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  
+  // Obtener el turno actual del contexto
+  const { turnoActual } = useTurno();
 
   // Consulta para obtener todas las transacciones
   const { data: transactions = [], isLoading } = useQuery({
@@ -77,6 +84,7 @@ const TransactionsList: React.FC = () => {
   });
 
   const handleOpenForm = (transaction?: Transaction) => {
+    // Si es una edición, permitir siempre
     if (transaction) {
       // Crear una copia de la transacción para evitar problemas de referencia
       setEditingTransaction({
@@ -84,9 +92,19 @@ const TransactionsList: React.FC = () => {
         // Asegurar que el estado sea un número
         estado: typeof transaction.estado === 'number' ? transaction.estado : 1
       });
-    } else {
-      setEditingTransaction(null);
+      setOpenForm(true);
+      return;
     }
+    
+    // Si es una nueva transacción, verificar si hay un turno activo
+    if (!turnoActual) {
+      console.log('[TRANSACTIONS_LIST] No hay turno activo. No se puede crear una nueva transacción.');
+      setShowNoTurnoAlert(true);
+      return;
+    }
+    
+    // Si hay turno activo, permitir crear la transacción
+    setEditingTransaction(null);
     setOpenForm(true);
   };
 
@@ -280,19 +298,31 @@ const TransactionsList: React.FC = () => {
   
   // Manejar cambio de opción de filtro
   const handleFilterChange = (event: SelectChangeEvent) => {
-    setFilterOption(event.target.value as string);
+    setFilterOption(event.target.value);
   };
 
   return (
     <Box sx={{ flexGrow: 1 }}>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-        <Typography variant="h4" component="h1" display="flex" alignItems="center" gap={1}>
-          <span role="img" aria-label="transactions-icon" style={{ fontSize: '1.2em' }}>💳</span>
-          Transacciones
-        </Typography>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+        <Typography variant="h5">Transacciones</Typography>
         <Box>
+          <Tooltip title={!turnoActual ? "Debe activar un turno para crear transacciones" : "Crear nueva transacción"}>
+            <span>
+              <Button 
+                variant="contained" 
+                color="primary" 
+                startIcon={<AddIcon />}
+                onClick={() => handleOpenForm()}
+                sx={{ mr: 1 }}
+                disabled={!turnoActual}
+              >
+                Nueva Transacción
+              </Button>
+            </span>
+          </Tooltip>
           <Button 
             variant="outlined" 
+            color="primary" 
             startIcon={<ReportIcon />}
             onClick={() => navigate('/reports', { state: { tabIndex: 1 } })}
             sx={{ 
@@ -307,109 +337,57 @@ const TransactionsList: React.FC = () => {
           >
             Resumen de Transacciones
           </Button>
-          <Button 
-            variant="contained" 
-            startIcon={<AddIcon />}
-            onClick={() => handleOpenForm()}
-            sx={{
-              backgroundColor: '#dc7633',
-              '&:hover': {
-                backgroundColor: '#b35c20'
-              },
-              boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
-            }}
-          >
-            Nueva Transacción
-          </Button>
         </Box>
       </Box>
-      
-      <Paper sx={{ 
-        p: 2, 
-        mb: 3, 
-        borderRadius: '8px',
-        boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
-        border: '1px solid rgba(0,0,0,0.05)',
-        overflow: 'hidden'
-      }}>
-        <Grid container spacing={2} sx={{ mb: 2 }}>
-          <Grid item xs={12} md={8}>
-            <TextField
-              fullWidth
-              variant="outlined"
-              placeholder="Buscar por agente o tipo de transacción..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              InputProps={{
-                startAdornment: (
-                  <InputAdornment position="start">
-                    <SearchIcon />
-                  </InputAdornment>
-                ),
-              }}
-            />
-          </Grid>
-          <Grid item xs={12} md={4}>
-            <FormControl fullWidth variant="outlined">
-              <InputLabel id="filter-label">Mostrar</InputLabel>
-              <Select
-                labelId="filter-label"
-                value={filterOption}
-                onChange={handleFilterChange}
-                label="Mostrar"
-              >
-                <MenuItem value="active">Solo las activas</MenuItem>
-                <MenuItem value="today">Todas las transacciones del día</MenuItem>
-                <MenuItem value="all">Todas las transacciones</MenuItem>
-              </Select>
-            </FormControl>
-          </Grid>
-        </Grid>
-        
+
+      {/* Filtros y búsqueda */}
+      <Box sx={{ display: 'flex', mb: 2, gap: 2 }}>
+        <FormControl variant="outlined" size="small" sx={{ minWidth: 150 }}>
+          <InputLabel id="filter-label">Filtrar por</InputLabel>
+          <Select
+            labelId="filter-label"
+            value={filterOption}
+            onChange={handleFilterChange}
+            label="Filtrar por"
+          >
+            <MenuItem value="active">Activas</MenuItem>
+            <MenuItem value="today">Hoy</MenuItem>
+            <MenuItem value="all">Todas</MenuItem>
+          </Select>
+        </FormControl>
+        <TextField
+          variant="outlined"
+          size="small"
+          placeholder="Buscar..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          InputProps={{
+            startAdornment: (
+              <InputAdornment position="start">
+                <SearchIcon />
+              </InputAdornment>
+            ),
+          }}
+          sx={{ width: 300 }}
+        />
+      </Box>
+
+      {/* Tabla de transacciones */}
+      <Paper sx={{ height: 'calc(100vh - 220px)', width: '100%' }}>
         {isLoading ? (
-          <Box sx={{ display: 'flex', justifyContent: 'center', p: 3 }}>
+          <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
             <CircularProgress />
           </Box>
         ) : (
           <DataGrid
             rows={filteredData}
             columns={columns}
-            autoHeight
-            pageSizeOptions={[10, 25, 50]}
             initialState={{
-              pagination: {
-                paginationModel: { pageSize: 10, page: 0 },
-              },
-              sorting: {
-                sortModel: [{ field: 'id', sort: 'desc' }],
-              },
+              pagination: { paginationModel: { pageSize: 10 } },
+              sorting: { sortModel: [{ field: 'id', sort: 'desc' }] },
             }}
+            pageSizeOptions={[10, 25, 50]}
             disableRowSelectionOnClick
-            sx={{ 
-              minHeight: 400,
-              '& .MuiDataGrid-columnHeaders': {
-                backgroundColor: '#f5f5f5',
-                borderBottom: '1px solid rgba(0,0,0,0.1)',
-              },
-              '& .MuiDataGrid-cell': {
-                borderBottom: '1px solid rgba(0,0,0,0.05)',
-              },
-              '& .MuiDataGrid-row:hover': {
-                backgroundColor: 'rgba(220, 118, 51, 0.04)',
-              },
-              '& .MuiDataGrid-row.Mui-selected': {
-                backgroundColor: 'rgba(220, 118, 51, 0.08)',
-                '&:hover': {
-                  backgroundColor: 'rgba(220, 118, 51, 0.12)',
-                },
-              },
-              '& .MuiDataGrid-columnHeaderTitle': {
-                fontWeight: 'bold',
-              },
-              '& .MuiDataGrid-toolbarContainer': {
-                padding: '8px 16px',
-              },
-            }}
           />
         )}
       </Paper>
@@ -423,24 +401,37 @@ const TransactionsList: React.FC = () => {
         />
       )}
 
-      {/* Diálogo de confirmación para eliminar */}
-      <Dialog
-        open={confirmDelete !== null}
-        onClose={() => setConfirmDelete(null)}
-      >
+      {/* Diálogo de confirmación de eliminación */}
+      <Dialog open={confirmDelete !== null} onClose={() => setConfirmDelete(null)}>
         <DialogTitle>Confirmar eliminación</DialogTitle>
         <DialogContent>
           <DialogContentText>
-            ¿Está seguro de que desea eliminar esta transacción? Esta acción no se puede deshacer.
+            ¿Está seguro que desea eliminar esta transacción? Esta acción no se puede deshacer.
           </DialogContentText>
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setConfirmDelete(null)}>Cancelar</Button>
-          <Button onClick={handleDelete} color="error" autoFocus>
+          <Button onClick={handleDelete} color="error" variant="contained">
             Eliminar
           </Button>
         </DialogActions>
       </Dialog>
+
+      {/* Alerta de turno no activo */}
+      <Snackbar 
+        open={showNoTurnoAlert} 
+        autoHideDuration={6000} 
+        onClose={() => setShowNoTurnoAlert(false)}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Alert 
+          onClose={() => setShowNoTurnoAlert(false)} 
+          severity="warning" 
+          variant="filled"
+        >
+          No hay un turno activo. Debe activar un turno antes de crear transacciones.
+        </Alert>
+      </Snackbar>
     </Box>
   );
 };

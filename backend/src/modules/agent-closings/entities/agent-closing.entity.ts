@@ -1,5 +1,6 @@
-import { Entity, Column, PrimaryGeneratedColumn, ManyToOne, JoinColumn, CreateDateColumn, UpdateDateColumn } from 'typeorm';
+import { Entity, Column, PrimaryGeneratedColumn, ManyToOne, JoinColumn, CreateDateColumn, UpdateDateColumn, OneToMany } from 'typeorm';
 import { Provider } from '../../providers/entities/provider.entity';
+import { ClosingAdjustment } from './closing-adjustment.entity';
 
 @Entity({ name: 'tbl_cierre_final_agentes' })
 export class AgentClosing {
@@ -45,4 +46,7 @@ export class AgentClosing {
 
   @UpdateDateColumn({ name: 'fecha_actualizacion' })
   fechaActualizacion: Date;
+
+  @OneToMany(() => ClosingAdjustment, adjustment => adjustment.closing)
+  adjustments: ClosingAdjustment[];
 }

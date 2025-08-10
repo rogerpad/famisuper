@@ -1,6 +1,6 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, UnauthorizedException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, DataSource } from 'typeorm';
 import { Transaction } from './entities/transaction.entity';
 import { CreateTransactionDto } from './dto/create-transaction.dto';
 import { UpdateTransactionDto } from './dto/update-transaction.dto';
@@ -14,9 +14,13 @@ export class TransactionsService {
     private transactionsRepository: Repository<Transaction>,
     private providersService: ProvidersService,
     private transactionTypesService: TransactionTypesService,
+    private dataSource: DataSource,
   ) {}
 
   async create(createTransactionDto: CreateTransactionDto): Promise<Transaction> {
+    // Verificar si el usuario tiene un turno activo
+    await this.verificarTurnoActivo(createTransactionDto.usuarioId);
+    
     // Verificar si el agente existe
     const agente = await this.providersService.findOne(createTransactionDto.agenteId);
     
@@ -40,6 +44,40 @@ export class TransactionsService {
     });
 
     return this.transactionsRepository.save(newTransaction);
+  }
+  
+  /**
+   * Verifica si el usuario tiene un turno activo asignado
+   * @param usuarioId ID del usuario
+   * @throws UnauthorizedException si el usuario no tiene un turno activo
+   */
+  private async verificarTurnoActivo(usuarioId: number): Promise<void> {
+    console.log(`[TS] Verificando turno activo para usuario ${usuarioId}`);
+    
+    try {
+      // Consultar si el usuario tiene un turno activo asignado
+      const turnoActivo = await this.dataSource
+        .createQueryBuilder()
+        .select('ut.usuario_id')
+        .from('tbl_usuarios_turnos', 'ut')
+        .innerJoin('tbl_turnos', 't', 'ut.turno_id = t.id')
+        .where('ut.usuario_id = :usuarioId', { usuarioId })
+        .andWhere('t.activo = :activo', { activo: true })
+        .getRawOne();
+      
+      if (!turnoActivo) {
+        console.log(`[TS] El usuario ${usuarioId} no tiene un turno activo asignado`);
+        throw new UnauthorizedException('No puede crear transacciones sin un turno activo. Por favor, active un turno primero.');
+      }
+      
+      console.log(`[TS] Usuario ${usuarioId} tiene turno activo`);
+    } catch (error) {
+      if (error instanceof UnauthorizedException) {
+        throw error;
+      }
+      console.error(`[TS] Error al verificar turno activo: ${error.message}`);
+      throw new BadRequestException(`Error al verificar turno activo: ${error.message}`);
+    }
   }
 
   async findAll(): Promise<Transaction[]> {
@@ -183,6 +221,70 @@ export class TransactionsService {
     
     // Eliminar la transacción
     await this.transactionsRepository.delete(id);
+  }
+
+  /**
+   * Actualiza el estado de todas las transacciones activas asociadas a un turno específico a inactivas
+   * @param turnoId ID del turno que se está finalizando
+   * @returns Número de transacciones actualizadas
+   */
+  /**
+   * Actualiza el estado de las transacciones activas asociadas a un turno específico a inactivas.
+   * 
+   * Esta versión mejorada utiliza joins entre tablas para identificar y actualizar solo las
+   * transacciones que están asociadas al turno que se está finalizando, a través de la relación
+   * entre usuarios y turnos en la tabla tbl_usuarios_turnos.
+   * 
+   * @param turnoId ID del turno que se está finalizando
+   * @returns Número de transacciones actualizadas
+   */
+  async updateTransactionStatusByTurno(turnoId: number): Promise<number> {
+    console.log(`[TransactionsService] Actualizando estado de transacciones para el turno ${turnoId}`);
+    
+    try {
+      // Obtener la fecha actual en formato YYYY-MM-DD
+      const today = new Date();
+      const formattedDate = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+      
+      console.log(`[TransactionsService] Fecha actual: ${formattedDate}, Turno ID: ${turnoId}`);
+      
+      // Primero, identificamos los IDs de las transacciones que queremos actualizar
+      // usando una subconsulta con joins
+      const transactionIdsToUpdate = await this.transactionsRepository
+        .createQueryBuilder('transaction')
+        .select('transaction.id')
+        .innerJoin('tbl_usuarios_turnos', 'ut', 'transaction.usuario_id = ut.usuario_id')
+        .where('transaction.fecha = :fecha', { fecha: formattedDate })
+        .andWhere('transaction.estado = :estado', { estado: 1 }) // Solo las activas
+        .andWhere('ut.turno_id = :turnoId', { turnoId })
+        .getMany();
+      
+      // Si no hay transacciones para actualizar, retornamos 0
+      if (transactionIdsToUpdate.length === 0) {
+        console.log(`[TransactionsService] No se encontraron transacciones para actualizar en el turno ${turnoId}`);
+        return 0;
+      }
+      
+      // Extraemos solo los IDs
+      const ids = transactionIdsToUpdate.map(t => t.id);
+      
+      console.log(`[TransactionsService] Transacciones a actualizar: ${ids.length} con IDs: ${ids.join(', ')}`);
+      
+      // Actualizamos las transacciones identificadas
+      const result = await this.transactionsRepository
+        .createQueryBuilder()
+        .update(Transaction)
+        .set({ estado: 0 }) // 0 = inactivo
+        .whereInIds(ids)
+        .execute();
+      
+      console.log(`[TransactionsService] ${result.affected} transacciones actualizadas a inactivas para el turno ${turnoId}`);
+      
+      return result.affected || 0;
+    } catch (error) {
+      console.error(`[TransactionsService] Error al actualizar transacciones: ${error.message}`);
+      throw new Error(`Error al actualizar el estado de las transacciones: ${error.message}`);
+    }
   }
 
   async findByDateRange(startDate: string, endDate: string): Promise<Transaction[]> {

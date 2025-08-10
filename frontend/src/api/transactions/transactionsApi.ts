@@ -103,14 +103,6 @@ const transactionsApi = {
     const response = await api.get('/transactions/summary');
     return response.data;
   },
-  
-  // Obtener transacciones activas por rango de fechas para el resumen
-  getByDateRangeForSummary: async (startDate: string, endDate: string): Promise<Transaction[]> => {
-    const response = await api.get(
-      `/transactions/summary/date-range?startDate=${startDate}&endDate=${endDate}`
-    );
-    return response.data;
-  },
 
   // Obtener transacciones por agente
   getByAgent: async (agentId: number): Promise<Transaction[]> => {

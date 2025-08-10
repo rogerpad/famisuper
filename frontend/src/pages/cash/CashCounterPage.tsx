@@ -9,6 +9,7 @@ import {
   Divider
 } from '@mui/material';
 import CashCounter from '../../components/CashCounter';
+import CashCountList from '../../components/CashCountList';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTurno } from '../../contexts/TurnoContext';
 
@@ -98,9 +99,10 @@ const CashCounterPage: React.FC = () => {
         </TabPanel>
         
         <TabPanel value={tabValue} index={1}>
-          <Typography variant="body1" paragraph>
-            El historial de conteos estará disponible próximamente.
+          <Typography variant="body1" color="text.secondary" paragraph>
+            Consulta y administra los registros históricos de conteos de efectivo.
           </Typography>
+          <CashCountList />
         </TabPanel>
       </Paper>
     </Container>

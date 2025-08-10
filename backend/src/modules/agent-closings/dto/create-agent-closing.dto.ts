@@ -3,6 +3,11 @@ import { Type } from 'class-transformer';
 import { ApiProperty } from '@nestjs/swagger';
 
 export class CreateAgentClosingDto {
+  @ApiProperty({ description: 'ID del usuario que crea el cierre' })
+  @IsNotEmpty({ message: 'El ID del usuario es requerido' })
+  @IsNumber({}, { message: 'El ID del usuario debe ser un número' })
+  usuarioId: number;
+
   @ApiProperty({ description: 'ID del proveedor (agente)' })
   @IsNotEmpty({ message: 'El proveedor es requerido' })
   @IsNumber({}, { message: 'El ID del proveedor debe ser un número' })

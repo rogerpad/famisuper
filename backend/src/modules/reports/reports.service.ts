@@ -56,6 +56,12 @@ export class ReportsService {
       order: { nombre: 'ASC' },
     });
 
+    // Crear un mapa de agentes por ID para facilitar la búsqueda
+    const agentesMap = {};
+    agentes.forEach(agente => {
+      agentesMap[agente.id] = agente;
+    });
+
     // Para el cálculo del resultado final, solo consideramos transacciones activas sin filtrar por fechas
     // Obtener todas las transacciones activas
     const transactions = await this.transactionsRepository.find({
@@ -65,8 +71,8 @@ export class ReportsService {
       relations: ['tipoTransaccion', 'agente'],
     });
   
-    console.log(`[RS] getTransactionSummary - Obteniendo todas las transacciones activas sin filtro de fechas`);
-    console.log(`[RS] getTransactionSummary - Total de transacciones activas: ${transactions.length}`);
+    console.log(`[REPORTS_SERVICE] getTransactionSummary - Obteniendo todas las transacciones activas sin filtro de fechas`);
+    console.log(`[REPORTS_SERVICE] getTransactionSummary - Total de transacciones activas: ${transactions.length}`);
 
     // Inicializar el objeto de resumen
     const summaryMap: { [tipoTransaccionId: number]: TransactionSummary } = {};
@@ -95,19 +101,50 @@ export class ReportsService {
 
     // Procesar las transacciones
     transactions.forEach(transaction => {
-      const { tipoTransaccionId, agenteId, valor } = transaction;
+      // Asegurarse de que tipoTransaccionId y agenteId sean números válidos
+      const tipoTransaccionId = Number(transaction.tipoTransaccionId);
+      const agenteId = Number(transaction.agenteId);
+      const valor = Number(transaction.valor) || 0;
       
-      // Si el tipo de transacción existe en nuestro mapa
-      if (summaryMap[tipoTransaccionId]) {
-        // Si la transacción tiene un agente y ese agente está en nuestro listado
-        if (agenteId && totales[agenteId] !== undefined) {
-          summaryMap[tipoTransaccionId].agentes[agenteId] += valor;
-          totales[agenteId] += valor;
-        } else {
-          // Si no tiene agente o el agente no está en el listado, se considera efectivo
-          summaryMap[tipoTransaccionId].efectivo += valor;
-          totalEfectivo += valor;
+      // Validar que el valor sea un número
+      if (isNaN(valor)) {
+        console.warn(`[REPORTS_SERVICE] Valor inválido en transacción ID ${transaction.id}: ${transaction.valor}`);
+        return; // Saltar esta transacción
+      }
+      
+      // Validar que el tipo de transacción exista
+      if (!summaryMap[tipoTransaccionId]) {
+        console.warn(`[REPORTS_SERVICE] Tipo de transacción no encontrado: ${tipoTransaccionId}`);
+        return; // Saltar esta transacción
+      }
+      
+      // Log detallado para depuración
+      console.log(`[REPORTS_SERVICE] Procesando transacción: ID=${transaction.id}, Tipo=${transaction.tipoTransaccion?.nombre || tipoTransaccionId}, Agente=${transaction.agente?.nombre || agenteId}, Valor=${valor}`);
+      
+      // Si la transacción tiene un agente válido y ese agente está en nuestro listado
+      if (!isNaN(agenteId) && agentesMap[agenteId] && totales[agenteId] !== undefined) {
+        console.log(`[REPORTS_SERVICE] Sumando ${valor} al agente ${agentesMap[agenteId].nombre} (ID: ${agenteId}) para tipo ${summaryMap[tipoTransaccionId].tipoTransaccion}`);
+        summaryMap[tipoTransaccionId].agentes[agenteId] += valor;
+        totales[agenteId] += valor;
+      } else {
+        // Si no tiene agente o el agente no está en el listado, se considera efectivo
+        console.log(`[REPORTS_SERVICE] Sumando ${valor} a efectivo para tipo ${summaryMap[tipoTransaccionId].tipoTransaccion}`);
+        summaryMap[tipoTransaccionId].efectivo += valor;
+        totalEfectivo += valor;
+      }
+    });
+    
+    // Log del resumen final para depuración
+    console.log('[REPORTS_SERVICE] Resumen de transacciones por tipo y agente:');
+    Object.values(summaryMap).forEach(summary => {
+      console.log(`[REPORTS_SERVICE] Tipo: ${summary.tipoTransaccion}`);
+      Object.entries(summary.agentes).forEach(([agenteId, valor]) => {
+        if (valor > 0) {
+          console.log(`[REPORTS_SERVICE]   - Agente ${agentesMap[agenteId]?.nombre || agenteId}: ${valor}`);
         }
+      });
+      if (summary.efectivo > 0) {
+        console.log(`[REPORTS_SERVICE]   - Efectivo: ${summary.efectivo}`);
       }
     });
 

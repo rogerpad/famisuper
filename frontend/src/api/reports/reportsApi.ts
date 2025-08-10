@@ -28,12 +28,8 @@ export interface TransactionReportData {
 
 const reportsApi = {
   // Obtener resumen de transacciones por tipo y agente
-  getTransactionSummary: async (startDate?: string, endDate?: string): Promise<TransactionReportData> => {
-    const params: any = {};
-    if (startDate) params.startDate = startDate;
-    if (endDate) params.endDate = endDate;
-    
-    const response = await api.get('/reports/transactions-summary', { params });
+  getTransactionSummary: async (): Promise<TransactionReportData> => {
+    const response = await api.get('/reports/transactions-summary');
     return response.data;
   },
 

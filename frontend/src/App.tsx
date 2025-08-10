@@ -4,6 +4,7 @@ import { ThemeProvider, createTheme } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
 import { AuthProvider } from './contexts/AuthContext';
 import TurnoProvider from './contexts/TurnoContext';
+import { SnackbarProvider } from 'notistack';
 
 // Componente de protección de rutas
 import ProtectedRoute from './components/ProtectedRoute';
@@ -96,8 +97,9 @@ function App() {
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
-      <AuthProvider>
-        <TurnoProvider>
+      <SnackbarProvider maxSnack={3}>
+        <AuthProvider>
+          <TurnoProvider>
           <Routes>
             {/* Rutas públicas */}
             <Route element={<AuthLayout />}>
@@ -242,8 +244,9 @@ function App() {
             {/* Ruta 404 */}
             <Route path="*" element={<NotFound />} />
           </Routes>
-        </TurnoProvider>
-      </AuthProvider>
+          </TurnoProvider>
+        </AuthProvider>
+      </SnackbarProvider>
     </ThemeProvider>
   );
 }

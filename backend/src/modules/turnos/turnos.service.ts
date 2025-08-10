@@ -8,6 +8,9 @@ import { FinalizarTurnoDto } from './dto/finalizar-turno.dto';
 import { Turno } from './entities/turno.entity';
 import { User } from '../users/entities/user.entity';
 import { RegistroActividad } from './entities/registro-actividad.entity';
+import { AgentClosingsService } from '../agent-closings/agent-closings.service';
+import { TransactionsService } from '../transactions/transactions.service';
+import { BilletesService } from '../cash/services/billetes.service';
 
 @Injectable()
 export class TurnosService {
@@ -18,6 +21,9 @@ export class TurnosService {
     private usersRepository: Repository<User>,
     @InjectRepository(RegistroActividad)
     private registroActividadRepository: Repository<RegistroActividad>,
+    private agentClosingsService: AgentClosingsService,
+    private transactionsService: TransactionsService,
+    private billetesService: BilletesService,
   ) {}
 
   async create(createTurnoDto: CreateTurnoDto): Promise<Turno> {
@@ -468,6 +474,39 @@ export class TurnosService {
       });
       
       console.log(`[TURNOS] Turno ${turno.nombre} finalizado y marcado como inactivo`);
+      
+      // Actualizar el estado de los cierres de agentes asociados a este turno a inactivo
+      try {
+        console.log(`[TURNOS] Actualizando estado de cierres de agentes para turno ${id} a inactivo`);
+        await this.agentClosingsService.updateClosingStatusByTurno(id, 'inactivo');
+        console.log(`[TURNOS] Estado de cierres de agentes actualizado correctamente`);
+      } catch (closingError) {
+        console.error(`[TURNOS] Error al actualizar estado de cierres de agentes:`, closingError);
+        // No lanzamos el error para que no interrumpa el flujo principal de finalización del turno
+        // Solo lo registramos en el log
+      }
+      
+      // Actualizar el estado de las transacciones asociadas a este turno a inactivo
+      try {
+        console.log(`[TURNOS] Actualizando estado de transacciones para turno ${id} a inactivo`);
+        const transactionsUpdated = await this.transactionsService.updateTransactionStatusByTurno(id);
+        console.log(`[TURNOS] ${transactionsUpdated} transacciones actualizadas a inactivas`);
+      } catch (transactionError) {
+        console.error(`[TURNOS] Error al actualizar estado de transacciones:`, transactionError);
+        // No lanzamos el error para que no interrumpa el flujo principal de finalización del turno
+        // Solo lo registramos en el log
+      }
+      
+      // Actualizar el estado de los conteos de billetes asociados a este turno a inactivo
+      try {
+        console.log(`[TURNOS] Actualizando estado de conteos de billetes para turno ${id} a inactivo`);
+        const cashCountsUpdated = await this.billetesService.updateCashCountStatusByTurno(id);
+        console.log(`[TURNOS] ${cashCountsUpdated} conteos de billetes actualizados a inactivos`);
+      } catch (cashCountError) {
+        console.error(`[TURNOS] Error al actualizar estado de conteos de billetes:`, cashCountError);
+        // No lanzamos el error para que no interrumpa el flujo principal de finalización del turno
+        // Solo lo registramos en el log
+      }
       
       // Retornar el turno actualizado
       return this.findOne(id);

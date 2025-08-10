@@ -388,4 +388,63 @@ export class BilletesService {
       throw error;
     }
   }
+
+  /**
+   * Actualiza el estado de todos los conteos de billetes asociados a un turno específico
+   * @param turnoId ID del turno que se está finalizando
+   * @returns Número de registros actualizados
+   */
+  async updateCashCountStatusByTurno(turnoId: number): Promise<number> {
+    this.logger.log(`[BILLETES_SERVICE] Actualizando estado de conteos de billetes para el turno ${turnoId}`);
+    
+    try {
+      // Validar que el turnoId sea un número válido
+      if (!turnoId || isNaN(Number(turnoId)) || Number(turnoId) <= 0) {
+        this.logger.error(`[BILLETES_SERVICE] ID de turno inválido: ${turnoId}`);
+        throw new Error(`ID de turno inválido: ${turnoId}`);
+      }
+      
+      // Obtener la fecha actual en formato YYYY-MM-DD
+      const today = new Date();
+      const formattedDate = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+      
+      this.logger.log(`[BILLETES_SERVICE] Fecha actual: ${formattedDate}, Turno ID: ${turnoId}`);
+      
+      // Identificar los IDs de los conteos que queremos actualizar usando una subconsulta con joins
+      const cashCountIdsToUpdate = await this.billetesRepository
+        .createQueryBuilder('billete')
+        .select('billete.id')
+        .innerJoin('tbl_usuarios_turnos', 'ut', 'billete.usuario_id = ut.usuario_id')
+        .where('DATE(billete.fecha) = :fecha', { fecha: formattedDate })
+        .andWhere('billete.estado = :estado', { estado: true }) // Solo los activos
+        .andWhere('ut.turno_id = :turnoId', { turnoId })
+        .getMany();
+      
+      // Si no hay conteos para actualizar, retornamos 0
+      if (cashCountIdsToUpdate.length === 0) {
+        this.logger.log(`[BILLETES_SERVICE] No se encontraron conteos de billetes para actualizar en el turno ${turnoId}`);
+        return 0;
+      }
+      
+      // Extraemos solo los IDs
+      const ids = cashCountIdsToUpdate.map(b => b.id);
+      
+      this.logger.log(`[BILLETES_SERVICE] Conteos de billetes a actualizar: ${ids.length} con IDs: ${ids.join(', ')}`);
+      
+      // Actualizamos los conteos identificados
+      const result = await this.billetesRepository
+        .createQueryBuilder()
+        .update(Billete)
+        .set({ estado: false }) // false = inactivo
+        .whereInIds(ids)
+        .execute();
+      
+      this.logger.log(`[BILLETES_SERVICE] ${result.affected} conteos de billetes actualizados a inactivos para el turno ${turnoId}`);
+      
+      return result.affected || 0;
+    } catch (error) {
+      this.logger.error(`[BILLETES_SERVICE] Error al actualizar conteos de billetes: ${error.message}`);
+      throw new Error(`Error al actualizar el estado de los conteos de billetes: ${error.message}`);
+    }
+  }
 }

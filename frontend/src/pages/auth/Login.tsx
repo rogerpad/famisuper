@@ -71,9 +71,20 @@ const Login: React.FC = () => {
           // Forzar una recarga completa de la página para reiniciar el estado
           console.log('Recargando la página para aplicar la autenticación...');
           
+          // Determinar la ruta de redirección según el rol del usuario
+          let redirectPath = '/';
+          
+          // Si el usuario tiene rol de Vendedor, redirigir a la página de turnos de vendedor
+          if (response.user && response.user.rol && response.user.rol.nombre === 'Vendedor') {
+            console.log('Usuario con rol Vendedor detectado, redirigiendo a /turnos/vendedor');
+            redirectPath = '/turnos/vendedor';
+          } else {
+            console.log(`Usuario con rol ${response.user?.rol?.nombre || 'desconocido'}, redirigiendo a /`);
+          }
+          
           // Usar window.location.replace para evitar problemas con el historial del navegador
           setTimeout(() => {
-            window.location.replace('/');
+            window.location.replace(redirectPath);
           }, 500);
         } else {
           console.error('Respuesta de login inválida:', response);

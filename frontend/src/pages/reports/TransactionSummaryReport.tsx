@@ -30,13 +30,13 @@ import html2pdf from 'html2pdf.js';
 
 const TransactionSummaryReport: React.FC = () => {
   const navigate = useNavigate();
-  const [startDate, setStartDate] = useState<string>(format(new Date(), 'yyyy-MM-01')); // Primer día del mes actual
-  const [endDate, setEndDate] = useState<string>(format(new Date(), 'yyyy-MM-dd')); // Día actual
+  // Eliminados los estados de fechas ya que no se utilizan
   const [turno, setTurno] = useState<string>(''); // Valor por defecto del turno
   const [turnoId, setTurnoId] = useState<number | string>(''); // ID del turno seleccionado - usamos string vacío como valor por defecto
   const [turnos, setTurnos] = useState<Turno[]>([]); // Lista de turnos disponibles
   const [horaInicio, setHoraInicio] = useState<string>('08:00'); // Hora de inicio por defecto
   const [horaFin, setHoraFin] = useState<string>('16:00'); // Hora de fin por defecto
+  const [horaActual, setHoraActual] = useState<string>(''); // Hora actual del sistema
   const [usuario, setUsuario] = useState<string>(''); // Usuario que ingresó las transacciones
   const { state: authState } = useAuth(); // Obtener el contexto de autenticación
   const { turnoActual, loading: isLoadingTurno } = useTurno(); // Obtener el turno actual del contexto
@@ -50,6 +50,28 @@ const TransactionSummaryReport: React.FC = () => {
       setTurnos(data);
     }
   });
+
+  // Función para obtener la hora actual formateada como HH:MM
+  const getCurrentTime = () => {
+    const now = new Date();
+    const hours = String(now.getHours()).padStart(2, '0');
+    const minutes = String(now.getMinutes()).padStart(2, '0');
+    return `${hours}:${minutes}`;
+  };
+
+  // Efecto para actualizar la hora actual cada minuto
+  useEffect(() => {
+    // Actualizar la hora actual inmediatamente
+    setHoraActual(getCurrentTime());
+    
+    // Configurar un intervalo para actualizar la hora cada minuto
+    const interval = setInterval(() => {
+      setHoraActual(getCurrentTime());
+    }, 60000); // 60000 ms = 1 minuto
+    
+    // Limpiar el intervalo cuando el componente se desmonte
+    return () => clearInterval(interval);
+  }, []);
 
   // Efecto para establecer el usuario actual y su turno cuando se carga el componente
   useEffect(() => {
@@ -84,8 +106,8 @@ const TransactionSummaryReport: React.FC = () => {
   
   // Consulta para obtener los datos del reporte
   const { data, isLoading, isError, refetch } = useQuery<TransactionReportData>({
-    queryKey: ['transactionSummary', startDate, endDate],
-    queryFn: () => reportsApi.getTransactionSummary(startDate, endDate),
+    queryKey: ['transactionSummary'],
+    queryFn: () => reportsApi.getTransactionSummary(),
   });
 
   // Las funciones handleExportToExcel y handlePrint han sido eliminadas ya que no se utilizan
@@ -127,7 +149,7 @@ const TransactionSummaryReport: React.FC = () => {
         
         const horarioElement = userInfoElement.querySelector('#horario-info');
         if (horarioElement) {
-          horarioElement.textContent = `Horario: ${horaInicio} - ${horaFin}`;
+          horarioElement.textContent = `Horario: ${horaInicio} - ${horaActual}`;
         }
       }
       
@@ -288,8 +310,20 @@ const TransactionSummaryReport: React.FC = () => {
   // Usar datos reales o datos de ejemplo
   const reportData = data || mockData;
   
-  // Filtrar el proveedor "EFECTIVO AGENTE" para que no se muestre en el reporte
-  const filteredAgentes = reportData.agentes.filter(agente => agente.nombre !== 'EFECTIVO AGENTE');
+  // Reorganizar los agentes para que "EFECTIVO AGENTE" aparezca en la antepenúltima columna
+  const reorderedAgentes = [...reportData.agentes];
+  
+  // Encontrar el índice del agente "EFECTIVO AGENTE"
+  const efectivoAgenteIndex = reorderedAgentes.findIndex(agente => agente.nombre === 'EFECTIVO AGENTE');
+  
+  // Si se encuentra "EFECTIVO AGENTE", moverlo a la última posición del array
+  if (efectivoAgenteIndex !== -1) {
+    const efectivoAgente = reorderedAgentes.splice(efectivoAgenteIndex, 1)[0];
+    reorderedAgentes.push(efectivoAgente);
+  }
+  
+  // Usar los agentes reordenados
+  const allAgentes = reorderedAgentes;
 
   return (
     <Box sx={{ flexGrow: 1 }}>
@@ -299,60 +333,16 @@ const TransactionSummaryReport: React.FC = () => {
       
       <Paper sx={{ p: 3, mb: 4 }}>
         <Typography variant="h6" gutterBottom>
-          Filtros del Reporte
+          Información del Reporte
         </Typography>
         
-        {/* Definimos un estilo común para todos los campos */}
         <Box sx={{ mb: 2 }}>
           <Typography variant="caption" color="textSecondary">
-            * Todos los campos tienen la misma altura para mantener la alineación horizontal
+            * Reporte generado con los datos actuales del sistema
           </Typography>
         </Box>
         
         <Grid container spacing={3} alignItems="flex-start">
-          <Grid item xs={12} md={3}>
-            <TextField
-              fullWidth
-              label="Fecha Inicial"
-              type="date"
-              value={startDate}
-              onChange={(e) => setStartDate(e.target.value)}
-              InputLabelProps={{ shrink: true }}
-              sx={{
-                '& .MuiInputBase-root': {
-                  bgcolor: 'rgba(255, 255, 255, 0.9)',
-                  height: '56px' // Altura fija para todos los campos
-                },
-                '& .MuiOutlinedInput-root': {
-                  '&.Mui-focused fieldset': {
-                    borderColor: '#dc7633'
-                  }
-                }
-              }}
-            />
-          </Grid>
-          
-          <Grid item xs={12} md={3}>
-            <TextField
-              fullWidth
-              label="Fecha Final"
-              type="date"
-              value={endDate}
-              onChange={(e) => setEndDate(e.target.value)}
-              InputLabelProps={{ shrink: true }}
-              sx={{
-                '& .MuiInputBase-root': {
-                  bgcolor: 'rgba(255, 255, 255, 0.9)',
-                  height: '56px' // Altura fija para todos los campos
-                },
-                '& .MuiOutlinedInput-root': {
-                  '&.Mui-focused fieldset': {
-                    borderColor: '#dc7633'
-                  }
-                }
-              }}
-            />
-          </Grid>
           
           <Grid item xs={12} md={2}>
             <TextField
@@ -437,14 +427,14 @@ const TransactionSummaryReport: React.FC = () => {
               fullWidth
               label="Hora Fin"
               type="time"
-              value={horaFin}
+              value={horaActual} // Usar la hora actual en lugar de horaFin
               disabled={true} // Siempre deshabilitado
               InputLabelProps={{ shrink: true }}
               inputProps={{ step: 300 }}
-              helperText="Hora fin del turno"
+              helperText="Hora actual del sistema"
               sx={{
                 '& .MuiInputBase-root': {
-                  bgcolor: turnoActual ? 'rgba(76, 175, 80, 0.1)' : 'rgba(255, 255, 255, 0.9)',
+                  bgcolor: 'rgba(33, 150, 243, 0.1)', // Color azul para diferenciar
                   height: '56px' // Altura fija para todos los campos
                 },
                 '& .MuiOutlinedInput-root': {
@@ -453,7 +443,7 @@ const TransactionSummaryReport: React.FC = () => {
                   }
                 },
                 '& .MuiFormHelperText-root': {
-                  color: turnoActual ? 'green' : 'inherit',
+                  color: '#1976d2', // Color azul para el texto de ayuda
                   position: 'absolute',
                   top: '100%',
                   marginTop: '2px'
@@ -508,6 +498,7 @@ const TransactionSummaryReport: React.FC = () => {
               fullWidth
               variant="contained"
               onClick={handleGenerarCierre}
+              disabled={!turnoActual}
               sx={{ 
                 bgcolor: '#4caf50', // Verde
                 '&:hover': { bgcolor: '#388e3c' },
@@ -515,7 +506,8 @@ const TransactionSummaryReport: React.FC = () => {
                 fontWeight: 'medium',
                 textTransform: 'none',
                 fontSize: '1rem',
-                boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
+                boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
+                opacity: turnoActual ? 1 : 0.7
               }}
             >
               Crear Cierre
@@ -566,7 +558,7 @@ const TransactionSummaryReport: React.FC = () => {
               <TableHead>
                 <TableRow sx={{ bgcolor: '#dc7633', '& > *': { fontSize: '0.875rem', lineHeight: 1.2, py: 0.8 } }}>
                   <TableCell sx={{ fontWeight: 'bold', color: 'white' }}>Tipo de Transacción</TableCell>
-                  {filteredAgentes.map((agente) => (
+                  {allAgentes.map((agente) => (
                     <TableCell key={agente.id} align="right" sx={{ fontWeight: 'bold', color: 'white' }}>
                       {agente.nombre}
                     </TableCell>
@@ -580,7 +572,7 @@ const TransactionSummaryReport: React.FC = () => {
                 {reportData.transactionTypes.map((row) => (
                   <TableRow key={row.tipoTransaccionId} sx={{ '& > *': { fontSize: '0.875rem', lineHeight: 1.2 } }}>
                     <TableCell>{row.tipoTransaccion}</TableCell>
-                    {filteredAgentes.map((agente) => (
+                    {allAgentes.map((agente) => (
                       <TableCell key={agente.id} align="right">
                         {row.agentes[agente.id] > 0 
                           ? formatCurrency(row.agentes[agente.id]) 
@@ -596,7 +588,7 @@ const TransactionSummaryReport: React.FC = () => {
               <TableFooter>
                 <TableRow sx={{ '& .MuiTableCell-root': { fontWeight: 'bold', bgcolor: 'primary.light', color: 'white', fontSize: '0.875rem', lineHeight: 1.2, py: 0.8 } }}>
                   <TableCell>TOTAL</TableCell>
-                  {filteredAgentes.map((agente) => (
+                  {allAgentes.map((agente) => (
                     <TableCell key={agente.id} align="right">
                       {calcularTotalPorAgente(agente.id) > 0 
                         ? formatCurrency(calcularTotalPorAgente(agente.id)) 

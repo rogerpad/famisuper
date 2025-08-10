@@ -193,12 +193,7 @@ const menuItemsConfig = [
     path: '/cash-counter', 
     permissionCode: 'ver_contador_efectivo' 
   },
-  { 
-    text: 'Historial de Conteos', 
-    icon: <CashCounterIcon />, 
-    path: '/cash-history', 
-    permissionCode: 'ver_contador_efectivo' 
-  },
+  // Opción de Historial de Conteos eliminada - ahora integrada en la pestaña del Contador de Efectivo
   { 
     text: 'Roles y Permisos', 
     icon: <SecurityIcon />, 
@@ -386,7 +381,6 @@ const menuItemsConfig = [
                 </Typography>
               </Box>
             )}
-            <MenuItem onClick={handleMenuClose}>Perfil</MenuItem>
             <MenuItem onClick={handleLogout}>Cerrar sesión</MenuItem>
           </Menu>
         </Toolbar>

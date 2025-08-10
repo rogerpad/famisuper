@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, DataSource } from 'typeorm';
 import { TransactionType } from './entities/transaction-type.entity';
 import { CreateTransactionTypeDto } from './dto/create-transaction-type.dto';
 import { UpdateTransactionTypeDto } from './dto/update-transaction-type.dto';
@@ -10,6 +10,7 @@ export class TransactionTypesService {
   constructor(
     @InjectRepository(TransactionType)
     private transactionTypesRepository: Repository<TransactionType>,
+    private dataSource: DataSource,
   ) {}
 
   async create(createTransactionTypeDto: CreateTransactionTypeDto): Promise<TransactionType> {
@@ -81,6 +82,30 @@ export class TransactionTypesService {
   async remove(id: number): Promise<void> {
     // Verificar si el tipo de transacción existe
     await this.findOne(id);
+    
+    // Verificar si el tipo de transacción está siendo utilizado en configuración de fórmulas
+    const formulaConfigCount = await this.dataSource.query(
+      `SELECT COUNT(*) FROM tbl_configuracion_formulas WHERE tipo_transaccion_id = $1`,
+      [id]
+    );
+    
+    if (parseInt(formulaConfigCount[0].count) > 0) {
+      throw new ConflictException(
+        `No se puede eliminar el tipo de transacción porque está siendo utilizado en ${formulaConfigCount[0].count} configuraciones de fórmulas`
+      );
+    }
+    
+    // Verificar si el tipo de transacción está siendo utilizado en transacciones
+    const transactionsCount = await this.dataSource.query(
+      `SELECT COUNT(*) FROM tbl_transacciones_agentes WHERE tipo_transaccion_id = $1`,
+      [id]
+    );
+    
+    if (parseInt(transactionsCount[0].count) > 0) {
+      throw new ConflictException(
+        `No se puede eliminar el tipo de transacción porque está siendo utilizado en ${transactionsCount[0].count} transacciones`
+      );
+    }
     
     // Eliminar el tipo de transacción
     await this.transactionTypesRepository.delete(id);
