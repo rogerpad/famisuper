@@ -6,6 +6,11 @@ export class CreatePermisoDto {
   @MaxLength(100, { message: 'El nombre no puede tener más de 100 caracteres' })
   nombre: string;
 
+  @IsNotEmpty({ message: 'El código es requerido' })
+  @IsString({ message: 'El código debe ser una cadena de texto' })
+  @MaxLength(50, { message: 'El código no puede tener más de 50 caracteres' })
+  codigo: string;
+
   @IsOptional()
   @IsString({ message: 'La descripción debe ser una cadena de texto' })
   @MaxLength(255, { message: 'La descripción no puede tener más de 255 caracteres' })

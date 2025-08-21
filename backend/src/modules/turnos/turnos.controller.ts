@@ -34,7 +34,7 @@ export class TurnosController {
   }
 
   @Get()
-  @RequierePermiso('ver_turnos')
+  @RequierePermiso('ver_turnos', 'ver_mis_turnos')
   findAll() {
     return this.turnosService.findAll();
   }
@@ -68,7 +68,7 @@ export class TurnosController {
   }
 
   @Get(':id')
-  @RequierePermiso('ver_turnos')
+  @RequierePermiso('ver_turnos', 'ver_mis_turnos')
   findOne(@Param('id') id: string) {
     return this.turnosService.findOne(+id);
   }

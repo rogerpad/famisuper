@@ -105,4 +105,64 @@ export class PermisosService {
     
     return validIds;
   }
+
+  // Actualizar un permiso existente
+  async update(id: number, updatePermisoDto: any): Promise<Permiso> {
+    console.log(`[PERMISOS-SERVICE] Actualizando permiso con ID: ${id}`, updatePermisoDto);
+    
+    // Verificar si el permiso existe
+    const permiso = await this.permisoRepository.findOne({
+      where: { id }
+    });
+
+    if (!permiso) {
+      throw new NotFoundException(`No se encontró el permiso con ID ${id}`);
+    }
+
+    // Si se está actualizando el nombre, verificar que no exista otro permiso con ese nombre
+    if (updatePermisoDto.nombre && updatePermisoDto.nombre !== permiso.nombre) {
+      const existingPermiso = await this.permisoRepository.findOne({
+        where: { nombre: updatePermisoDto.nombre }
+      });
+
+      if (existingPermiso && existingPermiso.id !== id) {
+        throw new ConflictException(`Ya existe un permiso con el nombre ${updatePermisoDto.nombre}`);
+      }
+    }
+
+    // Actualizar el permiso
+    await this.permisoRepository.update(id, updatePermisoDto);
+    
+    // Devolver el permiso actualizado
+    return this.permisoRepository.findOne({
+      where: { id }
+    });
+  }
+
+  // Eliminar un permiso
+  async remove(id: number): Promise<void> {
+    console.log(`[PERMISOS-SERVICE] Eliminando permiso con ID: ${id}`);
+    
+    // Verificar si el permiso existe
+    const permiso = await this.permisoRepository.findOne({
+      where: { id }
+    });
+
+    if (!permiso) {
+      throw new NotFoundException(`No se encontró el permiso con ID ${id}`);
+    }
+
+    // Verificar si el permiso está asignado a algún rol
+    const permisosRoles = await this.permisoRolRepository.find({
+      where: { permiso_id: id }
+    });
+
+    if (permisosRoles.length > 0) {
+      // Eliminar las asignaciones de roles primero
+      await this.permisoRolRepository.delete({ permiso_id: id });
+    }
+
+    // Eliminar el permiso
+    await this.permisoRepository.delete(id);
+  }
 }

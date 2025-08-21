@@ -38,6 +38,17 @@ import CashCounterPage from './pages/cash/CashCounterPage';
 import CashCountHistoryPage from './pages/CashCountHistoryPage';
 import Login from './pages/auth/Login';
 import NotFound from './pages/NotFound';
+import PermissionsList from './components/permisos/PermissionsList';
+import SuperExpenseTypesList from './components/super-expense-types/SuperExpenseTypesList';
+import PaymentDocumentsList from './components/payment-documents/PaymentDocumentsList';
+import PaymentMethodsList from './components/payment-methods/PaymentMethodsList';
+import SuperExpensesList from './components/super-expenses/SuperExpensesList';
+import PhoneLinesList from './components/phoneLines/PhoneLinesList';
+import BalanceFlowsList from './components/balance-flows/BalanceFlowsList';
+import BalanceSalesList from './components/balance-sales/BalanceSalesList';
+import BalanceSaleForm from './components/balance-sales/BalanceSaleForm';
+import PackagesList from './components/packages/PackagesList';
+import PackageForm from './components/packages/PackageForm';
 
 // Tema de la aplicación
 const theme = createTheme({
@@ -193,7 +204,7 @@ function App() {
                   </ProtectedRoute>
                 } />
                 <Route path="/turnos/vendedor" element={
-                  <ProtectedRoute requiredPermission="ver_turnos">
+                  <ProtectedRoute requiredPermission="ver_mis_turnos">
                     <TurnosVendedor />
                   </ProtectedRoute>
                 } />
@@ -236,6 +247,89 @@ function App() {
                 <Route path="/cash-history" element={
                   <ProtectedRoute requiredPermission="ver_contador_efectivo">
                     <CashCountHistoryPage />
+                  </ProtectedRoute>
+                } />
+                
+                {/* Ruta para gestión de permisos */}
+                <Route path="/permissions" element={
+                  <ProtectedRoute requiredPermission="admin_permisos">
+                    <PermissionsList />
+                  </ProtectedRoute>
+                } />
+                
+                {/* Ruta para egresos de super */}
+                <Route path="/super-expenses" element={
+                  <ProtectedRoute requiredPermission="ver_egresos_super">
+                    <SuperExpensesList />
+                  </ProtectedRoute>
+                } />
+                
+                {/* Ruta para tipos de egresos del super */}
+                <Route path="/super-expense-types" element={
+                  <ProtectedRoute requiredPermission="ver_tipos_egresos_super">
+                    <SuperExpenseTypesList />
+                  </ProtectedRoute>
+                } />
+                
+                {/* Ruta para documentos de pago */}
+                <Route path="/payment-documents" element={
+                  <ProtectedRoute requiredPermission="ver_documento_pago">
+                    <PaymentDocumentsList />
+                  </ProtectedRoute>
+                } />
+                
+                {/* Ruta para formas de pago */}
+                <Route path="/payment-methods" element={
+                  <ProtectedRoute requiredPermission="ver_forma_pago">
+                    <PaymentMethodsList />
+                  </ProtectedRoute>
+                } />
+                
+                {/* Ruta para líneas telefónicas */}
+                <Route path="/phone-lines" element={
+                  <ProtectedRoute requiredPermission="admin_lineas_telefonicas">
+                    <PhoneLinesList />
+                  </ProtectedRoute>
+                } />
+                
+                {/* Ruta para flujos de saldo */}
+                <Route path="/balance-flows" element={
+                  <ProtectedRoute requiredPermission="ver_flujos_saldo">
+                    <BalanceFlowsList />
+                  </ProtectedRoute>
+                } />
+                
+                {/* Rutas para ventas de saldo */}
+                <Route path="/balance-sales" element={
+                  <ProtectedRoute requiredPermission="ver_venta_paquete">
+                    <BalanceSalesList />
+                  </ProtectedRoute>
+                } />
+                <Route path="/balance-sales/new" element={
+                  <ProtectedRoute requiredPermission="crear_editar_venta">
+                    <BalanceSaleForm />
+                  </ProtectedRoute>
+                } />
+                <Route path="/balance-sales/edit/:id" element={
+                  <ProtectedRoute requiredPermission="crear_editar_venta">
+                    <BalanceSaleForm />
+                  </ProtectedRoute>
+                } />
+                
+                {/* Rutas para paquetes */}
+                <Route path="/packages" element={
+                  <ProtectedRoute requiredPermission="ver_paquetes">
+                    <PackagesList />
+                  </ProtectedRoute>
+                } />
+                <Route path="/packages/new" element={
+                  <ProtectedRoute requiredPermission="admin_paquetes">
+                    <PackageForm />
+                  </ProtectedRoute>
+                } />
+                <Route path="/packages/edit/:id" element={
+                  <ProtectedRoute requiredPermission="admin_paquetes">
+                    <PackageForm />
                   </ProtectedRoute>
                 } />
               </Route>

@@ -1,9 +1,12 @@
-import { Controller, Get, Post, Body, Param, UseGuards, HttpStatus } from '@nestjs/common';
+import { Controller, Get, Post, Put, Delete, Body, Param, UseGuards, HttpStatus, ParseIntPipe } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { PermisosService } from '../services/permisos.service';
 import { Permiso } from '../entities/permiso.entity';
 import { AssignPermisosDto } from '../dto/assign-permisos.dto';
+import { CreatePermisoDto } from '../dto/create-permiso.dto';
+import { UpdatePermisoDto } from '../dto/update-permiso.dto';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
+import { PermisosGuard } from '../../auth/guards/permisos.guard';
 
 @ApiTags('permisos')
 @Controller('permisos')
@@ -61,5 +64,36 @@ export class PermisosController {
     await this.permisosService.assignToRol(validatedDto);
     
     return { message: 'Permisos asignados correctamente' };
+  }
+
+  @Post()
+  @UseGuards(PermisosGuard)
+  @ApiOperation({ summary: 'Crear un nuevo permiso' })
+  @ApiResponse({ status: HttpStatus.CREATED, description: 'Permiso creado correctamente', type: Permiso })
+  async create(@Body() createPermisoDto: CreatePermisoDto): Promise<Permiso> {
+    console.log('[PERMISOS-CONTROLLER] Creando nuevo permiso:', createPermisoDto);
+    return this.permisosService.create(createPermisoDto);
+  }
+
+  @Put(':id')
+  @UseGuards(PermisosGuard)
+  @ApiOperation({ summary: 'Actualizar un permiso existente' })
+  @ApiResponse({ status: HttpStatus.OK, description: 'Permiso actualizado correctamente', type: Permiso })
+  async update(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() updatePermisoDto: UpdatePermisoDto
+  ): Promise<Permiso> {
+    console.log(`[PERMISOS-CONTROLLER] Actualizando permiso con ID: ${id}`, updatePermisoDto);
+    return this.permisosService.update(id, updatePermisoDto);
+  }
+
+  @Delete(':id')
+  @UseGuards(PermisosGuard)
+  @ApiOperation({ summary: 'Eliminar un permiso' })
+  @ApiResponse({ status: HttpStatus.OK, description: 'Permiso eliminado correctamente' })
+  async remove(@Param('id', ParseIntPipe) id: number): Promise<{ message: string }> {
+    console.log(`[PERMISOS-CONTROLLER] Eliminando permiso con ID: ${id}`);
+    await this.permisosService.remove(id);
+    return { message: 'Permiso eliminado correctamente' };
   }
 }

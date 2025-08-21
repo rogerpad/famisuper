@@ -312,10 +312,10 @@ const UsersList: React.FC = () => {
                     />
                   </TableCell>
                   <TableCell>
-                    {user.fecha_registro ? new Date(user.fecha_registro).toLocaleDateString() : '-'}
+                    {user.fecha_registro ? new Date(user.fecha_registro instanceof Date ? user.fecha_registro : user.fecha_registro).toLocaleDateString() : '-'}
                   </TableCell>
                   <TableCell>
-                    {user.ultimo_acceso ? new Date(user.ultimo_acceso).toLocaleString() : '-'}
+                    {user.ultimo_acceso ? new Date(user.ultimo_acceso instanceof Date ? user.ultimo_acceso : user.ultimo_acceso).toLocaleString() : '-'}
                   </TableCell>
                   <TableCell>
                     <IconButton

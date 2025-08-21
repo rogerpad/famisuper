@@ -149,7 +149,7 @@ const UserForm: React.FC<UserFormProps> = ({ open, onClose, user }) => {
                         fullWidth
                         margin="normal"
                         error={touched.username && Boolean(errors.username)}
-                        helperText={touched.username && errors.username}
+                        helperText={touched.username && errors.username ? errors.username : undefined}
                       />
                     )}
                   </Field>
@@ -164,7 +164,7 @@ const UserForm: React.FC<UserFormProps> = ({ open, onClose, user }) => {
                         fullWidth
                         margin="normal"
                         error={touched.password && Boolean(errors.password)}
-                        helperText={touched.password && errors.password}
+                        helperText={touched.password && errors.password ? errors.password : undefined}
                       />
                     )}
                   </Field>
@@ -178,7 +178,7 @@ const UserForm: React.FC<UserFormProps> = ({ open, onClose, user }) => {
                         fullWidth
                         margin="normal"
                         error={touched.nombre && Boolean(errors.nombre)}
-                        helperText={touched.nombre && errors.nombre}
+                        helperText={touched.nombre && errors.nombre ? errors.nombre : undefined}
                       />
                     )}
                   </Field>
@@ -192,7 +192,7 @@ const UserForm: React.FC<UserFormProps> = ({ open, onClose, user }) => {
                         fullWidth
                         margin="normal"
                         error={touched.apellido && Boolean(errors.apellido)}
-                        helperText={touched.apellido && errors.apellido}
+                        helperText={touched.apellido && errors.apellido ? errors.apellido : undefined}
                       />
                     )}
                   </Field>
@@ -206,7 +206,7 @@ const UserForm: React.FC<UserFormProps> = ({ open, onClose, user }) => {
                         fullWidth
                         margin="normal"
                         error={touched.email && Boolean(errors.email)}
-                        helperText={touched.email && errors.email}
+                        helperText={touched.email && errors.email ? errors.email : undefined}
                       />
                     )}
                   </Field>
@@ -238,7 +238,7 @@ const UserForm: React.FC<UserFormProps> = ({ open, onClose, user }) => {
                           )}
                         </Select>
                         {touched.rol_id && errors.rol_id && (
-                          <FormHelperText>{errors.rol_id}</FormHelperText>
+                          <FormHelperText>{typeof errors.rol_id === 'string' ? errors.rol_id : ''}</FormHelperText>
                         )}
                       </FormControl>
                     )}

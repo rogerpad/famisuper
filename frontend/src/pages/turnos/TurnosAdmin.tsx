@@ -295,7 +295,7 @@ const TurnosAdmin: React.FC = () => {
         id: u.id,
         username: u.username,
         nombre: u.nombre,
-        apellido: u.apellido,
+        apellido: u.apellido || '',  // Aseguramos que apellido siempre sea un string
         activo: true,
         rol_id: 0,
         fecha_registro: new Date()

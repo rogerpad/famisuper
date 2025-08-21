@@ -2,12 +2,20 @@ import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { AppModule } from './app.module';
+import { HttpExceptionFilter } from './common/filters/http-exception.filter';
+import { LoggerService } from './common/services/logger.service';
 
 async function bootstrap() {
   try {
+    // Crear instancia del logger personalizado
+    let appLogger = new LoggerService();
+    
     const app = await NestFactory.create(AppModule, {
-      logger: ['error', 'warn', 'log', 'debug', 'verbose'],
+      logger: appLogger,
     });
+    
+    // Registrar el inicio de la aplicación
+    appLogger.log('Iniciando aplicación Famisuper API', 'Bootstrap');
   
   // Configuración de CORS - Permitimos cualquier origen durante desarrollo
   app.enableCors({
@@ -28,15 +36,70 @@ async function bootstrap() {
       forbidNonWhitelisted: true,
       enableDebugMessages: true,
       disableErrorMessages: false,
+      validationError: {
+        target: true,
+        value: true,
+      },
+      stopAtFirstError: false, // Recolectar todos los errores de validación
+      transformOptions: {
+        enableImplicitConversion: true, // Habilitar conversión implícita para permitir transformación automática de tipos
+      },
     }),
   );
   
-  // Interceptor global para logging de errores
+  // Registrar el filtro de excepciones personalizado
+  app.useGlobalFilters(new HttpExceptionFilter());
+  
+  // Obtener la instancia del logger desde la aplicación
+  appLogger = app.get(LoggerService);
+  
+  // Interceptor global para logging de solicitudes
   app.use((req, res, next) => {
-    console.log(`Request ${req.method} ${req.url}`);
-    if (req.method === 'POST' || req.method === 'PUT') {
-      console.log('Request body:', req.body);
+    // Registrar la solicitud
+    appLogger.log(`Request ${req.method} ${req.url}`, 'HTTP');
+    
+    // Registrar el cuerpo de la solicitud para métodos POST, PUT y PATCH
+    if (['POST', 'PUT', 'PATCH'].includes(req.method)) {
+      // Evitar registrar datos sensibles
+      const sanitizedBody = { ...req.body };
+      if (sanitizedBody.password) sanitizedBody.password = '***REDACTED***';
+      if (sanitizedBody.token) sanitizedBody.token = '***REDACTED***';
+      
+      appLogger.debug(`Request body: ${JSON.stringify(sanitizedBody)}`, 'HTTP');
     }
+    
+    // Capturar y registrar la respuesta
+    const originalSend = res.send;
+    res.send = function(body) {
+      // Registrar el código de estado de la respuesta
+      const statusCode = res.statusCode;
+      
+      // Registrar errores con más detalle
+      if (statusCode >= 400) {
+        let responseBody;
+        try {
+          responseBody = JSON.parse(body);
+        } catch (e) {
+          responseBody = body;
+        }
+        
+        appLogger.error(
+          `Response ${statusCode} for ${req.method} ${req.url}`,
+          JSON.stringify(responseBody),
+          'HTTP'
+        );
+      } else {
+        // Registrar respuestas exitosas
+        appLogger.log(
+          `Response ${statusCode} for ${req.method} ${req.url}`,
+          'HTTP'
+        );
+      }
+      
+      originalSend.call(this, body);
+      return res;
+    };
+    
     next();
   });
 
@@ -51,11 +114,17 @@ async function bootstrap() {
   SwaggerModule.setup('api/docs', app, document);
 
   // Puerto de la aplicación
-  const port = 4001; // Cambiamos a puerto 4001 para evitar conflictos
+  const port = 4002; // Cambiamos a puerto 4002 para evitar conflictos
   await app.listen(port);
-  console.log(`La aplicación está corriendo en: http://localhost:${port}`);
+  appLogger.log(`La aplicación está corriendo en: http://localhost:${port}`, 'Bootstrap');
   } catch (error) {
-    console.error('Error al iniciar la aplicación:', error);
+    // Usar un nuevo logger para registrar errores de inicio
+    const bootstrapLogger = new LoggerService();
+    bootstrapLogger.error(
+      'Error al iniciar la aplicación',
+      error.stack || error.toString(),
+      'Bootstrap'
+    );
     process.exit(1);
   }
 }

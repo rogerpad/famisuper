@@ -1,0 +1,259 @@
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { CreateBalanceSaleDto } from './dto/create-balance-sale.dto';
+import { UpdateBalanceSaleDto } from './dto/update-balance-sale.dto';
+import { BalanceSale } from './entities/balance-sale.entity';
+
+@Injectable()
+export class BalanceSalesService {
+  private readonly logger = new Logger(BalanceSalesService.name);
+
+  constructor(
+    @InjectRepository(BalanceSale)
+    private balanceSaleRepository: Repository<BalanceSale>,
+  ) {}
+
+  async create(createBalanceSaleDto: CreateBalanceSaleDto): Promise<BalanceSale> {
+    try {
+      this.logger.log(
+        `Creando nueva venta de saldo: ${JSON.stringify(createBalanceSaleDto)}`,
+        'BalanceSalesService'
+      );
+      
+      // Convertir fecha a objeto Date si es necesario
+      if (createBalanceSaleDto.fecha && !(createBalanceSaleDto.fecha instanceof Date)) {
+        createBalanceSaleDto.fecha = new Date(createBalanceSaleDto.fecha);
+      }
+      
+      const balanceSale = this.balanceSaleRepository.create(createBalanceSaleDto);
+      return await this.balanceSaleRepository.save(balanceSale);
+    } catch (error) {
+      this.handleBalanceSaleError(error, createBalanceSaleDto, 'create');
+    }
+  }
+
+  async findAll(): Promise<BalanceSale[]> {
+    return this.balanceSaleRepository.find({
+      relations: ['usuario', 'telefonica', 'flujoSaldo'],
+      where: { activo: true },
+      order: { fecha: 'DESC' },
+    });
+  }
+
+  async findOne(id: number): Promise<BalanceSale> {
+    const balanceSale = await this.balanceSaleRepository.findOne({
+      where: { id, activo: true },
+      relations: ['usuario', 'telefonica', 'flujoSaldo'],
+    });
+
+    if (!balanceSale) {
+      throw new NotFoundException(`Venta de saldo con ID ${id} no encontrada`);
+    }
+
+    return balanceSale;
+  }
+
+  async findByTelefonica(telefonicaId: number): Promise<BalanceSale[]> {
+    return this.balanceSaleRepository.find({
+      where: { telefonicaId, activo: true },
+      relations: ['usuario', 'telefonica', 'flujoSaldo'],
+      order: { fecha: 'DESC' },
+    });
+  }
+
+  async findByFlujoSaldo(flujoSaldoId: number): Promise<BalanceSale[]> {
+    return this.balanceSaleRepository.find({
+      where: { flujoSaldoId, activo: true },
+      relations: ['usuario', 'telefonica', 'flujoSaldo'],
+      order: { fecha: 'DESC' },
+    });
+  }
+
+  async findByPhoneLine(telefonicaId: number): Promise<BalanceSale[]> {
+    return this.findByTelefonica(telefonicaId);
+  }
+
+  async findByBalanceFlow(flujoSaldoId: number): Promise<BalanceSale[]> {
+    return this.findByFlujoSaldo(flujoSaldoId);
+  }
+
+  async update(id: number, updateBalanceSaleDto: UpdateBalanceSaleDto): Promise<BalanceSale> {
+    try {
+      this.logger.log(
+        `Iniciando actualización de venta de saldo ID ${id}: ${JSON.stringify(updateBalanceSaleDto)}`,
+        'BalanceSalesService'
+      );
+      
+      // Registrar los tipos de datos recibidos
+      this.logger.log(
+        `Tipos de datos recibidos - telefonicaId: ${typeof updateBalanceSaleDto.telefonicaId} (${updateBalanceSaleDto.telefonicaId}), ` +
+        `flujoSaldoId: ${typeof updateBalanceSaleDto.flujoSaldoId} (${updateBalanceSaleDto.flujoSaldoId}), ` +
+        `fecha: ${typeof updateBalanceSaleDto.fecha} (${updateBalanceSaleDto.fecha})`,
+        'BalanceSalesService'
+      );
+      
+      // Verificar que el registro existe
+      const balanceSale = await this.findOne(id);
+      
+      this.logger.log(
+        `Estado actual en la base de datos - telefonicaId: ${balanceSale.telefonicaId}, ` +
+        `flujoSaldoId: ${balanceSale.flujoSaldoId}`,
+        'BalanceSalesService'
+      );
+      
+      // Preparar los datos para la actualización
+      const updateData: any = {};
+      
+      // Procesar cada campo del DTO y agregarlo al objeto de actualización
+      if (updateBalanceSaleDto.usuarioId !== undefined) {
+        updateData.usuarioId = Number(updateBalanceSaleDto.usuarioId);
+      }
+      
+      if (updateBalanceSaleDto.telefonicaId !== undefined) {
+        updateData.telefonicaId = Number(updateBalanceSaleDto.telefonicaId);
+        this.logger.log(
+          `Agregando telefonicaId para actualizar: ${updateData.telefonicaId}`,
+          'BalanceSalesService'
+        );
+      }
+      
+      if (updateBalanceSaleDto.flujoSaldoId !== undefined) {
+        updateData.flujoSaldoId = Number(updateBalanceSaleDto.flujoSaldoId);
+        this.logger.log(
+          `Agregando flujoSaldoId para actualizar: ${updateData.flujoSaldoId}`,
+          'BalanceSalesService'
+        );
+      }
+      
+      if (updateBalanceSaleDto.paqueteId !== undefined) {
+        updateData.paqueteId = updateBalanceSaleDto.paqueteId === null ? null : Number(updateBalanceSaleDto.paqueteId);
+      }
+      
+      if (updateBalanceSaleDto.cantidad !== undefined) {
+        updateData.cantidad = Number(updateBalanceSaleDto.cantidad);
+      }
+      
+      if (updateBalanceSaleDto.monto !== undefined) {
+        updateData.monto = Number(updateBalanceSaleDto.monto);
+      }
+      
+      if (updateBalanceSaleDto.fecha !== undefined) {
+        updateData.fecha = updateBalanceSaleDto.fecha instanceof Date 
+          ? updateBalanceSaleDto.fecha 
+          : new Date(updateBalanceSaleDto.fecha);
+      }
+      
+      if (updateBalanceSaleDto.observacion !== undefined) {
+        updateData.observacion = updateBalanceSaleDto.observacion;
+      }
+      
+      if (updateBalanceSaleDto.activo !== undefined) {
+        updateData.activo = updateBalanceSaleDto.activo;
+      }
+      
+      this.logger.log(
+        `Datos preparados para actualizar: ${JSON.stringify(updateData)}`,
+        'BalanceSalesService'
+      );
+      
+      // Si no hay datos para actualizar, devolver el registro actual
+      if (Object.keys(updateData).length === 0) {
+        this.logger.log(
+          `No hay datos para actualizar para la venta de saldo ID ${id}`,
+          'BalanceSalesService'
+        );
+        return balanceSale;
+      }
+      
+      // Usar queryBuilder para actualizar directamente en la base de datos
+      // Registrar explícitamente los campos que se van a actualizar
+      this.logger.log(
+        `Campos a actualizar: ${JSON.stringify(updateData)}`,
+        'BalanceSalesService'
+      );
+      
+      // Construir la consulta SQL manualmente para asegurar que todos los campos se actualicen
+      // En lugar de usar set() múltiples veces, pasamos todos los campos de una vez
+      const fieldsToUpdate = {};
+      
+      // Agregar cada campo al objeto de actualización
+      Object.keys(updateData).forEach(key => {
+        this.logger.log(
+          `Agregando campo a la consulta SQL: ${key} = ${updateData[key]}`,
+          'BalanceSalesService'
+        );
+        fieldsToUpdate[key] = updateData[key];
+      });
+      
+      // Crear la consulta con todos los campos a la vez
+      let query = this.balanceSaleRepository.createQueryBuilder()
+        .update('tbl_ventas_saldo')
+        .set(fieldsToUpdate)
+        .where('id = :id', { id });
+      
+      // Intentar obtener la consulta SQL generada (si es posible con TypeORM)
+      try {
+        const sqlQuery = query.getSql();
+        this.logger.log(
+          `Consulta SQL generada: ${sqlQuery}`,
+          'BalanceSalesService'
+        );
+      } catch (error) {
+        this.logger.log(
+          `No se pudo obtener la consulta SQL: ${error.message}`,
+          'BalanceSalesService'
+        );
+      }
+      
+      // Ejecutar la consulta
+      const result = await query.execute();
+      
+      // Registrar el resultado de la actualización
+      this.logger.log(
+        `Resultado de la actualización: ${JSON.stringify(result)}`,
+        'BalanceSalesService'
+      );
+      
+      // Registrar la consulta SQL generada
+      this.logger.log(
+        `Ejecutada actualización directa en la base de datos para ID ${id}`,
+        'BalanceSalesService'
+      );
+      
+      // Obtener el registro actualizado
+      const updatedBalanceSale = await this.findOne(id);
+      
+      this.logger.log(
+        `Venta de saldo ID ${id} actualizada exitosamente. Resultado: ${JSON.stringify(updatedBalanceSale)}`,
+        'BalanceSalesService'
+      );
+      
+      return updatedBalanceSale;
+    } catch (error) {
+      this.handleBalanceSaleError(error, { id, ...updateBalanceSaleDto }, 'update');
+    }
+  }
+
+  async remove(id: number): Promise<void> {
+    const balanceSale = await this.findOne(id);
+    
+    balanceSale.activo = false;
+    
+    await this.balanceSaleRepository.save(balanceSale);
+  }
+
+  private handleBalanceSaleError(error: any, data: any, operation: string): never {
+    this.logger.error(
+      `Error en operación ${operation} de venta de saldo: ${error.message}`,
+      error.stack,
+      'BalanceSalesService'
+    );
+    
+    if (error instanceof NotFoundException) {
+      throw error;
+    }
+    
+    throw new Error(`Error al ${operation} venta de saldo: ${error.message}`);
+  }
+}

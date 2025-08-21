@@ -21,7 +21,8 @@ import {
   Avatar,
   Menu,
   MenuItem,
-  CircularProgress
+  CircularProgress,
+  Collapse
 } from '@mui/material';
 import {
   Menu as MenuIcon,
@@ -40,7 +41,13 @@ import {
   Store as StoreIcon,
   Schedule as TurnosIcon,
   AccessTime as AccessTimeIcon,
-  AttachMoney as CashCounterIcon
+  AttachMoney as CashCounterIcon,
+  ExpandLess,
+  ExpandMore,
+  Business as BusinessIcon,
+  Settings as SettingsIcon,
+  SupervisorAccount as SupervisorIcon,
+  SupervisedUserCircle as SuperUserIcon
 } from '@mui/icons-material';
 
 const drawerWidth = 240;
@@ -68,9 +75,9 @@ const MainLayout: React.FC = () => {
     logout();
   };
 
-  // Definimos los códigos de permisos para cada opción del menú
+  // Definimos los permisos para cada item del menú
 const MENU_PERMISSIONS = {
-  // Permisos de Administrador
+  DASHBOARD: 'ver_dashboard',
   TRANSACTIONS: 'ver_transacciones',
   TRANSACTION_TYPES: 'ver_tipos_transaccion',
   AGENT_CLOSINGS: 'ver_cierres_agentes',
@@ -78,17 +85,30 @@ const MENU_PERMISSIONS = {
   ROLES: 'ver_roles',
   USERS: 'ver_usuarios',
   TURNOS: 'ver_turnos',
-  ADMIN_TURNOS: 'admin_turnos',
+  MIS_TURNOS: 'ver_mis_turnos',
+  ADMIN_TURNOS: 'ver_turnos',
   REGISTRO_ACTIVIDAD_TURNOS: 'ver_registro_actividad_turnos',
   PROVIDER_TYPES: 'ver_tipos_proveedor',
   PROVIDERS: 'ver_proveedores',
-  DASHBOARD: 'ver_dashboard',
-  
-  // Permisos de Vendedor
+  ADMIN_PERMISOS: 'admin_permisos',
   VENDEDOR_DASHBOARD: 'ver_dashboard_vendedor',
   VENTAS: 'ver_ventas',
   CLIENTES: 'ver_clientes',
-  PRODUCTOS: 'ver_productos'
+  PRODUCTOS: 'ver_productos',
+  SUPER_EXPENSE_TYPES: 'ver_tipos_egresos_super',
+  PAYMENT_DOCUMENTS: 'ver_documento_pago',
+  ADMIN_PAYMENT_DOCUMENTS: 'admin_documentos_pago',
+  PAYMENT_METHODS: 'ver_forma_pago',
+  ADMIN_PAYMENT_METHODS: 'admin_forma_pago',
+  SUPER_EXPENSES: 'ver_egresos_super',
+  ADMIN_SUPER_EXPENSES: 'admin_egresos_super',
+  PHONE_LINES: 'admin_lineas_telefonicas',
+  BALANCE_FLOWS: 'ver_flujos_saldo',
+  ADMIN_BALANCE_FLOWS: 'crear_editar_flujo',
+  BALANCE_SALES: 'ver_venta_paquete',
+  ADMIN_BALANCE_SALES: 'crear_editar_venta',
+  PACKAGES: 'ver_paquetes',
+  ADMIN_PACKAGES: 'admin_paquetes'
 };
 
 // Definimos los permisos por rol
@@ -101,6 +121,7 @@ const ROLE_PERMISSIONS = {
     MENU_PERMISSIONS.ROLES,
     MENU_PERMISSIONS.USERS,
     MENU_PERMISSIONS.TURNOS,
+    MENU_PERMISSIONS.MIS_TURNOS,
     MENU_PERMISSIONS.ADMIN_TURNOS,
     MENU_PERMISSIONS.REGISTRO_ACTIVIDAD_TURNOS,
     MENU_PERMISSIONS.PROVIDER_TYPES,
@@ -109,6 +130,7 @@ const ROLE_PERMISSIONS = {
   ],
   VENDEDOR: [
     MENU_PERMISSIONS.VENDEDOR_DASHBOARD,
+    MENU_PERMISSIONS.MIS_TURNOS,
     MENU_PERMISSIONS.VENTAS,
     MENU_PERMISSIONS.CLIENTES,
     MENU_PERMISSIONS.PRODUCTOS,
@@ -116,8 +138,19 @@ const ROLE_PERMISSIONS = {
   ]
 };
 
+// Definir interfaces para los tipos de menú
+interface MenuItem {
+  text: string;
+  icon: React.ReactNode;
+  path?: string;
+  permissionCode?: string | null;
+  isGroup?: boolean;
+  children?: MenuItem[];
+  showEmpty?: boolean; // Propiedad para indicar si un grupo debe mostrarse aunque esté vacío
+}
+
 // Definimos los elementos del menú con sus permisos requeridos
-const menuItemsConfig = [
+const menuItemsConfig: MenuItem[] = [
   // Menú para Vendedores
   { 
     text: 'Dashboard Vendedor', 
@@ -129,7 +162,7 @@ const menuItemsConfig = [
     text: 'Mis Turnos', 
     icon: <TurnosIcon />, 
     path: '/turnos/vendedor', 
-    permissionCode: MENU_PERMISSIONS.TURNOS 
+    permissionCode: MENU_PERMISSIONS.MIS_TURNOS 
   },
   { 
     text: 'Ventas', 
@@ -151,107 +184,270 @@ const menuItemsConfig = [
   },
   
   // Menú para Administradores
-  { 
-    text: 'Administración de Turnos', 
-    icon: <AccessTimeIcon />, 
-    path: '/turnos', 
-    permissionCode: MENU_PERMISSIONS.TURNOS 
+  
+  // Grupo de Módulo Administrativo
+  {
+    text: 'Módulo Administrativo',
+    icon: <SettingsIcon />,
+    isGroup: true,
+    permissionCode: null, // No requiere permiso específico para ver el grupo
+    children: [
+      { 
+        text: 'Administración de Turnos', 
+        icon: <AccessTimeIcon />, 
+        path: '/turnos', 
+        permissionCode: MENU_PERMISSIONS.TURNOS 
+      },
+      { 
+        text: 'Registro de Actividad de Turnos', 
+        icon: <AccessTimeIcon />, 
+        path: '/turnos/registros-actividad', 
+        permissionCode: MENU_PERMISSIONS.REGISTRO_ACTIVIDAD_TURNOS 
+      },
+      { 
+        text: 'Roles y Permisos', 
+        icon: <SecurityIcon />, 
+        path: '/roles', 
+        permissionCode: MENU_PERMISSIONS.ROLES 
+      },
+      { 
+        text: 'Gestión de Permisos', 
+        icon: <SecurityIcon />, 
+        path: '/permissions', 
+        permissionCode: MENU_PERMISSIONS.ADMIN_PERMISOS 
+      },
+      { 
+        text: 'Gestión de Usuarios', 
+        icon: <UsersIcon />, 
+        path: '/users', 
+        permissionCode: MENU_PERMISSIONS.USERS 
+      },
+    ]
   },
-  { 
-    text: 'Registro de Actividad de Turnos', 
-    icon: <AccessTimeIcon />, 
-    path: '/turnos/registros-actividad', 
-    permissionCode: MENU_PERMISSIONS.REGISTRO_ACTIVIDAD_TURNOS 
+  
+  // Grupo de Operación de Agentes
+  {
+    text: 'Operación de Agentes',
+    icon: <BusinessIcon />,
+    isGroup: true,
+    permissionCode: null, // No requiere permiso específico para ver el grupo
+    children: [
+      { 
+        text: 'Transacciones', 
+        icon: <ReceiptIcon />, 
+        path: '/transactions', 
+        permissionCode: MENU_PERMISSIONS.TRANSACTIONS 
+      },
+      { 
+        text: 'Reportes', 
+        icon: <AssessmentIcon />, 
+        path: '/reports', 
+        permissionCode: MENU_PERMISSIONS.REPORTS 
+      },
+      { 
+        text: 'Contador de Efectivo', 
+        icon: <CashCounterIcon />, 
+        path: '/cash-counter', 
+        permissionCode: 'ver_contador_efectivo' 
+      },
+      { 
+        text: 'Cierre Final de Agentes', 
+        icon: <AgentClosingsIcon />, 
+        path: '/agent-closings', 
+        permissionCode: MENU_PERMISSIONS.AGENT_CLOSINGS 
+      },
+    ]
   },
-  { 
-    text: 'Transacciones', 
-    icon: <ReceiptIcon />, 
-    path: '/transactions', 
-    permissionCode: MENU_PERMISSIONS.TRANSACTIONS 
+  // Grupo de Administración Agentes
+  {
+    text: 'Administración Agentes',
+    icon: <SupervisorIcon />,
+    isGroup: true,
+    permissionCode: null, // No requiere permiso específico para ver el grupo
+    children: [
+      { 
+        text: 'Tipos de Proveedor', 
+        icon: <ProviderTypesIcon />, 
+        path: '/provider-types', 
+        permissionCode: MENU_PERMISSIONS.PROVIDER_TYPES 
+      },
+      { 
+        text: 'Proveedores', 
+        icon: <ProvidersIcon />, 
+        path: '/providers', 
+        permissionCode: MENU_PERMISSIONS.PROVIDERS 
+      },
+      { 
+        text: 'Tipos de Transacción', 
+        icon: <TransactionTypesIcon />, 
+        path: '/transaction-types', 
+        permissionCode: MENU_PERMISSIONS.TRANSACTION_TYPES 
+      },
+    ]
   },
-  { 
-    text: 'Tipos de Transacción', 
-    icon: <TransactionTypesIcon />, 
-    path: '/transaction-types', 
-    permissionCode: MENU_PERMISSIONS.TRANSACTION_TYPES 
+  
+  // Grupo de Operación de Super
+  {
+    text: 'Operación de Super',
+    icon: <SuperUserIcon />,
+    isGroup: true,
+    permissionCode: null, // No requiere permiso específico para ver el grupo
+    showEmpty: true, // Propiedad para indicar que se debe mostrar aunque esté vacío
+    children: [
+      { 
+        text: 'Egresos de Super', 
+        icon: <ReceiptIcon />, 
+        path: '/super-expenses', 
+        permissionCode: MENU_PERMISSIONS.SUPER_EXPENSES 
+      },
+      { 
+        text: 'Flujos de Saldo', 
+        icon: <ReceiptIcon />, 
+        path: '/balance-flows', 
+        permissionCode: MENU_PERMISSIONS.BALANCE_FLOWS 
+      },
+      { 
+        text: 'Ventas de Saldo', 
+        icon: <ReceiptIcon />, 
+        path: '/balance-sales', 
+        permissionCode: MENU_PERMISSIONS.BALANCE_SALES 
+      },
+    ]
   },
-  { 
-    text: 'Cierre Final de Agentes', 
-    icon: <AgentClosingsIcon />, 
-    path: '/agent-closings', 
-    permissionCode: MENU_PERMISSIONS.AGENT_CLOSINGS 
-  },
-  { 
-    text: 'Reportes', 
-    icon: <AssessmentIcon />, 
-    path: '/reports', 
-    permissionCode: MENU_PERMISSIONS.REPORTS 
-  },
-  { 
-    text: 'Contador de Efectivo', 
-    icon: <CashCounterIcon />, 
-    path: '/cash-counter', 
-    permissionCode: 'ver_contador_efectivo' 
-  },
-  // Opción de Historial de Conteos eliminada - ahora integrada en la pestaña del Contador de Efectivo
-  { 
-    text: 'Roles y Permisos', 
-    icon: <SecurityIcon />, 
-    path: '/roles', 
-    permissionCode: MENU_PERMISSIONS.ROLES 
-  },
-  { 
-    text: 'Gestión de Usuarios', 
-    icon: <UsersIcon />, 
-    path: '/users', 
-    permissionCode: MENU_PERMISSIONS.USERS 
-  },
-  // Entrada de menú 'Gestión de Turnos' eliminada para evitar duplicidad
-  // Solo se mantiene 'Administración de Turnos'
-  { 
-    text: 'Tipos de Proveedor', 
-    icon: <ProviderTypesIcon />, 
-    path: '/provider-types', 
-    permissionCode: MENU_PERMISSIONS.PROVIDER_TYPES 
-  },
-  { 
-    text: 'Proveedores', 
-    icon: <ProvidersIcon />, 
-    path: '/providers', 
-    permissionCode: MENU_PERMISSIONS.PROVIDERS 
+  
+  // Grupo de Administración Super
+  {
+    text: 'Administración Super',
+    icon: <SuperUserIcon />,
+    isGroup: true,
+    permissionCode: null, // No requiere permiso específico para ver el grupo
+    showEmpty: true, // Propiedad para indicar que se debe mostrar aunque esté vacío
+    children: [
+      { 
+        text: 'Tipos de Egresos del Super', 
+        icon: <TransactionTypesIcon />, 
+        path: '/super-expense-types', 
+        permissionCode: MENU_PERMISSIONS.SUPER_EXPENSE_TYPES 
+      },
+      { 
+        text: 'Documentos de Pago', 
+        icon: <ReceiptIcon />, 
+        path: '/payment-documents', 
+        permissionCode: MENU_PERMISSIONS.PAYMENT_DOCUMENTS 
+      },
+      { 
+        text: 'Formas de Pago', 
+        icon: <ReceiptIcon />, 
+        path: '/payment-methods', 
+        permissionCode: MENU_PERMISSIONS.PAYMENT_METHODS 
+      },
+      { 
+        text: 'Líneas Telefónicas', 
+        icon: <ReceiptIcon />, 
+        path: '/phone-lines', 
+        permissionCode: MENU_PERMISSIONS.PHONE_LINES 
+      },
+      { 
+        text: 'Paquetes', 
+        icon: <ReceiptIcon />, 
+        path: '/packages', 
+        permissionCode: MENU_PERMISSIONS.PACKAGES 
+      },
+    ]
   },
 ];
 
-  // Logs para depuración
-  console.log('Auth State:', authState);
-  console.log('Is Authenticated:', authState.isAuthenticated);
-  console.log('User:', authState.user);
-  console.log('Permissions:', authState.permissions);
-  console.log('Tiene permiso ver_registro_actividad_turnos:', hasPermission('ver_registro_actividad_turnos'));
+  // Estado para controlar qué grupos están expandidos
+  const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({});
+  
+  // Función para alternar la expansión de un grupo
+  const toggleGroup = (groupName: string) => {
+    setOpenGroups(prev => ({
+      ...prev,
+      [groupName]: !prev[groupName]
+    }));
+  };
   
   // Filtrar el menú según los permisos del usuario
-  const menuItems = useMemo(() => {
+  const menuItems = useMemo((): MenuItem[] => {
     if (authState.loading) {
       console.log('Cargando permisos...');
       return []; // No mostrar menús mientras se cargan los permisos
     }
     
+    const filterByPermission = (items: MenuItem[]): MenuItem[] => {
+      return items.filter(item => {
+        // Si el ítem tiene hijos (es un grupo), filtrar sus hijos
+        if (item.isGroup && item.children) {
+          const filteredChildren: MenuItem[] = filterByPermission(item.children);
+          // Mostrar el grupo si tiene al menos un hijo con permiso O si está marcado para mostrarse vacío
+          return filteredChildren.length > 0 || item.showEmpty === true;
+        }
+        // Para ítems normales, verificar el permiso
+        return !item.permissionCode || hasPermission(item.permissionCode);
+      });
+    };
+
     if (hasRole('Vendedor')) {
       // Si el usuario tiene el rol de Vendedor, mostrar solo los menús de vendedor
+      // y excluir los grupos
       console.log('Mostrando menú para rol Vendedor');
-      return menuItemsConfig.filter(item => 
-        item.permissionCode && hasPermission(item.permissionCode)
-      );
+      return filterByPermission(menuItemsConfig.filter(item => !item.isGroup));
     } else {
       // Para cualquier otro rol (Admin), filtrar según permisos específicos
       console.log('Filtrando menús por permisos');
-      return menuItemsConfig.filter(item => 
-        !item.permissionCode || hasPermission(item.permissionCode)
+      return filterByPermission(menuItemsConfig);
+    }
+  }, [authState.loading, hasPermission, hasRole]);
+  
+  // Renderizar un ítem de menú (puede ser un grupo o un ítem normal)
+  const renderMenuItem = (item: MenuItem) => {
+    // Si es un grupo con hijos
+    if (item.isGroup && item.children) {
+      const isOpen = openGroups[item.text] || false;
+      
+      return (
+        <React.Fragment key={item.text}>
+          <ListItem disablePadding>
+            <ListItemButton onClick={() => toggleGroup(item.text)}>
+              <ListItemIcon>{item.icon}</ListItemIcon>
+              <ListItemText primary={item.text} />
+              {isOpen ? <ExpandLess /> : <ExpandMore />}
+            </ListItemButton>
+          </ListItem>
+          <Collapse in={isOpen} timeout="auto" unmountOnExit>
+            <List component="div" disablePadding>
+              {item.children.map((child: MenuItem) => (
+                <ListItem 
+                  key={child.text} 
+                  disablePadding 
+                  sx={{ pl: 4 }}
+                >
+                  <ListItemButton onClick={() => child.path && navigate(child.path)}>
+                    <ListItemIcon>{child.icon}</ListItemIcon>
+                    <ListItemText primary={child.text} />
+                  </ListItemButton>
+                </ListItem>
+              ))}
+            </List>
+          </Collapse>
+        </React.Fragment>
       );
     }
-  }, [authState.permissions, authState.loading, hasPermission, hasRole]);
-  
-  console.log('Menú filtrado:', menuItems.map(item => item.text));
+    
+    // Si es un ítem normal
+    return (
+      <ListItem 
+        key={item.text} 
+        disablePadding
+      >
+        <ListItemButton onClick={() => item.path && navigate(item.path)}>
+          <ListItemIcon>{item.icon}</ListItemIcon>
+          <ListItemText primary={item.text} />
+        </ListItemButton>
+      </ListItem>
+    );
+  };
 
   const drawer = (
     <div>
@@ -273,21 +469,7 @@ const menuItemsConfig = [
             <CircularProgress size={24} />
           </Box>
         ) : (
-          menuItems.map((item) => (
-            <ListItem key={item.text} disablePadding>
-              <ListItemButton
-                onClick={() => navigate(item.path)}
-                sx={{
-                  '&.active': {
-                    backgroundColor: 'rgba(0, 0, 0, 0.08)',
-                  },
-                }}
-              >
-                <ListItemIcon>{item.icon}</ListItemIcon>
-                <ListItemText primary={item.text} />
-              </ListItemButton>
-            </ListItem>
-          ))
+          menuItems.map(renderMenuItem)
         )}
       </List>
       {/* Mostrar mensaje si no hay elementos en el menú */}

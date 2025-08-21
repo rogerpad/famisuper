@@ -1,4 +1,5 @@
 import api from '../api';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 
 // Interfaces
 export interface Permiso {
@@ -73,7 +74,7 @@ const mockPermisos: Permiso[] = [
 ];
 
 // Mock data para permisos de roles
-const mockPermisosRoles: PermisoRol[] = [
+let mockPermisosRoles: PermisoRol[] = [
   // Administrador tiene todos los permisos
   // Permisos de Usuarios
   { id: 1, rol_id: 1, permiso_id: 1 },
@@ -212,7 +213,176 @@ const permisosApi = {
       return Promise.resolve();
     }
     await api.post('/permisos/roles', data);
+  },
+
+  // Crear un nuevo permiso
+  create: async (data: Omit<Permiso, 'id' | 'activo'>): Promise<Permiso> => {
+    return new Promise((resolve, reject) => {
+      try {
+        if (USE_MOCK) {
+          console.log('Creando permiso (MOCK):', data);
+          
+          // Generar nuevo ID
+          const newId = mockPermisos.length > 0 ? Math.max(...mockPermisos.map(p => p.id)) + 1 : 1;
+          
+          // Crear nuevo permiso
+          const newPermiso: Permiso = {
+            id: newId,
+            nombre: data.nombre,
+            codigo: data.codigo,
+            descripcion: data.descripcion,
+            modulo: data.modulo,
+            activo: true
+          };
+          
+          // Agregar a la lista
+          mockPermisos.push(newPermiso);
+          
+          // Simular delay de red
+          setTimeout(() => {
+            resolve(newPermiso);
+          }, 300);
+        } else {
+          // Llamada real a la API
+          api.post('/permisos', data)
+            .then(response => resolve(response.data))
+            .catch(error => reject(error));
+        }
+      } catch (error) {
+        reject(error);
+      }
+    });
+  },
+
+  // Actualizar un permiso existente
+  update: async (id: number, data: Partial<Omit<Permiso, 'id' | 'activo'>>): Promise<Permiso> => {
+    return new Promise((resolve, reject) => {
+      try {
+        if (USE_MOCK) {
+          console.log(`Actualizando permiso ${id} (MOCK):`, data);
+          
+          // Buscar el permiso
+          const index = mockPermisos.findIndex(p => p.id === id);
+          
+          if (index === -1) {
+            reject(new Error(`Permiso con ID ${id} no encontrado`));
+            return;
+          }
+          
+          // Actualizar permiso
+          mockPermisos[index] = {
+            ...mockPermisos[index],
+            ...data
+          };
+          
+          // Simular delay de red
+          setTimeout(() => {
+            resolve(mockPermisos[index]);
+          }, 300);
+        } else {
+          // Llamada real a la API
+          api.put(`/permisos/${id}`, data)
+            .then(response => resolve(response.data))
+            .catch(error => reject(error));
+        }
+      } catch (error) {
+        reject(error);
+      }
+    });
+  },
+
+  // Eliminar un permiso
+  delete: async (id: number): Promise<void> => {
+    return new Promise((resolve, reject) => {
+      try {
+        if (USE_MOCK) {
+          console.log(`Eliminando permiso ${id} (MOCK)`);
+          
+          // Buscar el permiso
+          const index = mockPermisos.findIndex(p => p.id === id);
+          
+          if (index === -1) {
+            reject(new Error(`Permiso con ID ${id} no encontrado`));
+            return;
+          }
+          
+          // Eliminar permiso
+          mockPermisos.splice(index, 1);
+          
+          // Eliminar asignaciones relacionadas
+          mockPermisosRoles = mockPermisosRoles.filter(pr => pr.permiso_id !== id);
+          
+          // Simular delay de red
+          setTimeout(() => {
+            resolve();
+          }, 300);
+        } else {
+          // Llamada real a la API
+          api.delete(`/permisos/${id}`)
+            .then(() => resolve())
+            .catch(error => reject(error));
+        }
+      } catch (error) {
+        reject(error);
+      }
+    });
   }
 };
 
 export default permisosApi;
+
+// Hook para usar los permisos
+
+export const usePermissions = () => {
+  const queryClient = useQueryClient();
+  
+  // Obtener permisos agrupados por módulo
+  const { data, isLoading, isError, error } = useQuery({
+    queryKey: ['permisos', 'byModulo'],
+    queryFn: async () => {
+      const permisos = await permisosApi.getAll();
+      
+      // Agrupar por módulo
+      return permisos.reduce((result: { [key: string]: Permiso[] }, permiso) => {
+        if (!result[permiso.modulo]) {
+          result[permiso.modulo] = [];
+        }
+        result[permiso.modulo].push(permiso);
+        return result;
+      }, {});
+    },
+  });
+  
+  // Crear permiso
+  const createPermiso = async (permisoData: Omit<Permiso, 'id' | 'activo'>) => {
+    const result = await permisosApi.create(permisoData);
+    return result;
+  };
+  
+  // Actualizar permiso
+  const updatePermiso = async (id: number, permisoData: Partial<Omit<Permiso, 'id' | 'activo'>>) => {
+    const result = await permisosApi.update(id, permisoData);
+    return result;
+  };
+  
+  // Eliminar permiso
+  const deletePermiso = async (id: number) => {
+    await permisosApi.delete(id);
+  };
+  
+  // Refetch data
+  const refetch = () => {
+    queryClient.invalidateQueries({ queryKey: ['permisos'] });
+  };
+  
+  return {
+    data,
+    isLoading,
+    isError,
+    error,
+    createPermiso,
+    updatePermiso,
+    deletePermiso,
+    refetch
+  };
+};

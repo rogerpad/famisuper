@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 // Definir la URL base de la API
-export const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:4001';
+export const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:4002';
 
 // Crear instancia de axios con configuración base
 const api = axios.create({

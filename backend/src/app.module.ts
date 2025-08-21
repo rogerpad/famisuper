@@ -15,6 +15,15 @@ import { MigrationModule } from './database/migrations/migration.module';
 import { PermisosModule } from './modules/permisos/permisos.module';
 import { TurnosModule } from './modules/turnos/turnos.module';
 import { CashModule } from './modules/cash/cash.module';
+import { SuperExpenseTypesModule } from './modules/super-expense-types/super-expense-types.module';
+import { PaymentDocumentsModule } from './modules/payment-documents/payment-documents.module';
+import { PaymentMethodsModule } from './modules/payment-methods/payment-methods.module';
+import { SuperExpensesModule } from './super-expenses/super-expenses.module';
+import { PhoneLinesModule } from './modules/phone-lines/phone-lines.module';
+import { BalanceFlowsModule } from './modules/balance-flows/balance-flows.module';
+import { BalanceSalesModule } from './modules/balance-sales/balance-sales.module';
+import { PackagesModule } from './modules/packages/packages.module';
+import { LoggerModule } from './common/modules/logger.module';
 
 @Module({
   imports: [
@@ -30,6 +39,9 @@ import { CashModule } from './modules/cash/cash.module';
     // Módulo de migración para actualizar la estructura de la base de datos
     MigrationModule,
     
+    // Módulo de logging centralizado
+    LoggerModule,
+    
     // Módulos de la aplicación
     AuthModule,
     UsersModule,
@@ -44,6 +56,14 @@ import { CashModule } from './modules/cash/cash.module';
     FormulaConfigsModule,
     TurnosModule,
     CashModule,
+    SuperExpenseTypesModule,
+    PaymentDocumentsModule,
+    PaymentMethodsModule,
+    SuperExpensesModule,
+    PhoneLinesModule,
+    BalanceFlowsModule,
+    BalanceSalesModule,
+    PackagesModule,
   ],
 })
 export class AppModule {}
