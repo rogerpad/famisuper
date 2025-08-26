@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import {
   Box,
   Button,
@@ -22,18 +22,36 @@ import { useNavigate } from 'react-router-dom';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { useBalanceSales } from '../../api/balance-sales/balanceSalesApi';
+import { usePackages } from '../../api/packages/packagesApi';
 import { BalanceSale } from '../../api/balance-sales/types';
+import { Package } from '../../api/packages/types';
 
 const BalanceSalesList: React.FC = () => {
   const navigate = useNavigate();
   const { loading, error, fetchBalanceSales, deleteBalanceSale } = useBalanceSales();
+  const { loading: packagesLoading, fetchPackages } = usePackages();
   const [balanceSales, setBalanceSales] = useState<BalanceSale[]>([]);
+  const [packages, setPackages] = useState<Package[]>([]);
+  const [packageMap, setPackageMap] = useState<Record<number, string>>({});
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [selectedBalanceSaleId, setSelectedBalanceSaleId] = useState<number | null>(null);
 
   useEffect(() => {
     loadBalanceSales();
+    loadPackages();
   }, []);
+  
+  const loadPackages = async () => {
+    const packagesData = await fetchPackages();
+    setPackages(packagesData);
+    
+    // Crear un mapeo de ID de paquete a nombre de paquete
+    const packageMapping: Record<number, string> = {};
+    packagesData.forEach(pkg => {
+      packageMapping[pkg.id] = pkg.nombre;
+    });
+    setPackageMap(packageMapping);
+  };
 
   const loadBalanceSales = async () => {
     const data = await fetchBalanceSales();
@@ -44,9 +62,12 @@ const BalanceSalesList: React.FC = () => {
     navigate('/balance-sales/new');
   };
 
-  const handleEditClick = (id: number) => {
+  // Utilizamos useCallback para evitar recreaciones innecesarias de la función
+  const handleEditClick = useCallback((id: number) => {
+    // Evitamos navegaciones repetidas al mismo ID
+    console.log(`[BalanceSalesList] Navegando a edición de venta ID: ${id}`);
     navigate(`/balance-sales/edit/${id}`);
-  };
+  }, [navigate]);
 
   const handleDeleteClick = (id: number) => {
     setSelectedBalanceSaleId(id);
@@ -69,7 +90,7 @@ const BalanceSalesList: React.FC = () => {
     setSelectedBalanceSaleId(null);
   };
 
-  if (loading && balanceSales.length === 0) {
+  if ((loading && balanceSales.length === 0) || packagesLoading) {
     return <Typography>Cargando ventas de saldo...</Typography>;
   }
 
@@ -96,12 +117,13 @@ const BalanceSalesList: React.FC = () => {
           <TableHead>
             <TableRow>
               <TableCell>ID</TableCell>
-              <TableCell>Fecha</TableCell>
-              <TableCell>Usuario</TableCell>
-              <TableCell>Línea Telefónica</TableCell>
-              <TableCell>Flujo de Saldo</TableCell>
+              <TableCell>Paquete</TableCell>
               <TableCell>Cantidad</TableCell>
               <TableCell>Monto</TableCell>
+              <TableCell>Línea Telefónica</TableCell>
+              <TableCell>Observación</TableCell>
+              <TableCell>Fecha</TableCell>
+              <TableCell>Usuario</TableCell>
               <TableCell>Acciones</TableCell>
             </TableRow>
           </TableHead>
@@ -116,14 +138,15 @@ const BalanceSalesList: React.FC = () => {
               balanceSales.map((balanceSale) => (
                 <TableRow key={balanceSale.id}>
                   <TableCell>{balanceSale.id}</TableCell>
+                  <TableCell>{balanceSale.paqueteId && packageMap[balanceSale.paqueteId] ? packageMap[balanceSale.paqueteId] : 'N/A'}</TableCell>
+                  <TableCell>{balanceSale.cantidad}</TableCell>
+                  <TableCell>L. {typeof balanceSale.monto === 'number' ? balanceSale.monto.toFixed(2) : Number(balanceSale.monto).toFixed(2)}</TableCell>
+                  <TableCell>{balanceSale.telefonica?.nombre || 'N/A'}</TableCell>
+                  <TableCell>{balanceSale.observacion || '-'}</TableCell>
                   <TableCell>
                     {format(new Date(balanceSale.fecha), 'dd/MM/yyyy HH:mm', { locale: es })}
                   </TableCell>
                   <TableCell>{balanceSale.usuario?.nombre || 'N/A'}</TableCell>
-                  <TableCell>{balanceSale.telefonica?.nombre || 'N/A'}</TableCell>
-                  <TableCell>{balanceSale.flujoSaldo?.nombre || 'N/A'}</TableCell>
-                  <TableCell>{balanceSale.cantidad}</TableCell>
-                  <TableCell>${typeof balanceSale.monto === 'number' ? balanceSale.monto.toFixed(2) : Number(balanceSale.monto).toFixed(2)}</TableCell>
                   <TableCell>
                     <IconButton
                       size="small"

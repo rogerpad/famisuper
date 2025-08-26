@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import {
   Box,
   Button,
@@ -37,7 +37,7 @@ const BalanceSaleForm: React.FC = () => {
   
   const { loading: loadingBalanceSale, error: balanceSaleError, fetchBalanceSaleById, createBalanceSale, updateBalanceSale } = useBalanceSales();
   const { loading: loadingPhoneLines, phoneLines, fetchPhoneLines } = usePhoneLines();
-  const { loading: loadingBalanceFlows, balanceFlows, fetchBalanceFlows } = useBalanceFlows();
+  const { loading: loadingBalanceFlows, balanceFlows, fetchBalanceFlows, fetchBalanceFlowById, updateBalanceAfterSale, updateBalanceAfterSaleEdit } = useBalanceFlows();
   const { loading: loadingPackages, error: packagesError, fetchPackages } = usePackages();
   const [packages, setPackages] = useState<any[]>([]);
   
@@ -56,74 +56,84 @@ const BalanceSaleForm: React.FC = () => {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
   
+  // Guardar el monto original para comparar al editar
+  const [originalMonto, setOriginalMonto] = useState<number>(0);
+  
   // Cargar líneas telefónicas, flujos de saldo y paquetes al montar el componente
   useEffect(() => {
     fetchPhoneLines();
     fetchBalanceFlows();
     loadPackages();
-  }, []);
+  }, [fetchPhoneLines, fetchBalanceFlows]); // Agregar dependencias para evitar loops
   
-  // Función para cargar los paquetes
-  const loadPackages = async () => {
+  // Función para cargar los paquetes, opcionalmente filtrados por línea telefónica
+  const loadPackages = useCallback(async (telefonicaId?: number) => {
     try {
       const packagesData = await fetchPackages();
-      setPackages(packagesData);
+      
+      // Si se proporciona un ID de línea telefónica, filtrar los paquetes
+      if (telefonicaId && telefonicaId > 0) {
+        console.log(`[BalanceSaleForm] Filtrando paquetes por línea telefónica ID: ${telefonicaId}`);
+        const filteredPackages = packagesData.filter(pkg => pkg.telefonicaId === telefonicaId);
+        setPackages(filteredPackages);
+        console.log(`[BalanceSaleForm] Paquetes filtrados: ${filteredPackages.length} de ${packagesData.length}`);
+      } else {
+        // Si no hay filtro, mostrar todos los paquetes
+        setPackages(packagesData);
+      }
     } catch (error) {
       console.error('Error al cargar paquetes:', error);
     }
-  };
+  }, [fetchPackages]); // Memoizar la función
+
+  // Referencia para controlar si ya se cargó la venta
+  const ventaCargadaRef = React.useRef(false);
 
   // Cargar datos de la venta si estamos en modo edición
   useEffect(() => {
-    if (isEditMode && id) {
-      loadBalanceSale(parseInt(id));
+    // Evitar cargas múltiples usando una referencia
+    if (isEditMode && id && !ventaCargadaRef.current) {
+      // Marcar como cargado inmediatamente para evitar múltiples ejecuciones
+      ventaCargadaRef.current = true;
+      
+      console.log('[BalanceSaleForm] Iniciando carga de venta con ID:', id);
+      
+      const loadBalanceSale = async () => {
+        try {
+          const balanceSale = await fetchBalanceSaleById(parseInt(id));
+          if (balanceSale) {
+            console.log('[BalanceSaleForm] Venta de saldo cargada una sola vez:', balanceSale);
+            // Guardar el monto original para usarlo en la actualización del flujo de saldo
+            setOriginalMonto(balanceSale.monto);
+            
+            // Primero cargar los paquetes filtrados por la línea telefónica de la venta
+            await loadPackages(balanceSale.telefonicaId);
+            
+            setFormData({
+              usuarioId: balanceSale.usuarioId,
+              telefonicaId: balanceSale.telefonicaId,
+              flujoSaldoId: balanceSale.flujoSaldoId,
+              paqueteId: balanceSale.paqueteId,
+              cantidad: balanceSale.cantidad,
+              monto: balanceSale.monto,
+              fecha: balanceSale.fecha,
+              observacion: balanceSale.observacion || '',
+              activo: balanceSale.activo
+            });
+          }
+        } catch (error) {
+          console.error('[BalanceSaleForm] Error al cargar venta:', error);
+        }
+      };
+      
+      loadBalanceSale();
     }
-  }, [id, isEditMode]);
-  
-  // Efecto para cargar datos cuando los selectores estén listos
-  useEffect(() => {
-    if (phoneLines?.length > 0 && balanceFlows?.length > 0 && isEditMode && id) {
-      console.log('Selectores cargados, recargando datos...');
-      loadBalanceSale(parseInt(id));
-    }
-  }, [phoneLines, balanceFlows, isEditMode, id]);
-  
-  const loadBalanceSale = async (balanceSaleId: number) => {
-    try {
-      const balanceSale = await fetchBalanceSaleById(balanceSaleId);
-      if (balanceSale) {
-        console.log('Datos recibidos del backend:', balanceSale);
-        
-        // Forzar la conversión de todos los campos numéricos
-        const telefonicaId = Number(balanceSale.telefonicaId);
-        const flujoSaldoId = Number(balanceSale.flujoSaldoId);
-        const paqueteId = balanceSale.paqueteId ? Number(balanceSale.paqueteId) : undefined;
-        
-        console.log('Valores convertidos:', { 
-          telefonicaId, 
-          flujoSaldoId, 
-          paqueteId 
-        });
-        
-        // Actualizar el estado con un timeout para asegurar que los selectores se actualicen
-        setTimeout(() => {
-          setFormData({
-            usuarioId: Number(balanceSale.usuarioId),
-            telefonicaId: telefonicaId,
-            flujoSaldoId: flujoSaldoId,
-            paqueteId: paqueteId,
-            cantidad: Number(balanceSale.cantidad),
-            monto: Number(balanceSale.monto),
-            fecha: new Date(balanceSale.fecha),
-            observacion: balanceSale.observacion || '',
-            activo: balanceSale.activo,
-          });
-        }, 100);
-      }
-    } catch (error) {
-      console.error('Error al cargar la venta de saldo:', error);
-    }
-  };
+    
+    // Limpiar la referencia cuando el componente se desmonte
+    return () => {
+      // No reseteamos ventaCargadaRef.current = false aquí para evitar recargas
+    };
+  }, [id, isEditMode, loadPackages]); // Agregamos loadPackages a las dependencias
   
   // Función para calcular el monto basado en la cantidad y el precio del paquete
   const calculateAmount = (packageId: number | undefined, quantity: number): number => {
@@ -184,8 +194,25 @@ const BalanceSaleForm: React.FC = () => {
         paqueteId: packageId,
         monto: newAmount
       });
-    } else if (name === 'telefonicaId' || name === 'flujoSaldoId') {
-      // Para campos numéricos, asegurar que sean números
+    } else if (name === 'telefonicaId') {
+      // Para línea telefónica, asegurar que sea número
+      const numericValue = value === '' ? 0 : Number(value);
+      console.log(`Convirtiendo ${name} a número: ${numericValue}`);
+      
+      // Actualizar el estado del formulario
+      setFormData({
+        ...formData,
+        [name]: numericValue,
+        // Resetear el paquete seleccionado cuando cambia la línea telefónica
+        paqueteId: undefined,
+        // Si había un monto calculado por paquete, resetearlo también
+        monto: formData.paqueteId ? 0 : formData.monto
+      });
+      
+      // Cargar los paquetes filtrados por la línea telefónica seleccionada
+      loadPackages(numericValue);
+    } else if (name === 'flujoSaldoId') {
+      // Para flujo de saldo, asegurar que sea número
       const numericValue = value === '' ? 0 : Number(value);
       console.log(`Convirtiendo ${name} a número: ${numericValue}`);
       
@@ -211,8 +238,11 @@ const BalanceSaleForm: React.FC = () => {
     }
   };
   
-  const validateForm = (): boolean => {
+  const validateForm = async (): Promise<boolean> => {
     const newErrors: Record<string, string> = {};
+    
+    // Limpiar errores anteriores
+    setErrors({});
     
     if (!authState.user?.id) {
       newErrors.usuarioId = 'No hay usuario en la sesión actual';
@@ -238,53 +268,143 @@ const BalanceSaleForm: React.FC = () => {
       newErrors.fecha = 'La fecha es requerida';
     }
     
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
+    // Verificar que haya suficiente saldo disponible
+    if (formData.flujoSaldoId && formData.monto > 0) {
+      try {
+        const flujoSaldo = await fetchBalanceFlowById(formData.flujoSaldoId);
+        if (flujoSaldo) {
+          if (!flujoSaldo.activo) {
+            newErrors.flujoSaldoId = 'El flujo de saldo seleccionado no está activo';
+          } else {
+            // Si es modo edición, verificar que haya suficiente saldo para la diferencia
+            if (isEditMode) {
+              // Calcular la diferencia entre el monto nuevo y el original
+              const diferencia = Number(formData.monto) - Number(originalMonto);
+              
+              // Solo verificar si el nuevo monto es mayor que el original
+              if (diferencia > 0 && Number(flujoSaldo.saldoFinal) < diferencia) {
+                newErrors.monto = `No hay suficiente saldo disponible para el incremento. Saldo actual: L. ${flujoSaldo.saldoFinal}`;
+              }
+            } else if (Number(flujoSaldo.saldoFinal) < Number(formData.monto)) {
+              // En modo creación, verificar que haya suficiente saldo para el monto completo
+              newErrors.monto = `No hay suficiente saldo disponible. Saldo actual: L. ${flujoSaldo.saldoFinal}`;
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Error al verificar saldo disponible:', error);
+      }
+    }
+    
+    // Actualizar los errores y devolver si el formulario es válido
+    if (Object.keys(newErrors).length > 0) {
+      console.log('Errores de validación:', newErrors);
+      setErrors(newErrors);
+      return false;
+    }
+    
+    return true;
   };
   
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     // Mostrar el estado actual del formulario antes de validar
-    console.log('Estado del formulario antes de enviar:', formData);
-    console.log('Tipo de telefonicaId:', typeof formData.telefonicaId, formData.telefonicaId);
-    console.log('Tipo de flujoSaldoId:', typeof formData.flujoSaldoId, formData.flujoSaldoId);
+    console.log('[BalanceSaleForm] Estado del formulario antes de enviar:', formData);
+    console.log('[BalanceSaleForm] Tipo de telefonicaId:', typeof formData.telefonicaId, formData.telefonicaId);
+    console.log('[BalanceSaleForm] Tipo de flujoSaldoId:', typeof formData.flujoSaldoId, formData.flujoSaldoId);
     
-    if (!validateForm()) {
+    // Evitar envíos múltiples
+    if (submitting) {
+      console.log('[BalanceSaleForm] Formulario ya está siendo enviado, ignorando click');
+      return;
+    }
+    
+    const isValid = await validateForm();
+    if (!isValid) {
+      console.log('[BalanceSaleForm] Formulario inválido, abortando envío');
       return;
     }
     
     setSubmitting(true);
+    console.log(`[BalanceSaleForm] Iniciando ${isEditMode ? 'actualización' : 'creación'} de venta de saldo`);
     
     try {
+      // Funciones de utilidad para conversión segura de tipos
+      const safeParseInt = (value: any): number => {
+        if (typeof value === 'number') return value;
+        return parseInt(String(value).trim()) || 0;
+      };
+      
+      const safeParseFloat = (value: any): number => {
+        if (typeof value === 'number') return value;
+        return parseFloat(String(value).trim()) || 0;
+      };
+      
       // Crear una copia del objeto para no modificar el estado original
       const dataToSubmit = {
         // Forzar la conversión de todos los campos numéricos
-        usuarioId: Number(authState.user?.id || 0),
-        telefonicaId: Number(formData.telefonicaId),
-        flujoSaldoId: Number(formData.flujoSaldoId),
-        paqueteId: formData.paqueteId !== undefined ? Number(formData.paqueteId) : undefined,
-        cantidad: Number(formData.cantidad),
-        monto: Number(formData.monto),
+        usuarioId: safeParseInt(authState.user?.id || 0),
+        telefonicaId: safeParseInt(formData.telefonicaId),
+        flujoSaldoId: safeParseInt(formData.flujoSaldoId),
+        paqueteId: formData.paqueteId !== undefined ? safeParseInt(formData.paqueteId) : undefined,
+        cantidad: safeParseInt(formData.cantidad),
+        monto: safeParseFloat(formData.monto),
         // Mantener fecha como Date para cumplir con la interfaz BalanceSale
         fecha: formData.fecha instanceof Date ? formData.fecha : new Date(formData.fecha),
         observacion: formData.observacion || '',
         activo: Boolean(formData.activo)
       };
       
-      console.log('Datos convertidos a enviar:', dataToSubmit);
+      console.log('[BalanceSaleForm] Datos convertidos a enviar:', dataToSubmit);
       
       if (isEditMode && id) {
         const result = await updateBalanceSale(parseInt(id), dataToSubmit);
-        console.log('Resultado de la actualización:', result);
+        console.log('[BalanceSaleForm] Resultado de la actualización:', result);
+        
+        // Si el monto ha cambiado, actualizar el saldo del flujo
+        if (Number(dataToSubmit.monto) !== Number(originalMonto)) {
+          try {
+            console.log(`[BalanceSaleForm] Actualizando flujo de saldo ${dataToSubmit.flujoSaldoId} con monto anterior ${originalMonto} y monto nuevo ${dataToSubmit.monto}`);
+            await updateBalanceAfterSaleEdit(
+              dataToSubmit.flujoSaldoId,
+              Number(originalMonto),
+              Number(dataToSubmit.monto)
+            );
+            console.log('[BalanceSaleForm] Saldo actualizado correctamente después de edición');
+          } catch (updateError: any) {
+            console.error('[BalanceSaleForm] Error al actualizar saldo después de edición:', updateError);
+            alert(`La venta se ha actualizado, pero hubo un error al actualizar el saldo: ${updateError.message || 'Error desconocido'}`);
+          }
+        }
       } else {
-        await createBalanceSale(dataToSubmit);
+        // Crear la venta de saldo
+        const result = await createBalanceSale(dataToSubmit);
+        console.log('[BalanceSaleForm] Resultado de la creación:', result);
+        
+        if (result) {
+          try {
+            // Actualizar el saldo vendido y saldo final en el flujo de saldo
+            console.log(`[BalanceSaleForm] Actualizando flujo de saldo ${dataToSubmit.flujoSaldoId} con monto ${dataToSubmit.monto}`);
+            await updateBalanceAfterSale(dataToSubmit.flujoSaldoId, dataToSubmit.monto);
+            console.log('[BalanceSaleForm] Saldo actualizado correctamente');
+          } catch (updateError: any) {
+            console.error('[BalanceSaleForm] Error al actualizar saldo:', updateError);
+            alert(`La venta se ha registrado, pero hubo un error al actualizar el saldo: ${updateError.message || 'Error desconocido'}`);
+          }
+        }
       }
+      
+      // Navegar a la lista de ventas de saldo
+      console.log('[BalanceSaleForm] Operación exitosa, redirigiendo a la lista');
       navigate('/balance-sales');
-    } catch (error) {
-      console.error('Error al guardar venta de saldo:', error);
+    } catch (error: any) {
+      console.error('[BalanceSaleForm] Error al guardar venta de saldo:', error);
+      // Mostrar mensaje de error
+      alert(`Error al ${isEditMode ? 'actualizar' : 'crear'} la venta de saldo: ${error.message || 'Error desconocido'}`);
     } finally {
       setSubmitting(false);
+      console.log(`[BalanceSaleForm] Finalizado ${isEditMode ? 'actualización' : 'creación'} de venta de saldo`);
     }
   };
   
@@ -328,20 +448,13 @@ const BalanceSaleForm: React.FC = () => {
             <FormControl fullWidth error={!!errors.telefonicaId}>
               <InputLabel>Línea Telefónica</InputLabel>
               <Select
-                key={`telefonicaId-${formData.telefonicaId}`}
                 name="telefonicaId"
                 value={formData.telefonicaId || ''}
-                onChange={(e) => {
-                  const value = e.target.value === '' ? 0 : Number(e.target.value);
-                  console.log('Seleccionado telefonicaId:', value);
-                  setFormData(prev => ({
-                    ...prev,
-                    telefonicaId: value
-                  }));
-                }}
+                onChange={handleSelectChange}
                 label="Línea Telefónica"
                 disabled={submitting}
               >
+                <MenuItem value="">Seleccione una línea</MenuItem>
                 {phoneLines?.map((phoneLine: PhoneLine) => (
                   <MenuItem key={phoneLine.id} value={phoneLine.id}>
                     {phoneLine.nombre}
@@ -356,20 +469,13 @@ const BalanceSaleForm: React.FC = () => {
             <FormControl fullWidth error={!!errors.flujoSaldoId}>
               <InputLabel>Flujo de Saldo</InputLabel>
               <Select
-                key={`flujoSaldoId-${formData.flujoSaldoId}`}
                 name="flujoSaldoId"
                 value={formData.flujoSaldoId || ''}
-                onChange={(e) => {
-                  const value = e.target.value === '' ? 0 : Number(e.target.value);
-                  console.log('Seleccionado flujoSaldoId:', value);
-                  setFormData(prev => ({
-                    ...prev,
-                    flujoSaldoId: value
-                  }));
-                }}
+                onChange={handleSelectChange}
                 label="Flujo de Saldo"
                 disabled={submitting}
               >
+                <MenuItem value="">Seleccione un flujo</MenuItem>
                 {balanceFlows?.map((flow: BalanceFlow) => (
                   <MenuItem key={flow.id} value={flow.id}>
                     {flow.nombre}
@@ -384,29 +490,26 @@ const BalanceSaleForm: React.FC = () => {
             <FormControl fullWidth>
               <InputLabel>Paquete (opcional)</InputLabel>
               <Select
-                key={`paqueteId-${formData.paqueteId}`}
                 name="paqueteId"
                 value={formData.paqueteId !== undefined ? formData.paqueteId : ''}
-                onChange={(e) => {
-                  const value = e.target.value === '' ? undefined : Number(e.target.value);
-                  console.log('Seleccionado paqueteId:', value);
-                  const newAmount = calculateAmount(value, formData.cantidad);
-                  setFormData(prev => ({
-                    ...prev,
-                    paqueteId: value,
-                    monto: newAmount
-                  }));
-                }}
+                onChange={handleSelectChange}
                 label="Paquete (opcional)"
-                disabled={submitting}
+                disabled={submitting || formData.telefonicaId === 0}
               >
                 <MenuItem value="">Ninguno</MenuItem>
                 {packages?.map((pkg: Package) => (
                   <MenuItem key={pkg.id} value={pkg.id}>
-                    {pkg.nombre} (${pkg.precio})
+                    {pkg.nombre} (L. {pkg.precio})
                   </MenuItem>
                 ))}
               </Select>
+              {formData.telefonicaId === 0 ? (
+                <FormHelperText>Seleccione primero una línea telefónica</FormHelperText>
+              ) : packages.length === 0 ? (
+                <FormHelperText>No hay paquetes disponibles para esta línea telefónica</FormHelperText>
+              ) : (
+                <FormHelperText>Mostrando {packages.length} paquetes para la línea seleccionada</FormHelperText>
+              )}
             </FormControl>
           </Grid>
           

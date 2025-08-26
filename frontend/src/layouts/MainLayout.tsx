@@ -108,7 +108,8 @@ const MENU_PERMISSIONS = {
   BALANCE_SALES: 'ver_venta_paquete',
   ADMIN_BALANCE_SALES: 'crear_editar_venta',
   PACKAGES: 'ver_paquetes',
-  ADMIN_PACKAGES: 'admin_paquetes'
+  ADMIN_PACKAGES: 'admin_paquetes',
+  CONTEO_BILLETES_SUPER: 'ver_conteo_super'
 };
 
 // Definimos los permisos por rol
@@ -311,6 +312,12 @@ const menuItemsConfig: MenuItem[] = [
         icon: <ReceiptIcon />, 
         path: '/balance-sales', 
         permissionCode: MENU_PERMISSIONS.BALANCE_SALES 
+      },
+      { 
+        text: 'Contador de Efectivo', 
+        icon: <CashCounterIcon />, 
+        path: '/conteo-billetes-super', 
+        permissionCode: MENU_PERMISSIONS.CONTEO_BILLETES_SUPER 
       },
     ]
   },

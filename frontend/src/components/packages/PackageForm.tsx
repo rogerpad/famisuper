@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
   Box,
@@ -30,6 +30,9 @@ const PackageForm: React.FC = () => {
   const { enqueueSnackbar } = useSnackbar();
   const { loading, error, fetchPackageById, createPackage, updatePackage } = usePackages();
   const { loading: loadingPhoneLines, error: phoneLineError, fetchPhoneLines } = usePhoneLines();
+  
+  // Referencia para controlar si ya se está procesando el envío del formulario
+  const isSubmittingRef = useRef(false);
 
   // Determinar si estamos en modo edición o creación
   const isEditMode = id !== 'new' && id !== undefined;
@@ -54,18 +57,19 @@ const PackageForm: React.FC = () => {
     telefonicaId: '',
   });
 
-  // Cargar datos al montar el componente
+  // Cargar datos al montar el componente con mejor manejo del ciclo de vida
   useEffect(() => {
+    let isMounted = true;
     const loadData = async () => {
       try {
         // Cargar líneas telefónicas
         const phoneLineData = await fetchPhoneLines();
-        setPhoneLines(phoneLineData);
+        if (isMounted) setPhoneLines(phoneLineData);
 
         // Si estamos en modo edición, cargar los datos del paquete
-        if (isEditMode && id) {
+        if (isEditMode && id && isMounted) {
           const packageData = await fetchPackageById(parseInt(id));
-          if (packageData) {
+          if (packageData && isMounted) {
             setFormData({
               nombre: packageData.nombre,
               descripcion: packageData.descripcion,
@@ -76,13 +80,18 @@ const PackageForm: React.FC = () => {
           }
         }
       } catch (err) {
-        console.error('Error al cargar datos:', err);
-        enqueueSnackbar('Error al cargar los datos necesarios', { variant: 'error' });
+        if (isMounted) {
+          console.error('Error al cargar datos:', err);
+          enqueueSnackbar('Error al cargar los datos necesarios', { variant: 'error' });
+        }
       }
     };
 
     loadData();
-  }, [isEditMode, id, fetchPackageById, fetchPhoneLines, enqueueSnackbar]);
+    
+    // Cleanup function para evitar actualizaciones en componentes desmontados
+    return () => { isMounted = false; };
+  }, [isEditMode, id]); // Reducir dependencias para evitar re-renders innecesarios
 
   // Manejar cambios en los campos del formulario
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
@@ -110,8 +119,8 @@ const PackageForm: React.FC = () => {
   };
 
   // Manejar cambios en el select de línea telefónica
-  const handleSelectChange = (e: React.ChangeEvent<{ name?: string; value: unknown }>) => {
-    const value = e.target.value as number;
+  const handleSelectChange = (event: any) => {
+    const value = Number(event.target.value);
     setFormData(prev => ({
       ...prev,
       telefonicaId: value,
@@ -134,9 +143,8 @@ const PackageForm: React.FC = () => {
       errors.nombre = 'El nombre es requerido';
     }
 
-    if (!formData.descripcion.trim()) {
-      errors.descripcion = 'La descripción es requerida';
-    }
+    // La descripción ahora es opcional
+    // Se eliminó la validación obligatoria
 
     if (formData.precio <= 0) {
       errors.precio = 'El precio debe ser mayor que cero';
@@ -153,39 +161,80 @@ const PackageForm: React.FC = () => {
   // Manejar envío del formulario
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-
+    
+    // Validar el formulario antes de procesar
     if (!validateForm()) {
-      enqueueSnackbar('Por favor corrija los errores en el formulario', { variant: 'error' });
+      console.warn('[PackageForm] Validación fallida, no se enviará el formulario');
+      enqueueSnackbar('Por favor, complete todos los campos requeridos', { variant: 'error' });
       return;
     }
-
+    
+    // Evitar envíos múltiples
+    if (isSubmittingRef.current) {
+      console.warn('[PackageForm] Envío ya en proceso, ignorando solicitud duplicada');
+      enqueueSnackbar('Procesando solicitud anterior, por favor espere', { variant: 'warning' });
+      return;
+    }
+    
+    const operationType = isEditMode ? 'ACTUALIZACIÓN' : 'CREACIÓN';
+    console.log(`[PackageForm] Iniciando ${operationType} de paquete con ID: ${id || 'nuevo'}`);
+    
+    isSubmittingRef.current = true;
+    
     try {
+      
+      // Asegurar que los tipos numéricos sean correctos antes de enviar
+      // Usamos String() antes de parseFloat/parseInt para garantizar una conversión segura
+      const processedFormData = {
+        nombre: formData.nombre.trim(),
+        descripcion: formData.descripcion ? formData.descripcion.trim() : '',
+        telefonicaId: parseInt(String(formData.telefonicaId)), // Conversión segura a entero
+        precio: parseFloat(String(formData.precio)), // Conversión segura a decimal
+        activo: Boolean(formData.activo)
+      };
+
+      console.log('Datos del formulario a enviar:', processedFormData);
+
       if (isEditMode && id) {
         // Actualizar paquete existente
-        const updatedPackage = await updatePackage(parseInt(id), formData);
-        if (updatedPackage) {
+        const updatedPackage = await updatePackage(parseInt(id), processedFormData);
+        if (updatedPackage && updatedPackage.id) {
           enqueueSnackbar('Paquete actualizado correctamente', { variant: 'success' });
+          // Navegación directa sin setTimeout para evitar problemas de timing
           navigate('/packages');
+        } else {
+          throw new Error('No se recibió una respuesta válida del servidor');
         }
       } else {
-        // Crear nuevo paquete
-        const newPackage = await createPackage(formData);
-        if (newPackage) {
+        // Crear nuevo paquete con manejo robusto
+        console.log('Iniciando creación de paquete con datos:', JSON.stringify(processedFormData));
+        const newPackage = await createPackage(processedFormData);
+        console.log('Respuesta de creación:', newPackage);
+        
+        if (newPackage && newPackage.id) {
           enqueueSnackbar('Paquete creado correctamente', { variant: 'success' });
+          // Navegación directa sin setTimeout para evitar problemas de timing
           navigate('/packages');
+        } else {
+          throw new Error('No se recibió una respuesta válida del servidor');
         }
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error al guardar paquete:', err);
       enqueueSnackbar(
-        `Error al ${isEditMode ? 'actualizar' : 'crear'} el paquete`, 
+        `Error al ${isEditMode ? 'actualizar' : 'crear'} el paquete: ${err.message || 'Verifique los datos e intente nuevamente'}`, 
         { variant: 'error' }
       );
+    } finally {
+      // Siempre liberar el bloqueo de envío, incluso si hay error
+      isSubmittingRef.current = false;
+      console.log(`[PackageForm] Finalizado ${isEditMode ? 'actualización' : 'creación'} de paquete`);
     }
   };
 
   // Manejar cancelación
   const handleCancel = () => {
+    // Navegación directa sin setTimeout
     navigate('/packages');
   };
 
@@ -232,7 +281,7 @@ const PackageForm: React.FC = () => {
                     error={!!validationErrors.precio}
                     helperText={validationErrors.precio}
                     InputProps={{
-                      startAdornment: <InputAdornment position="start">₡</InputAdornment>,
+                      startAdornment: <InputAdornment position="start">L.</InputAdornment>,
                     }}
                     required
                   />
@@ -249,7 +298,7 @@ const PackageForm: React.FC = () => {
                     helperText={validationErrors.descripcion}
                     multiline
                     rows={3}
-                    required
+                    // Ya no es requerido
                   />
                 </Grid>
 
@@ -305,8 +354,9 @@ const PackageForm: React.FC = () => {
                     type="submit"
                     variant="contained"
                     color="primary"
+                    disabled={isSubmittingRef.current}
                   >
-                    {isEditMode ? 'Actualizar' : 'Crear'}
+                    {isSubmittingRef.current ? 'Procesando...' : (isEditMode ? 'Actualizar' : 'Crear')}
                   </Button>
                 </Grid>
               </Grid>

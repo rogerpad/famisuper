@@ -175,11 +175,14 @@ const SuperExpensesList: React.FC = () => {
         <Table>
           <TableHead>
             <TableRow>
-              <TableCell>Fecha</TableCell>
               <TableCell>Tipo de Egreso</TableCell>
               <TableCell>Descripción</TableCell>
+              <TableCell>Documento</TableCell>
+              <TableCell>No. Factura</TableCell>
+              <TableCell>Impuesto</TableCell>
               <TableCell>Total</TableCell>
               <TableCell>Forma de Pago</TableCell>
+              <TableCell>Fecha</TableCell>
               <TableCell>Acciones</TableCell>
             </TableRow>
           </TableHead>
@@ -187,11 +190,14 @@ const SuperExpensesList: React.FC = () => {
             {filteredSuperExpenses.length > 0 ? (
               filteredSuperExpenses.map((expense) => (
                 <TableRow key={expense.id}>
-                  <TableCell>{formatDate(expense.fechaEgreso)}</TableCell>
                   <TableCell>{expense.tipoEgreso?.nombre || 'N/A'}</TableCell>
                   <TableCell>{expense.descripcionEgreso || '-'}</TableCell>
+                  <TableCell>{expense.documentoPago?.nombre || 'N/A'}</TableCell>
+                  <TableCell>{expense.nroFactura || '-'}</TableCell>
+                  <TableCell>{formatCurrency(expense.impuesto)}</TableCell>
                   <TableCell>{formatCurrency(expense.total)}</TableCell>
                   <TableCell>{expense.formaPago?.nombre || 'N/A'}</TableCell>
+                  <TableCell>{formatDate(expense.fechaEgreso)}</TableCell>
                   <TableCell>
                     <IconButton
                       size="small"

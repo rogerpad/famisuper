@@ -24,6 +24,7 @@ import { BalanceFlowsModule } from './modules/balance-flows/balance-flows.module
 import { BalanceSalesModule } from './modules/balance-sales/balance-sales.module';
 import { PackagesModule } from './modules/packages/packages.module';
 import { LoggerModule } from './common/modules/logger.module';
+import { ConteoBilletesSuperModule } from './conteo-billetes-super/conteo-billetes-super.module';
 
 @Module({
   imports: [
@@ -64,6 +65,7 @@ import { LoggerModule } from './common/modules/logger.module';
     BalanceFlowsModule,
     BalanceSalesModule,
     PackagesModule,
+    ConteoBilletesSuperModule,
   ],
 })
 export class AppModule {}

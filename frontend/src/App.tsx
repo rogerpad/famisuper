@@ -49,6 +49,7 @@ import BalanceSalesList from './components/balance-sales/BalanceSalesList';
 import BalanceSaleForm from './components/balance-sales/BalanceSaleForm';
 import PackagesList from './components/packages/PackagesList';
 import PackageForm from './components/packages/PackageForm';
+import { ConteoBilletesSuperList, ConteoBilletesSuperForm, ConteoBilletesSuperDetail } from './components/conteo-billetes-super';
 
 // Tema de la aplicación
 const theme = createTheme({
@@ -330,6 +331,28 @@ function App() {
                 <Route path="/packages/edit/:id" element={
                   <ProtectedRoute requiredPermission="admin_paquetes">
                     <PackageForm />
+                  </ProtectedRoute>
+                } />
+                
+                {/* Rutas para conteo de billetes super */}
+                <Route path="/conteo-billetes-super" element={
+                  <ProtectedRoute requiredPermission="ver_conteo_super">
+                    <ConteoBilletesSuperList />
+                  </ProtectedRoute>
+                } />
+                <Route path="/conteo-billetes-super/new" element={
+                  <ProtectedRoute requiredPermission="crear_editar_conteo_super">
+                    <ConteoBilletesSuperForm />
+                  </ProtectedRoute>
+                } />
+                <Route path="/conteo-billetes-super/edit/:id" element={
+                  <ProtectedRoute requiredPermission="crear_editar_conteo_super">
+                    <ConteoBilletesSuperForm />
+                  </ProtectedRoute>
+                } />
+                <Route path="/conteo-billetes-super/view/:id" element={
+                  <ProtectedRoute requiredPermission="ver_conteo_super">
+                    <ConteoBilletesSuperDetail />
                   </ProtectedRoute>
                 } />
               </Route>

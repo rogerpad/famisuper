@@ -4,6 +4,20 @@ import { Package, PackageFormData } from './types';
 // URL base de la API
 const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:4002';
 
+// Funciones de utilidad para conversión segura de tipos
+const safeParseInt = (value: any): number => {
+  if (typeof value === 'number') return value;
+  return parseInt(String(value).trim()) || 0;
+};
+
+const safeParseFloat = (value: any): number => {
+  if (typeof value === 'number') return value;
+  return parseFloat(String(value).trim()) || 0;
+};
+
+// Sistema de bloqueo para evitar solicitudes duplicadas
+const pendingRequests = new Map<string, boolean>();
+
 // Hook personalizado para consumir la API de paquetes
 export const usePackages = () => {
   const [loading, setLoading] = useState<boolean>(false);
@@ -80,6 +94,19 @@ export const usePackages = () => {
 
   // Crear un nuevo paquete
   const createPackage = async (packageData: PackageFormData): Promise<Package | null> => {
+    // Crear un identificador único para esta solicitud
+    const requestId = `create-${packageData.nombre}-${Date.now()}`;
+    
+    // Verificar si ya hay una solicitud en proceso
+    if (pendingRequests.has(requestId)) {
+      console.warn('Solicitud duplicada detectada en createPackage, ignorando');
+      return null;
+    }
+    
+    // Marcar esta solicitud como en proceso
+    pendingRequests.set(requestId, true);
+    console.log(`Iniciando solicitud: ${requestId}`);
+    
     setLoading(true);
     setError(null);
 
@@ -88,6 +115,15 @@ export const usePackages = () => {
       if (!token) {
         throw new Error('No se encontró token de autenticación');
       }
+
+      // Convertir explícitamente los tipos antes de enviar usando funciones seguras
+      const processedData = {
+        ...packageData,
+        telefonicaId: safeParseInt(packageData.telefonicaId),
+        precio: safeParseFloat(packageData.precio)
+      };
+
+      console.log('Datos a enviar en createPackage:', processedData);
 
       const response = await fetch(`${API_BASE_URL}/packages`, {
         method: 'POST',
@@ -95,7 +131,7 @@ export const usePackages = () => {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify(packageData)
+        body: JSON.stringify(processedData)
       });
 
       if (!response.ok) {
@@ -103,17 +139,33 @@ export const usePackages = () => {
       }
 
       const data = await response.json();
+      console.log('Respuesta del servidor en createPackage:', data);
       return data;
     } catch (err: any) {
+      console.error('Error en createPackage:', err);
       setError(err.message || 'Error desconocido al crear paquete');
       return null;
     } finally {
       setLoading(false);
+      pendingRequests.delete(requestId);
     }
   };
 
   // Actualizar un paquete existente
   const updatePackage = async (id: number, packageData: PackageFormData): Promise<Package | null> => {
+    // Crear un identificador único para esta solicitud
+    const requestId = `update-${id}-${packageData.nombre}-${Date.now()}`;
+    
+    // Verificar si ya hay una solicitud en proceso
+    if (pendingRequests.has(requestId)) {
+      console.warn('Solicitud duplicada detectada en updatePackage, ignorando');
+      return null;
+    }
+    
+    // Marcar esta solicitud como en proceso
+    pendingRequests.set(requestId, true);
+    console.log(`Iniciando solicitud de actualización: ${requestId}`);
+    
     setLoading(true);
     setError(null);
 
@@ -123,13 +175,22 @@ export const usePackages = () => {
         throw new Error('No se encontró token de autenticación');
       }
 
+      // Convertir explícitamente los tipos antes de enviar usando funciones seguras
+      const processedData = {
+        ...packageData,
+        telefonicaId: safeParseInt(packageData.telefonicaId),
+        precio: safeParseFloat(packageData.precio)
+      };
+
+      console.log('Datos a enviar en updatePackage:', processedData);
+
       const response = await fetch(`${API_BASE_URL}/packages/${id}`, {
         method: 'PATCH',
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify(packageData)
+        body: JSON.stringify(processedData)
       });
 
       if (!response.ok) {
@@ -137,12 +198,15 @@ export const usePackages = () => {
       }
 
       const data = await response.json();
+      console.log('Respuesta del servidor en updatePackage:', data);
       return data;
     } catch (err: any) {
+      console.error('Error en updatePackage:', err);
       setError(err.message || 'Error desconocido al actualizar paquete');
       return null;
     } finally {
       setLoading(false);
+      pendingRequests.delete(requestId);
     }
   };
 

@@ -1,7 +1,7 @@
 export interface Package {
   id: number;
   nombre: string;
-  descripcion: string;
+  descripcion?: string;
   precio: number;
   activo: boolean;
   telefonicaId: number;
@@ -11,7 +11,7 @@ export interface Package {
 
 export interface PackageFormData {
   nombre: string;
-  descripcion: string;
+  descripcion?: string;
   precio: number;
   activo: boolean;
   telefonicaId: number;

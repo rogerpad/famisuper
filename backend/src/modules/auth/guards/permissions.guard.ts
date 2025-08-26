@@ -18,12 +18,21 @@ export class PermissionsGuard implements CanActivate {
 
     const { user } = context.switchToHttp().getRequest();
     
-    if (!user || !user.permisos) {
+    // Verificar si el usuario tiene permisos en user.permissions (como se asigna en JwtStrategy)
+    // o en user.permisos (para mantener compatibilidad con código existente)
+    if (!user || (!user.permissions && !user.permisos)) {
+      console.log('Usuario sin permisos:', user);
       return false;
     }
 
+    // Usar user.permissions si está disponible, de lo contrario usar user.permisos
+    const userPermissions = user.permissions || user.permisos || [];
+    
+    console.log('Permisos requeridos:', requiredPermissions);
+    console.log('Permisos del usuario:', userPermissions);
+    
     return requiredPermissions.some(permission => 
-      user.permisos.includes(permission)
+      userPermissions.includes(permission)
     );
   }
 }
