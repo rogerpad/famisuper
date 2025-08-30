@@ -27,6 +27,12 @@ export class ConteoBilletesSuperController {
     return this.conteoBilletesSuperService.findAll();
   }
 
+  @Get('last-active')
+  @RequirePermissions('ver_conteo_super')
+  findLastActive() {
+    return this.conteoBilletesSuperService.findLastActive();
+  }
+
   @Get(':id')
   @RequirePermissions('ver_conteo_super')
   findOne(@Param('id') id: string) {

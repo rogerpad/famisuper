@@ -4,12 +4,14 @@ import { Repository } from 'typeorm';
 import { BalanceFlow } from './entities/balance-flow.entity';
 import { CreateBalanceFlowDto } from './dto/create-balance-flow.dto';
 import { UpdateBalanceFlowDto } from './dto/update-balance-flow.dto';
+import { LoggerService } from '../../common/services/logger.service';
 
 @Injectable()
 export class BalanceFlowsService {
   constructor(
     @InjectRepository(BalanceFlow)
     private balanceFlowsRepository: Repository<BalanceFlow>,
+    private readonly logger: LoggerService
   ) {}
 
   async create(createBalanceFlowDto: CreateBalanceFlowDto): Promise<BalanceFlow> {
@@ -134,5 +136,141 @@ export class BalanceFlowsService {
   async remove(id: number): Promise<void> {
     const balanceFlow = await this.findOne(id);
     await this.balanceFlowsRepository.remove(balanceFlow);
+  }
+
+  async getSumSaldoVendidoActivos(): Promise<number> {
+    // Obtener la suma de saldo_vendido de todos los registros activos
+    const result = await this.balanceFlowsRepository
+      .createQueryBuilder('balanceFlow')
+      .select('SUM(balanceFlow.saldoVendido)', 'total')
+      .where('balanceFlow.activo = :activo', { activo: true })
+      .getRawOne();
+    
+    // Convertir el resultado a número y manejar el caso de null/undefined
+    const total = result?.total ? parseFloat(result.total) : 0;
+    return total;
+  }
+  
+  /**
+   * Recalcula los saldos vendidos y finales para todos los flujos de saldo activos
+   * basado en las ventas de saldo registradas en tbl_ventas_saldo
+   */
+  async recalcularSaldosVendidos(): Promise<{ actualizados: number, errores: number }> {
+    this.logger.log('Iniciando recálculo de saldos vendidos para todos los flujos activos', 'BalanceFlowsService');
+    
+    let actualizados = 0;
+    let errores = 0;
+    
+    try {
+      // 1. Obtener todos los flujos de saldo activos
+      const flujosActivos = await this.balanceFlowsRepository.find({
+        where: { activo: true }
+      });
+      
+      this.logger.log(`Se encontraron ${flujosActivos.length} flujos activos para recalcular`, 'BalanceFlowsService');
+      
+      // 2. Para cada flujo, recalcular su saldo vendido y saldo final
+      for (const flujo of flujosActivos) {
+        try {
+          // 2.1 Obtener la suma de montos de ventas activas para este flujo
+          this.logger.log(`Consultando ventas para flujo ID ${flujo.id}`, 'BalanceFlowsService');
+          
+          // Primero verificamos si hay ventas para este flujo
+          const ventasCount = await this.balanceFlowsRepository.query(
+            `SELECT COUNT(*) as total 
+             FROM tbl_ventas_saldo vs 
+             WHERE vs.flujo_saldo_id = $1`,
+            [flujo.id]
+          );
+          
+          this.logger.log(`Total de ventas encontradas para flujo ID ${flujo.id}: ${ventasCount[0]?.total || 0}`, 'BalanceFlowsService');
+          
+          // Ahora obtenemos la suma de montos de ventas activas
+          const resultadoVentas = await this.balanceFlowsRepository.query(
+            `SELECT SUM(vs.monto) as total_vendido 
+             FROM tbl_ventas_saldo vs 
+             WHERE vs.flujo_saldo_id = $1 AND vs.activo = true`,
+            [flujo.id]
+          );
+          
+          this.logger.log(`Resultado consulta ventas: ${JSON.stringify(resultadoVentas)}`, 'BalanceFlowsService');
+          
+          // 2.2 Extraer el total vendido del resultado (o 0 si no hay ventas)
+          const totalVendido = resultadoVentas[0]?.total_vendido 
+            ? parseFloat(resultadoVentas[0].total_vendido) 
+            : 0;
+            
+          this.logger.log(`Total vendido calculado para flujo ID ${flujo.id}: ${totalVendido}`, 'BalanceFlowsService');
+          
+          // 2.3 Verificar si es un flujo Tigo para aplicar el cálculo especial
+          // Obtenemos la información de la telefónica
+          const telefonica = await this.balanceFlowsRepository.query(
+            `SELECT nombre FROM tbl_lineas_telefonicas WHERE id = $1`,
+            [flujo.telefonicaId]
+          );
+          
+          const nombreTelefonica = telefonica[0]?.nombre || '';
+          const esTigo = nombreTelefonica.toLowerCase().includes('tigo');
+          
+          // 2.4 Calcular el nuevo saldo final
+          // Para flujos Tigo: saldo_final = saldo_inicial + saldo_comprado + (saldo_comprado * 0.055) - saldo_vendido
+          // Para otros flujos: saldo_final = saldo_inicial + saldo_comprado - saldo_vendido
+          let saldoCompradoAjustado = Number(flujo.saldoComprado);
+          
+          if (esTigo) {
+            const bonificacionTigo = saldoCompradoAjustado * 0.055;
+            saldoCompradoAjustado += bonificacionTigo;
+            this.logger.log(
+              `Flujo Tigo ID ${flujo.id}: Aplicando bonificación del 5.5% (${bonificacionTigo.toFixed(2)})`,
+              'BalanceFlowsService'
+            );
+          }
+          
+          const nuevoSaldoFinal = Number(flujo.saldoInicial) + saldoCompradoAjustado - Number(totalVendido);
+          
+          this.logger.log(
+            `Flujo ID ${flujo.id}: saldoInicial=${flujo.saldoInicial}, saldoComprado=${flujo.saldoComprado}, ` +
+            `${esTigo ? 'saldoCompradoAjustado=' + saldoCompradoAjustado.toFixed(2) + ', ' : ''}` +
+            `totalVendido=${totalVendido}, nuevoSaldoFinal=${nuevoSaldoFinal}`,
+            'BalanceFlowsService'
+          );
+          
+          // 2.5 Actualizar el flujo de saldo con los nuevos valores
+          await this.balanceFlowsRepository
+            .createQueryBuilder()
+            .update(BalanceFlow)
+            .set({
+              saldoVendido: totalVendido,
+              saldoFinal: nuevoSaldoFinal
+            })
+            .where('id = :id', { id: flujo.id })
+            .execute();
+          
+          actualizados++;
+          this.logger.log(`Flujo ID ${flujo.id} actualizado correctamente`, 'BalanceFlowsService');
+        } catch (error) {
+          errores++;
+          this.logger.error(
+            `Error al recalcular saldo para flujo ID ${flujo.id}: ${error.message}`,
+            error.stack,
+            'BalanceFlowsService'
+          );
+        }
+      }
+      
+      this.logger.log(
+        `Recálculo de saldos completado. Actualizados: ${actualizados}, Errores: ${errores}`,
+        'BalanceFlowsService'
+      );
+      
+      return { actualizados, errores };
+    } catch (error) {
+      this.logger.error(
+        `Error general en recálculo de saldos: ${error.message}`,
+        error.stack,
+        'BalanceFlowsService'
+      );
+      throw error;
+    }
   }
 }

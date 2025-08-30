@@ -37,7 +37,7 @@ const BalanceSaleForm: React.FC = () => {
   
   const { loading: loadingBalanceSale, error: balanceSaleError, fetchBalanceSaleById, createBalanceSale, updateBalanceSale } = useBalanceSales();
   const { loading: loadingPhoneLines, phoneLines, fetchPhoneLines } = usePhoneLines();
-  const { loading: loadingBalanceFlows, balanceFlows, fetchBalanceFlows, fetchBalanceFlowById, updateBalanceAfterSale, updateBalanceAfterSaleEdit } = useBalanceFlows();
+  const { loading: loadingBalanceFlows, balanceFlows, fetchBalanceFlows, fetchBalanceFlowById, recalcularSaldosVendidos } = useBalanceFlows();
   const { loading: loadingPackages, error: packagesError, fetchPackages } = usePackages();
   const [packages, setPackages] = useState<any[]>([]);
   
@@ -256,6 +256,10 @@ const BalanceSaleForm: React.FC = () => {
       newErrors.flujoSaldoId = 'El flujo de saldo es requerido';
     }
     
+    if (!formData.paqueteId) {
+      newErrors.paqueteId = 'El paquete es requerido';
+    }
+    
     if (!formData.cantidad || formData.cantidad <= 0) {
       newErrors.cantidad = 'La cantidad debe ser mayor a 0';
     }
@@ -362,37 +366,15 @@ const BalanceSaleForm: React.FC = () => {
         const result = await updateBalanceSale(parseInt(id), dataToSubmit);
         console.log('[BalanceSaleForm] Resultado de la actualización:', result);
         
-        // Si el monto ha cambiado, actualizar el saldo del flujo
-        if (Number(dataToSubmit.monto) !== Number(originalMonto)) {
-          try {
-            console.log(`[BalanceSaleForm] Actualizando flujo de saldo ${dataToSubmit.flujoSaldoId} con monto anterior ${originalMonto} y monto nuevo ${dataToSubmit.monto}`);
-            await updateBalanceAfterSaleEdit(
-              dataToSubmit.flujoSaldoId,
-              Number(originalMonto),
-              Number(dataToSubmit.monto)
-            );
-            console.log('[BalanceSaleForm] Saldo actualizado correctamente después de edición');
-          } catch (updateError: any) {
-            console.error('[BalanceSaleForm] Error al actualizar saldo después de edición:', updateError);
-            alert(`La venta se ha actualizado, pero hubo un error al actualizar el saldo: ${updateError.message || 'Error desconocido'}`);
-          }
-        }
+        // Ya no actualizamos los saldos automáticamente después de editar una venta
+        // Los saldos se actualizarán solo cuando el usuario presione el botón "Actualizar Flujos de Ventas"
       } else {
         // Crear la venta de saldo
         const result = await createBalanceSale(dataToSubmit);
         console.log('[BalanceSaleForm] Resultado de la creación:', result);
         
-        if (result) {
-          try {
-            // Actualizar el saldo vendido y saldo final en el flujo de saldo
-            console.log(`[BalanceSaleForm] Actualizando flujo de saldo ${dataToSubmit.flujoSaldoId} con monto ${dataToSubmit.monto}`);
-            await updateBalanceAfterSale(dataToSubmit.flujoSaldoId, dataToSubmit.monto);
-            console.log('[BalanceSaleForm] Saldo actualizado correctamente');
-          } catch (updateError: any) {
-            console.error('[BalanceSaleForm] Error al actualizar saldo:', updateError);
-            alert(`La venta se ha registrado, pero hubo un error al actualizar el saldo: ${updateError.message || 'Error desconocido'}`);
-          }
-        }
+        // Ya no actualizamos los saldos automáticamente después de crear una venta
+        // Los saldos se actualizarán solo cuando el usuario presione el botón "Actualizar Flujos de Ventas"
       }
       
       // Navegar a la lista de ventas de saldo
@@ -487,14 +469,15 @@ const BalanceSaleForm: React.FC = () => {
           </Grid>
           
           <Grid item xs={12} md={6}>
-            <FormControl fullWidth>
-              <InputLabel>Paquete (opcional)</InputLabel>
+            <FormControl fullWidth error={!!errors.paqueteId}>
+              <InputLabel>Paquete</InputLabel>
               <Select
                 name="paqueteId"
                 value={formData.paqueteId !== undefined ? formData.paqueteId : ''}
                 onChange={handleSelectChange}
-                label="Paquete (opcional)"
+                label="Paquete"
                 disabled={submitting || formData.telefonicaId === 0}
+                required
               >
                 <MenuItem value="">Ninguno</MenuItem>
                 {packages?.map((pkg: Package) => (

@@ -50,6 +50,8 @@ async function bootstrap() {
   // Registrar el filtro de excepciones personalizado
   app.useGlobalFilters(new HttpExceptionFilter());
   
+  // No usar prefijo global para mantener compatibilidad con el frontend
+  
   // Obtener la instancia del logger desde la aplicación
   appLogger = app.get(LoggerService);
   

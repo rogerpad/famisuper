@@ -244,6 +244,43 @@ export const useConteoBilletesSuper = () => {
     }
   }, [fetchConteoBilletesSuper]);
 
+  // Obtener el último conteo de billetes activo
+  const getLastActiveConteoBilletes = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        throw new Error('No se encontró token de autenticación');
+      }
+
+      const response = await fetch(`${API_URL}/conteo-billetes-super/last-active`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        if (response.status === 404) {
+          console.log('No se encontró ningún conteo de billetes activo');
+          return null;
+        }
+        throw new Error(`Error al obtener último conteo activo: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      // Normalizar los datos para asegurar tipos correctos
+      return normalizeConteoData(data);
+    } catch (err: any) {
+      console.error('Error al cargar último conteo de billetes activo:', err);
+      setError(err.message || 'Error al cargar último conteo de billetes activo');
+      return null;
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
   return {
     conteoBilletesSuper,
     loading,
@@ -253,5 +290,6 @@ export const useConteoBilletesSuper = () => {
     createConteoBilletesSuper,
     updateConteoBilletesSuper,
     deleteConteoBilletesSuper,
+    getLastActiveConteoBilletes,
   };
 };

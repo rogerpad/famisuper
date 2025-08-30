@@ -1,4 +1,5 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, HttpStatus } from '@nestjs/common';
+import { LoggerService } from '../../common/services/logger.service';
 import { BalanceFlowsService } from './balance-flows.service';
 import { CreateBalanceFlowDto } from './dto/create-balance-flow.dto';
 import { UpdateBalanceFlowDto } from './dto/update-balance-flow.dto';
@@ -9,7 +10,10 @@ import { RequierePermiso } from '../../modules/auth/decorators/requiere-permiso.
 @Controller('balance-flows')
 @UseGuards(JwtAuthGuard, PermisosGuard)
 export class BalanceFlowsController {
-  constructor(private readonly balanceFlowsService: BalanceFlowsService) {}
+  constructor(
+    private readonly balanceFlowsService: BalanceFlowsService,
+    private readonly logger: LoggerService
+  ) {}
 
   @Post()
   @RequierePermiso('crear_editar_flujo')
@@ -27,6 +31,43 @@ export class BalanceFlowsController {
   @RequierePermiso('ver_flujos_saldo')
   findActive() {
     return this.balanceFlowsService.findActive();
+  }
+
+  @Get('sum-saldo-vendido')
+  @RequierePermiso('ver_flujos_saldo')
+  getSumSaldoVendido() {
+    return this.balanceFlowsService.getSumSaldoVendidoActivos();
+  }
+
+  @Post('recalcular-saldos')
+  @RequierePermiso('crear_editar_flujo')
+  async recalcularSaldosVendidos() {
+    try {
+      this.logger.log(
+        'Solicitud recibida para recalcular saldos vendidos',
+        'BalanceFlowsController'
+      );
+      
+      const resultado = await this.balanceFlowsService.recalcularSaldosVendidos();
+      
+      this.logger.log(
+        `Recálculo de saldos completado. Actualizados: ${resultado.actualizados}, Errores: ${resultado.errores}`,
+        'BalanceFlowsController'
+      );
+      
+      return {
+        statusCode: HttpStatus.OK,
+        message: 'Recálculo de saldos completado',
+        data: resultado
+      };
+    } catch (error) {
+      this.logger.error(
+        `Error al recalcular saldos: ${error.message}`,
+        error.stack,
+        'BalanceFlowsController'
+      );
+      throw error;
+    }
   }
 
   @Get('by-phone-line/:id')

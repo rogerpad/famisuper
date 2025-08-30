@@ -231,13 +231,19 @@ export class SuperExpensesService {
       
       if (updateSuperExpenseDto.documentoPagoId !== undefined) {
         try {
+          console.log('Procesando documentoPagoId:', updateSuperExpenseDto.documentoPagoId);
+          console.log('Tipo de documentoPagoId:', typeof updateSuperExpenseDto.documentoPagoId);
+          
           // Convertir a string para poder hacer comparaciones seguras
           const docPagoIdStr = String(updateSuperExpenseDto.documentoPagoId);
+          console.log('documentoPagoId como string:', docPagoIdStr);
           
           if (updateSuperExpenseDto.documentoPagoId === null || docPagoIdStr === '' || docPagoIdStr === '0') {
+            console.log('Asignando documentoPagoId como null');
             cleanUpdateData.documentoPagoId = null;
           } else {
             cleanUpdateData.documentoPagoId = Number(updateSuperExpenseDto.documentoPagoId);
+            console.log('documentoPagoId convertido a número:', cleanUpdateData.documentoPagoId);
             if (isNaN(cleanUpdateData.documentoPagoId)) {
               throw new Error('documentoPagoId debe ser un número válido o null');
             }
@@ -246,11 +252,19 @@ export class SuperExpensesService {
           console.error('Error al procesar documentoPagoId:', error);
           throw new BadRequestException('documentoPagoId debe ser un número válido o null');
         }
+      } else {
+        console.log('documentoPagoId no está definido en la solicitud de actualización');
       }
       
       if (updateSuperExpenseDto.nroFactura !== undefined) {
+        console.log('Procesando nroFactura:', updateSuperExpenseDto.nroFactura);
+        console.log('Tipo de nroFactura:', typeof updateSuperExpenseDto.nroFactura);
+        
         // Si nroFactura es una cadena vacía, establecerlo como null
         cleanUpdateData.nroFactura = updateSuperExpenseDto.nroFactura === '' ? null : updateSuperExpenseDto.nroFactura;
+        console.log('nroFactura procesado:', cleanUpdateData.nroFactura);
+      } else {
+        console.log('nroFactura no está definido en la solicitud de actualización');
       }
       
       if (updateSuperExpenseDto.excento !== undefined) {
@@ -365,25 +379,53 @@ export class SuperExpensesService {
       console.log('Servicio - Datos limpios para actualización:', cleanUpdateData);
       
       try {
-        // Verificar que los campos obligatorios estén presentes
-        if (!superExpense.tipoEgresoId) {
-          throw new BadRequestException('El tipo de egreso es obligatorio');
+        // IMPORTANTE: Asegurar que los IDs estén presentes y sean válidos
+        // Si se está actualizando tipoEgresoId, usar el nuevo valor, sino mantener el existente
+        if (cleanUpdateData.tipoEgresoId !== undefined) {
+          // Ya se validó que sea un número en el procesamiento anterior
+          if (cleanUpdateData.tipoEgresoId === 0) {
+            throw new BadRequestException('El tipo de egreso es obligatorio');
+          }
+        } else {
+          // Si no se está actualizando, asegurar que el valor existente sea válido
+          if (!superExpense.tipoEgresoId) {
+            throw new BadRequestException('El tipo de egreso es obligatorio');
+          }
         }
         
+        // Validar descripción
         if (!superExpense.descripcionEgreso && !cleanUpdateData.descripcionEgreso) {
           throw new BadRequestException('La descripción del egreso es obligatoria');
         }
         
-        if (!superExpense.documentoPagoId && cleanUpdateData.documentoPagoId === null) {
-          throw new BadRequestException('El documento de pago es obligatorio');
+        // Validar formaPagoId
+        if (cleanUpdateData.formaPagoId !== undefined) {
+          if (cleanUpdateData.formaPagoId === 0) {
+            throw new BadRequestException('La forma de pago es obligatoria');
+          }
+        } else {
+          // Si no se está actualizando, asegurar que el valor existente sea válido
+          if (!superExpense.formaPagoId) {
+            throw new BadRequestException('La forma de pago es obligatoria');
+          }
         }
         
-        // Actualizar solo los campos proporcionados
-        Object.assign(superExpense, cleanUpdateData);
+        // Documento de pago puede ser opcional dependiendo del tipo de egreso
+        // No validamos obligatoriedad aquí, eso se maneja en el frontend
         
-        console.log('Servicio - Objeto final a guardar:', JSON.stringify(superExpense));
+        console.log('Servicio - Datos limpios para actualizar:', JSON.stringify(cleanUpdateData));
         
-        const updatedExpense = await this.superExpenseRepository.save(superExpense);
+        // Usar update en lugar de save para asegurar que todos los campos se actualicen
+        await this.superExpenseRepository.update(id, cleanUpdateData);
+        console.log('Servicio - Update ejecutado con éxito');
+        
+        // Obtener el registro actualizado
+        const updatedExpense = await this.findOne(id);
+        if (!updatedExpense) {
+          throw new NotFoundException(`Egreso de Super con ID ${id} no encontrado después de actualizar`);
+        }
+        
+        console.log('Servicio - Egreso actualizado:', JSON.stringify(updatedExpense));
         console.log('Servicio - Egreso actualizado exitosamente');
         return updatedExpense;
       } catch (dbError) {
@@ -441,5 +483,93 @@ export class SuperExpensesService {
       })
       .orderBy('superExpense.fechaEgreso', 'DESC')
       .getMany();
+  }
+
+  /**
+   * Obtiene la suma del campo 'total' de los registros activos de tipo 'Pago de Productos'
+   * y forma de pago 'Efectivo'
+   * @returns Suma total de los pagos de productos en efectivo activos
+   */
+  async getSumPagoProductosEfectivo(): Promise<number> {
+    try {
+      // Primero obtenemos el ID del tipo de egreso 'Pago de Productos'
+      const tipoEgresoResult = await this.superExpenseRepository.query(
+        `SELECT id FROM tbl_tipo_egresos WHERE nombre ILIKE '%pago de producto%' AND activo = true LIMIT 1`
+      );
+      
+      if (!tipoEgresoResult || tipoEgresoResult.length === 0) {
+        console.log('No se encontró el tipo de egreso "Pago de Productos"');
+        return 0;
+      }
+      const tipoEgresoId = tipoEgresoResult[0].id;
+      
+      // Luego obtenemos el ID de la forma de pago 'Efectivo'
+      const formaPagoResult = await this.superExpenseRepository.query(
+        `SELECT id FROM tbl_forma_pagos WHERE nombre ILIKE '%efectivo%' AND activo = true LIMIT 1`
+      );
+      
+      if (!formaPagoResult || formaPagoResult.length === 0) {
+        console.log('No se encontró la forma de pago "Efectivo"');
+        return 0;
+      }
+      const formaPagoId = formaPagoResult[0].id;
+      
+      // Ahora realizamos la consulta para obtener la suma
+      const result = await this.superExpenseRepository.createQueryBuilder('superExpense')
+        .select('SUM(superExpense.total)', 'suma')
+        .where('superExpense.tipoEgresoId = :tipoEgresoId', { tipoEgresoId })
+        .andWhere('superExpense.formaPagoId = :formaPagoId', { formaPagoId })
+        .andWhere('superExpense.activo = :activo', { activo: true })
+        .getRawOne();
+      
+      return result && result.suma ? parseFloat(result.suma) : 0;
+    } catch (error) {
+      console.error('Error al obtener la suma de pagos de productos en efectivo:', error);
+      return 0;
+    }
+  }
+
+  /**
+   * Obtiene la suma del campo 'total' de los registros activos de tipo 'Gasto'
+   * y forma de pago 'Efectivo'
+   * @returns Suma total de los gastos en efectivo activos
+   */
+  async getSumGastosEfectivo(): Promise<number> {
+    try {
+      // Primero obtenemos el ID del tipo de egreso 'Gasto'
+      const tipoEgresoResult = await this.superExpenseRepository.query(
+        `SELECT id FROM tbl_tipo_egresos WHERE nombre ILIKE '%gasto%' AND activo = true LIMIT 1`
+      );
+      
+      if (!tipoEgresoResult || tipoEgresoResult.length === 0) {
+        console.log('No se encontró el tipo de egreso "Gasto"');
+        return 0;
+      }
+      const tipoEgresoId = tipoEgresoResult[0].id;
+      
+      // Luego obtenemos el ID de la forma de pago 'Efectivo'
+      const formaPagoResult = await this.superExpenseRepository.query(
+        `SELECT id FROM tbl_forma_pagos WHERE nombre ILIKE '%efectivo%' AND activo = true LIMIT 1`
+      );
+      
+      if (!formaPagoResult || formaPagoResult.length === 0) {
+        console.log('No se encontró la forma de pago "Efectivo"');
+        return 0;
+      }
+      const formaPagoId = formaPagoResult[0].id;
+      
+      // Ahora realizamos la consulta para obtener la suma
+      const result = await this.superExpenseRepository.createQueryBuilder('superExpense')
+        .select('SUM(superExpense.total)', 'suma')
+        .where('superExpense.tipoEgresoId = :tipoEgresoId', { tipoEgresoId })
+        .andWhere('superExpense.formaPagoId = :formaPagoId', { formaPagoId })
+        .andWhere('superExpense.activo = :activo', { activo: true })
+        .getRawOne();
+      
+      return result && result.suma ? parseFloat(result.suma) : 0;
+    } catch (error) {
+      console.error('Error al obtener la suma de gastos en efectivo:', error);
+      return 0;
+    }
   }
 }

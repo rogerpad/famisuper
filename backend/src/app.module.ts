@@ -25,6 +25,8 @@ import { BalanceSalesModule } from './modules/balance-sales/balance-sales.module
 import { PackagesModule } from './modules/packages/packages.module';
 import { LoggerModule } from './common/modules/logger.module';
 import { ConteoBilletesSuperModule } from './conteo-billetes-super/conteo-billetes-super.module';
+import { AdicionalesPrestamosModule } from './adicionales-prestamos/adicionales-prestamos.module';
+import { CierresSuperModule } from './modules/cierres-super/cierres-super.module';
 
 @Module({
   imports: [
@@ -66,6 +68,8 @@ import { ConteoBilletesSuperModule } from './conteo-billetes-super/conteo-billet
     BalanceSalesModule,
     PackagesModule,
     ConteoBilletesSuperModule,
+    AdicionalesPrestamosModule,
+    CierresSuperModule,
   ],
 })
 export class AppModule {}

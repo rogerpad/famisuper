@@ -5,6 +5,8 @@ import CssBaseline from '@mui/material/CssBaseline';
 import { AuthProvider } from './contexts/AuthContext';
 import TurnoProvider from './contexts/TurnoContext';
 import { SnackbarProvider } from 'notistack';
+import TokenDebugger from './components/debug/TokenDebugger';
+import TokenManagerDebugger from './components/debug/TokenManagerDebugger';
 
 // Componente de protección de rutas
 import ProtectedRoute from './components/ProtectedRoute';
@@ -50,6 +52,14 @@ import BalanceSaleForm from './components/balance-sales/BalanceSaleForm';
 import PackagesList from './components/packages/PackagesList';
 import PackageForm from './components/packages/PackageForm';
 import { ConteoBilletesSuperList, ConteoBilletesSuperForm, ConteoBilletesSuperDetail } from './components/conteo-billetes-super';
+
+// Adicionales Prestamos
+import AdicionalesPrestamosPage from './pages/adicionales-prestamos/AdicionalesPrestamosPage';
+import AdicionalesPrestamosFormPage from './pages/adicionales-prestamos/AdicionalesPrestamosFormPage';
+import AdicionalesPrestamosDetallePage from './pages/adicionales-prestamos/AdicionalesPrestamosDetallePage';
+
+// Cierres Super
+import { CierresSuperList, CierreSuperForm, CierreSuperDetail } from './components/cierres-super';
 
 // Tema de la aplicación
 const theme = createTheme({
@@ -120,6 +130,10 @@ function App() {
             
             {/* Ruta de demostración de turnos - Accesible sin autenticación */}
             <Route path="/turnos/demo" element={<TurnosAdminDemo />} />
+            
+            {/* Rutas de depuración de token JWT */}
+            <Route path="/debug/token" element={<TokenDebugger />} />
+            <Route path="/debug/token-manager" element={<TokenManagerDebugger />} />
             
             {/* Ruta de acceso denegado (fuera de la protección) */}
             <Route path="/access-denied" element={<AccessDenied />} />
@@ -353,6 +367,50 @@ function App() {
                 <Route path="/conteo-billetes-super/view/:id" element={
                   <ProtectedRoute requiredPermission="ver_conteo_super">
                     <ConteoBilletesSuperDetail />
+                  </ProtectedRoute>
+                } />
+                
+                {/* Rutas para adicionales y préstamos */}
+                <Route path="/adicionales-prestamos" element={
+                  <ProtectedRoute requiredPermission="ver_adic_presta">
+                    <AdicionalesPrestamosPage />
+                  </ProtectedRoute>
+                } />
+                <Route path="/adicionales-prestamos/nuevo" element={
+                  <ProtectedRoute requiredPermission="crear_editar_adic_prest">
+                    <AdicionalesPrestamosFormPage />
+                  </ProtectedRoute>
+                } />
+                <Route path="/adicionales-prestamos/editar/:id" element={
+                  <ProtectedRoute requiredPermission="crear_editar_adic_prest">
+                    <AdicionalesPrestamosFormPage />
+                  </ProtectedRoute>
+                } />
+                <Route path="/adicionales-prestamos/detalle/:id" element={
+                  <ProtectedRoute requiredPermission="ver_adic_presta">
+                    <AdicionalesPrestamosDetallePage />
+                  </ProtectedRoute>
+                } />
+                
+                {/* Rutas para cierres super */}
+                <Route path="/cierres-super" element={
+                  <ProtectedRoute requiredPermission="ver_cierre_super">
+                    <CierresSuperList />
+                  </ProtectedRoute>
+                } />
+                <Route path="/cierres-super/new" element={
+                  <ProtectedRoute requiredPermission="crear_editar_cierre_super">
+                    <CierreSuperForm />
+                  </ProtectedRoute>
+                } />
+                <Route path="/cierres-super/:id" element={
+                  <ProtectedRoute requiredPermission="ver_cierre_super">
+                    <CierreSuperDetail />
+                  </ProtectedRoute>
+                } />
+                <Route path="/cierres-super/:id/edit" element={
+                  <ProtectedRoute requiredPermission="crear_editar_cierre_super">
+                    <CierreSuperForm />
                   </ProtectedRoute>
                 } />
               </Route>

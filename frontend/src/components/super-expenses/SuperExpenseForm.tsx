@@ -85,16 +85,25 @@ const SuperExpenseForm: React.FC<SuperExpenseFormProps> = ({
 
   useEffect(() => {
     if (superExpense) {
-      // Preparar los datos iniciales
+      console.log('Inicializando formulario con datos:', superExpense);
+      
+      // Función para asegurar que los valores sean números
+      const ensureNumber = (value: any): number => {
+        if (value === null || value === undefined || value === '') return 0;
+        const num = Number(value);
+        return isNaN(num) ? 0 : num;
+      };
+      
+      // Preparar los datos iniciales asegurando que los IDs sean números
       const initialData = {
-        tipoEgresoId: superExpense.tipoEgresoId,
+        tipoEgresoId: ensureNumber(superExpense.tipoEgresoId),
         descripcionEgreso: superExpense.descripcionEgreso || '',
-        documentoPagoId: superExpense.documentoPagoId,
+        documentoPagoId: superExpense.documentoPagoId !== null ? ensureNumber(superExpense.documentoPagoId) : undefined,
         nroFactura: superExpense.nroFactura || '',
-        excento: superExpense.excento,
-        gravado: superExpense.gravado,
-        impuesto: superExpense.impuesto,
-        formaPagoId: superExpense.formaPagoId,
+        excento: ensureNumber(superExpense.excento),
+        gravado: ensureNumber(superExpense.gravado),
+        impuesto: ensureNumber(superExpense.impuesto),
+        formaPagoId: ensureNumber(superExpense.formaPagoId),
         fechaEgreso: superExpense.fechaEgreso instanceof Date
           ? superExpense.fechaEgreso.toISOString().split('T')[0]
           : new Date(superExpense.fechaEgreso).toISOString().split('T')[0],
@@ -102,12 +111,14 @@ const SuperExpenseForm: React.FC<SuperExpenseFormProps> = ({
         activo: superExpense.activo,
       };
       
+      console.log('Datos iniciales procesados:', initialData);
+      
       // Calcular el total basado en los valores actuales para asegurar consistencia
       const calculatedTotal = recalculateTotal(initialData);
       
       // Si el total calculado difiere del almacenado, usar el calculado para mayor consistencia
-      const finalTotal = Math.abs(calculatedTotal - (superExpense.total || 0)) < 0.01 
-        ? superExpense.total 
+      const finalTotal = Math.abs(calculatedTotal - ensureNumber(superExpense.total)) < 0.01 
+        ? ensureNumber(superExpense.total) 
         : calculatedTotal;
       
       console.log(`Total almacenado: ${superExpense.total}, Total calculado: ${calculatedTotal}, Total final: ${finalTotal}`);
@@ -167,10 +178,20 @@ const SuperExpenseForm: React.FC<SuperExpenseFormProps> = ({
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | { name?: string; value: unknown }> | SelectChangeEvent<number | string | ''>) => {
     const { name, value } = e.target;
     if (!name) return;
+    
+    // Convertir valores numéricos para los campos de ID
+    let processedValue = value;
+    if (['tipoEgresoId', 'formaPagoId'].includes(name)) {
+      processedValue = value === '' ? 0 : Number(value);
+      console.log(`Convirtiendo ${name} de ${value} a ${processedValue}`);
+    } else if (name === 'documentoPagoId') {
+      processedValue = value === '' ? undefined : Number(value);
+      console.log(`Convirtiendo ${name} de ${value} a ${processedValue}`);
+    }
 
     setFormData((prev) => ({
       ...prev,
-      [name]: value,
+      [name]: processedValue,
     }));
 
     // Limpiar error del campo cuando se modifica
@@ -254,20 +275,32 @@ const SuperExpenseForm: React.FC<SuperExpenseFormProps> = ({
       // Crear una copia limpia de los datos para enviar
       const cleanData = { ...formData };
       
-      // Asegurar que los campos numéricos sean números
-      cleanData.tipoEgresoId = Number(cleanData.tipoEgresoId);
-      cleanData.formaPagoId = Number(cleanData.formaPagoId);
-      cleanData.total = Number(cleanData.total);
+      // IMPORTANTE: Asegurar que los campos de ID sean siempre números válidos
+      // y que se incluyan siempre en la solicitud de actualización
       
-      // Asegurar que los campos opcionales numéricos sean números o undefined
-      if (cleanData.documentoPagoId && String(cleanData.documentoPagoId) !== '') {
+      // Tipo de Egreso - campo obligatorio
+      cleanData.tipoEgresoId = Number(cleanData.tipoEgresoId || 0);
+      if (cleanData.tipoEgresoId === 0) {
+        setErrors(prev => ({ ...prev, tipoEgresoId: 'Tipo de egreso es requerido' }));
+        return;
+      }
+      
+      // Forma de Pago - campo obligatorio
+      cleanData.formaPagoId = Number(cleanData.formaPagoId || 0);
+      if (cleanData.formaPagoId === 0) {
+        setErrors(prev => ({ ...prev, formaPagoId: 'Forma de pago es requerida' }));
+        return;
+      }
+      
+      // Documento de Pago - puede ser opcional dependiendo del tipo de egreso
+      if (cleanData.documentoPagoId !== undefined && cleanData.documentoPagoId !== null && String(cleanData.documentoPagoId) !== '') {
         cleanData.documentoPagoId = Number(cleanData.documentoPagoId);
       } else {
-        // Si está vacío o es 0, eliminarlo del objeto para que el backend lo maneje
+        // Si está vacío, eliminarlo del objeto para que el backend lo maneje como undefined
         delete cleanData.documentoPagoId;
       }
       
-      // Manejar nroFactura - eliminar la propiedad si está vacía para que el backend la maneje
+      // Manejar nroFactura - si está vacío, eliminarlo del objeto
       if (cleanData.nroFactura === '') {
         delete cleanData.nroFactura;
       }
@@ -276,13 +309,14 @@ const SuperExpenseForm: React.FC<SuperExpenseFormProps> = ({
       cleanData.excento = Number(cleanData.excento || 0);
       cleanData.gravado = Number(cleanData.gravado || 0);
       cleanData.impuesto = Number(cleanData.impuesto || 0);
+      cleanData.total = Number(cleanData.total || 0);
       
       // Asegurar que la hora tenga el formato correcto (HH:MM:SS)
       if (cleanData.hora && cleanData.hora.split(':').length === 2) {
         cleanData.hora = `${cleanData.hora}:00`;
       }
       
-      console.log('Datos limpios a enviar:', cleanData);
+      console.log('Datos limpios a enviar:', JSON.stringify(cleanData, null, 2));
       
       if (superExpense) {
         try {
@@ -336,7 +370,7 @@ const SuperExpenseForm: React.FC<SuperExpenseFormProps> = ({
                   labelId="tipo-egreso-label"
                   id="tipoEgresoId"
                   name="tipoEgresoId"
-                  value={formData.tipoEgresoId}
+                  value={Number(formData.tipoEgresoId) || 0}
                   onChange={handleChange}
                   label="Tipo de Egreso *"
                 >
@@ -407,7 +441,7 @@ const SuperExpenseForm: React.FC<SuperExpenseFormProps> = ({
                   labelId="documento-pago-label"
                   id="documentoPagoId"
                   name="documentoPagoId"
-                  value={formData.documentoPagoId || ''}
+                  value={formData.documentoPagoId !== undefined ? Number(formData.documentoPagoId) : ''}
                   onChange={handleChange}
                   label="Documento de Pago *"
                 >
@@ -512,7 +546,7 @@ const SuperExpenseForm: React.FC<SuperExpenseFormProps> = ({
                   labelId="forma-pago-label"
                   id="formaPagoId"
                   name="formaPagoId"
-                  value={formData.formaPagoId}
+                  value={Number(formData.formaPagoId) || 0}
                   onChange={handleChange}
                   label="Forma de Pago *"
                 >

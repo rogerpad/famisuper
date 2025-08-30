@@ -69,6 +69,20 @@ export class ConteoBilletesSuperService {
     return conteos.map((conteo) => this.mapToDto(conteo));
   }
 
+  async findLastActive(): Promise<ConteoBilletesSuperDto> {
+    const conteo = await this.conteoBilletesSuperRepository.findOne({
+      where: { activo: true },
+      relations: ['usuario'],
+      order: { fecha: 'DESC' },
+    });
+    
+    if (!conteo) {
+      throw new NotFoundException('No se encontró ningún conteo de billetes activo');
+    }
+    
+    return this.mapToDto(conteo);
+  }
+
   async findOne(id: number): Promise<ConteoBilletesSuperDto> {
     const conteo = await this.conteoBilletesSuperRepository.findOne({
       where: { id },

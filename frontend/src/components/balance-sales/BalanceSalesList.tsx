@@ -16,13 +16,16 @@ import {
   DialogContent,
   DialogContentText,
   DialogTitle,
+  Snackbar,
+  Alert,
 } from '@mui/material';
-import { Add as AddIcon, Edit as EditIcon, Delete as DeleteIcon } from '@mui/icons-material';
+import { Add as AddIcon, Edit as EditIcon, Delete as DeleteIcon, Refresh as RefreshIcon } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { useBalanceSales } from '../../api/balance-sales/balanceSalesApi';
 import { usePackages } from '../../api/packages/packagesApi';
+import { useBalanceFlows } from '../../api/balance-flows/balanceFlowsApi';
 import { BalanceSale } from '../../api/balance-sales/types';
 import { Package } from '../../api/packages/types';
 
@@ -30,11 +33,15 @@ const BalanceSalesList: React.FC = () => {
   const navigate = useNavigate();
   const { loading, error, fetchBalanceSales, deleteBalanceSale } = useBalanceSales();
   const { loading: packagesLoading, fetchPackages } = usePackages();
+  const { loading: balanceFlowsLoading, error: balanceFlowsError, recalcularSaldosVendidos } = useBalanceFlows();
   const [balanceSales, setBalanceSales] = useState<BalanceSale[]>([]);
   const [packages, setPackages] = useState<Package[]>([]);
   const [packageMap, setPackageMap] = useState<Record<number, string>>({});
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [selectedBalanceSaleId, setSelectedBalanceSaleId] = useState<number | null>(null);
+  const [snackbarOpen, setSnackbarOpen] = useState(false);
+  const [snackbarMessage, setSnackbarMessage] = useState('');
+  const [snackbarSeverity, setSnackbarSeverity] = useState<'success' | 'error' | 'info' | 'warning'>('info');
 
   useEffect(() => {
     loadBalanceSales();
@@ -89,27 +96,67 @@ const BalanceSalesList: React.FC = () => {
     setDeleteDialogOpen(false);
     setSelectedBalanceSaleId(null);
   };
+  
+  // Función para manejar el recálculo de saldos vendidos
+  const handleRecalcularSaldos = async () => {
+    try {
+      const resultado = await recalcularSaldosVendidos();
+      
+      setSnackbarMessage(
+        `Recálculo completado. Flujos actualizados: ${resultado.actualizados}, Errores: ${resultado.errores}`
+      );
+      setSnackbarSeverity('success');
+      setSnackbarOpen(true);
+      
+      // Recargar la lista de ventas para mostrar datos actualizados
+      loadBalanceSales();
+    } catch (error) {
+      console.error('Error al recalcular saldos:', error);
+      
+      setSnackbarMessage(
+        `Error al recalcular saldos: ${error instanceof Error ? error.message : 'Error desconocido'}`
+      );
+      setSnackbarSeverity('error');
+      setSnackbarOpen(true);
+    }
+  };
+  
+  // Función para cerrar el snackbar
+  const handleCloseSnackbar = () => {
+    setSnackbarOpen(false);
+  };
 
-  if ((loading && balanceSales.length === 0) || packagesLoading) {
+  if ((loading && balanceSales.length === 0) || packagesLoading || balanceFlowsLoading) {
     return <Typography>Cargando ventas de saldo...</Typography>;
   }
 
-  if (error) {
-    return <Typography color="error">Error: {error}</Typography>;
+  if (error || balanceFlowsError) {
+    return <Typography color="error">Error: {error || balanceFlowsError}</Typography>;
   }
 
   return (
     <Box>
       <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
         <Typography variant="h5">Ventas de Saldo</Typography>
-        <Button
-          variant="contained"
-          color="primary"
-          startIcon={<AddIcon />}
-          onClick={handleAddClick}
-        >
-          Nueva Venta
-        </Button>
+        <Box>
+          <Button
+            variant="outlined"
+            color="secondary"
+            startIcon={<RefreshIcon />}
+            onClick={handleRecalcularSaldos}
+            sx={{ mr: 2 }}
+          >
+            Actualizar Flujos de Ventas
+          </Button>
+          <Button
+            variant="contained"
+            color="primary"
+            startIcon={<AddIcon />}
+            onClick={handleAddClick}
+          >
+            Nueva Venta
+          </Button>
+        </Box>
       </Box>
 
       <TableContainer component={Paper}>
@@ -189,6 +236,22 @@ const BalanceSalesList: React.FC = () => {
           </Button>
         </DialogActions>
       </Dialog>
+      
+      {/* Snackbar para mostrar mensajes de éxito o error */}
+      <Snackbar 
+        open={snackbarOpen} 
+        autoHideDuration={6000} 
+        onClose={handleCloseSnackbar}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Alert 
+          onClose={handleCloseSnackbar} 
+          severity={snackbarSeverity} 
+          sx={{ width: '100%' }}
+        >
+          {snackbarMessage}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 };

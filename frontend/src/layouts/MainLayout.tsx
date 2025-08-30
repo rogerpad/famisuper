@@ -109,7 +109,11 @@ const MENU_PERMISSIONS = {
   ADMIN_BALANCE_SALES: 'crear_editar_venta',
   PACKAGES: 'ver_paquetes',
   ADMIN_PACKAGES: 'admin_paquetes',
-  CONTEO_BILLETES_SUPER: 'ver_conteo_super'
+  CONTEO_BILLETES_SUPER: 'ver_conteo_super',
+  ADICIONALES_PRESTAMOS: 'ver_adic_presta',
+  ADMIN_ADICIONALES_PRESTAMOS: 'crear_editar_adic_prest',
+  CIERRES_SUPER: 'ver_cierre_super',
+  ADMIN_CIERRES_SUPER: 'crear_editar_cierre_super'
 };
 
 // Definimos los permisos por rol
@@ -127,7 +131,9 @@ const ROLE_PERMISSIONS = {
     MENU_PERMISSIONS.REGISTRO_ACTIVIDAD_TURNOS,
     MENU_PERMISSIONS.PROVIDER_TYPES,
     MENU_PERMISSIONS.PROVIDERS,
-    MENU_PERMISSIONS.DASHBOARD
+    MENU_PERMISSIONS.DASHBOARD,
+    MENU_PERMISSIONS.ADICIONALES_PRESTAMOS,
+    MENU_PERMISSIONS.ADMIN_ADICIONALES_PRESTAMOS
   ],
   VENDEDOR: [
     MENU_PERMISSIONS.VENDEDOR_DASHBOARD,
@@ -318,6 +324,18 @@ const menuItemsConfig: MenuItem[] = [
         icon: <CashCounterIcon />, 
         path: '/conteo-billetes-super', 
         permissionCode: MENU_PERMISSIONS.CONTEO_BILLETES_SUPER 
+      },
+      { 
+        text: 'Cierres Super', 
+        icon: <AgentClosingsIcon />, 
+        path: '/cierres-super', 
+        permissionCode: MENU_PERMISSIONS.CIERRES_SUPER 
+      },
+      { 
+        text: 'Adicionales y Préstamos', 
+        icon: <ReceiptIcon />, 
+        path: '/adicionales-prestamos', 
+        permissionCode: MENU_PERMISSIONS.ADICIONALES_PRESTAMOS 
       },
     ]
   },

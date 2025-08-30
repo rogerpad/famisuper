@@ -136,4 +136,20 @@ export class SuperExpensesController {
       new Date(endDate),
     );
   }
+
+  @Get('sum/pago-productos-efectivo')
+  @UseGuards(PermisosGuard)
+  @RequierePermiso('ver_egresos_super')
+  async getSumPagoProductosEfectivo() {
+    const suma = await this.superExpensesService.getSumPagoProductosEfectivo();
+    return { suma };
+  }
+
+  @Get('sum/gastos-efectivo')
+  @UseGuards(PermisosGuard)
+  @RequierePermiso('ver_egresos_super')
+  async getSumGastosEfectivo() {
+    const suma = await this.superExpensesService.getSumGastosEfectivo();
+    return { suma };
+  }
 }

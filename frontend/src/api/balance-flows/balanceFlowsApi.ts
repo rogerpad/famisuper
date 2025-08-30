@@ -104,6 +104,42 @@ export const useBalanceFlows = () => {
       setLoading(false);
     }
   }, []);
+  
+  // Obtener la suma de saldo vendido de registros activos
+  const getSumSaldoVendido = useCallback(async (): Promise<number> => {
+    setLoading(true);
+    setError(null);
+    
+    try {
+      if (USE_MOCK) {
+        // Calcular suma en datos mock
+        const sum = mockBalanceFlows
+          .filter(flow => flow.activo)
+          .reduce((total, flow) => total + flow.saldoVendido, 0);
+        return sum;
+      } else {
+        // Usar API real
+        const response = await fetch(`${API_BASE_URL}/balance-flows/sum-saldo-vendido`, {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem('token')}`,
+          },
+        });
+
+        if (!response.ok) {
+          throw new Error(`Error: ${response.status}`);
+        }
+
+        const total = await response.json();
+        return parseFloat(total) || 0;
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Error desconocido');
+      console.error('Error al obtener suma de saldo vendido:', err);
+      return 0;
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   // Obtener flujos de saldo por línea telefónica
   const fetchBalanceFlowsByPhoneLine = useCallback(async (phoneLineId: number) => {
@@ -308,163 +344,49 @@ export const useBalanceFlows = () => {
     }
   }, []);
 
-  // Actualizar saldo vendido y saldo final después de una venta
-  const updateBalanceAfterSale = useCallback(async (flujoSaldoId: number, montoVenta: number) => {
-    // No activar el estado de carga global para evitar renderizados innecesarios
-    // Solo usamos loading local para esta operación específica
-    let localLoading = true;
-    let localError: string | null = null;
-
-    try {
-      // Primero obtener el flujo de saldo actual
-      const currentFlow = await fetchBalanceFlowById(flujoSaldoId);
-      
-      if (!currentFlow) {
-        throw new Error('Flujo de saldo no encontrado');
-      }
-      
-      if (!currentFlow.activo) {
-        throw new Error('El flujo de saldo no está activo');
-      }
-      
-      // Calcular nuevos valores
-      const nuevoSaldoVendido = Number(currentFlow.saldoVendido) + Number(montoVenta);
-      const nuevoSaldoFinal = Number(currentFlow.saldoFinal) - Number(montoVenta);
-      
-      if (nuevoSaldoFinal < 0) {
-        throw new Error('No hay suficiente saldo disponible para esta venta');
-      }
-      
-      // Actualizar el flujo de saldo
-      const updateData: UpdateBalanceFlowDto = {
-        saldoVendido: nuevoSaldoVendido,
-        saldoFinal: nuevoSaldoFinal
-      };
-      
-      // Llamada directa a la API sin actualizar el estado global
-      if (USE_MOCK) {
-        // Simular actualización en datos mock
-        const index = mockBalanceFlows.findIndex(flow => flow.id === flujoSaldoId);
-        if (index === -1) {
-          throw new Error('Flujo de saldo no encontrado');
-        }
-
-        const updatedBalanceFlow = {
-          ...mockBalanceFlows[index],
-          ...updateData,
-        };
-
-        return updatedBalanceFlow;
-      } else {
-        // Usar API real
-        const response = await fetch(`${API_BASE_URL}/balance-flows/${flujoSaldoId}`, {
-          method: 'PATCH',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${localStorage.getItem('token')}`,
-          },
-          body: JSON.stringify(updateData),
-        });
-
-        if (!response.ok) {
-          throw new Error(`Error: ${response.status}`);
-        }
-
-        return await response.json();
-      }
-    } catch (err) {
-      localError = err instanceof Error ? err.message : 'Error desconocido';
-      console.error('Error al actualizar saldo después de venta:', err);
-      throw err; // Re-lanzar el error para manejarlo en el componente
-    } finally {
-      localLoading = false;
-    }
-  }, [fetchBalanceFlowById]);
+  // La función updateBalanceAfterSale ha sido eliminada ya que ahora se usa recalcularSaldosVendidos
   
-  // Actualizar saldo vendido y saldo final al modificar una venta existente
-  const updateBalanceAfterSaleEdit = useCallback(async (flujoSaldoId: number, montoAnterior: number, montoNuevo: number) => {
-    // No activar el estado de carga global para evitar renderizados innecesarios
-    // Solo usamos loading local para esta operación específica
-    let localLoading = true;
-    let localError: string | null = null;
+  // La función updateBalanceAfterSaleEdit ha sido eliminada ya que ahora se usa recalcularSaldosVendidos
+
+  // Recalcular saldos vendidos y finales para todos los flujos activos
+  const recalcularSaldosVendidos = useCallback(async () => {
+    setLoading(true);
+    setError(null);
 
     try {
-      // Primero obtener el flujo de saldo actual
-      const currentFlow = await fetchBalanceFlowById(flujoSaldoId);
-      
-      if (!currentFlow) {
-        throw new Error('Flujo de saldo no encontrado');
-      }
-      
-      if (!currentFlow.activo) {
-        throw new Error('El flujo de saldo no está activo');
-      }
-      
-      // Si los montos son iguales, no hay nada que actualizar
-      if (Number(montoAnterior) === Number(montoNuevo)) {
-        console.log('[updateBalanceAfterSaleEdit] Montos iguales, no se requiere actualización');
-        return currentFlow;
-      }
-      
-      // Calcular nuevos valores
-      // 1. Restar el monto anterior del saldo vendido
-      // 2. Sumar el monto nuevo al saldo vendido
-      // 3. Sumar el monto anterior al saldo final
-      // 4. Restar el monto nuevo del saldo final
-      const nuevoSaldoVendido = Number(currentFlow.saldoVendido) - Number(montoAnterior) + Number(montoNuevo);
-      const nuevoSaldoFinal = Number(currentFlow.saldoFinal) + Number(montoAnterior) - Number(montoNuevo);
-      
-      console.log(`[updateBalanceAfterSaleEdit] Valores calculados: saldoVendido=${nuevoSaldoVendido}, saldoFinal=${nuevoSaldoFinal}`);
-      
-      if (nuevoSaldoFinal < 0) {
-        throw new Error('No hay suficiente saldo disponible para esta modificación');
-      }
-      
-      // Actualizar el flujo de saldo
-      const updateData: UpdateBalanceFlowDto = {
-        saldoVendido: nuevoSaldoVendido,
-        saldoFinal: nuevoSaldoFinal
-      };
-      
-      // Llamada directa a la API sin actualizar el estado global
       if (USE_MOCK) {
-        // Simular actualización en datos mock
-        const index = mockBalanceFlows.findIndex(flow => flow.id === flujoSaldoId);
-        if (index === -1) {
-          throw new Error('Flujo de saldo no encontrado');
-        }
-
-        const updatedBalanceFlow = {
-          ...mockBalanceFlows[index],
-          ...updateData,
-        };
-
-        return updatedBalanceFlow;
+        // Simular recálculo en datos mock
+        console.log('Recálculo de saldos simulado en modo mock');
+        return { actualizados: mockBalanceFlows.length, errores: 0 };
       } else {
         // Usar API real
-        const response = await fetch(`${API_BASE_URL}/balance-flows/${flujoSaldoId}`, {
-          method: 'PATCH',
+        const response = await fetch(`${API_BASE_URL}/balance-flows/recalcular-saldos`, {
+          method: 'POST',
           headers: {
             'Content-Type': 'application/json',
             Authorization: `Bearer ${localStorage.getItem('token')}`,
           },
-          body: JSON.stringify(updateData),
         });
 
         if (!response.ok) {
           throw new Error(`Error: ${response.status}`);
         }
 
-        return await response.json();
+        const resultado = await response.json();
+        
+        // Refrescar los datos después del recálculo
+        await fetchBalanceFlows();
+        
+        return resultado.data;
       }
     } catch (err) {
-      localError = err instanceof Error ? err.message : 'Error desconocido';
-      console.error('Error al actualizar saldo después de modificar venta:', err);
+      setError(err instanceof Error ? err.message : 'Error desconocido');
+      console.error('Error al recalcular saldos vendidos:', err);
       throw err; // Re-lanzar el error para manejarlo en el componente
     } finally {
-      localLoading = false;
+      setLoading(false);
     }
-  }, [fetchBalanceFlowById]);
+  }, [fetchBalanceFlows]);
 
   return {
     balanceFlows,
@@ -477,7 +399,7 @@ export const useBalanceFlows = () => {
     createBalanceFlow,
     updateBalanceFlow,
     deleteBalanceFlow,
-    updateBalanceAfterSale,
-    updateBalanceAfterSaleEdit,
+    getSumSaldoVendido,
+    recalcularSaldosVendidos,
   };
 };
