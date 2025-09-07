@@ -85,6 +85,44 @@ const BalanceSaleForm: React.FC = () => {
       console.error('Error al cargar paquetes:', error);
     }
   }, [fetchPackages]); // Memoizar la función
+  
+  // Función para asignar el flujo de saldo según la línea telefónica seleccionada
+  const asignarFlujoSegunLinea = useCallback((telefonicaId: number) => {
+    console.log('[BalanceSaleForm] Asignando flujo según línea telefónica ID:', telefonicaId);
+    
+    // Buscar flujos de saldo que coincidan con la línea telefónica seleccionada
+    const flujosFiltrados = balanceFlows.filter(flow => {
+      // Buscar flujos cuyo nombre contenga el nombre de la línea telefónica
+      const linea = phoneLines.find(line => line.id === telefonicaId);
+      if (!linea) return false;
+      
+      const lineaNombre = linea.nombre.toLowerCase();
+      const flujoNombre = flow.nombre.toLowerCase();
+      
+      // Verificar si el nombre del flujo contiene el nombre de la línea
+      if (lineaNombre.includes('tigo') && flujoNombre.includes('tigo')) {
+        console.log('[BalanceSaleForm] Encontrado flujo Tigo:', flow.nombre);
+        return true;
+      }
+      
+      if (lineaNombre.includes('claro') && flujoNombre.includes('claro')) {
+        console.log('[BalanceSaleForm] Encontrado flujo Claro:', flow.nombre);
+        return true;
+      }
+      
+      return false;
+    });
+    
+    // Si se encontró algún flujo, devolver el ID del primero
+    if (flujosFiltrados.length > 0) {
+      console.log('[BalanceSaleForm] Flujo seleccionado automáticamente:', flujosFiltrados[0].nombre);
+      return flujosFiltrados[0].id;
+    }
+    
+    // Si no se encontró ningún flujo, devolver 0
+    console.log('[BalanceSaleForm] No se encontró ningún flujo para la línea seleccionada');
+    return 0;
+  }, [balanceFlows, phoneLines]); // Memoizar la función con dependencias
 
   // Referencia para controlar si ya se cargó la venta
   const ventaCargadaRef = React.useRef(false);
@@ -199,10 +237,16 @@ const BalanceSaleForm: React.FC = () => {
       const numericValue = value === '' ? 0 : Number(value);
       console.log(`Convirtiendo ${name} a número: ${numericValue}`);
       
+      // Asignar automáticamente el flujo de saldo correspondiente
+      const flujoSaldoId = numericValue > 0 ? asignarFlujoSegunLinea(numericValue) : 0;
+      console.log(`[BalanceSaleForm] Flujo de saldo asignado automáticamente: ${flujoSaldoId}`);
+      
       // Actualizar el estado del formulario
       setFormData({
         ...formData,
         [name]: numericValue,
+        // Asignar automáticamente el flujo de saldo
+        flujoSaldoId: flujoSaldoId,
         // Resetear el paquete seleccionado cuando cambia la línea telefónica
         paqueteId: undefined,
         // Si había un monto calculado por paquete, resetearlo también

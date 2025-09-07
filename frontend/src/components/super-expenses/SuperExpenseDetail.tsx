@@ -24,7 +24,7 @@ const SuperExpenseDetail: React.FC<SuperExpenseDetailProps> = ({ open, onClose, 
   return (
     <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
       <DialogTitle>
-        <Typography variant="h5">Detalle de Egreso de Super</Typography>
+        Detalle de Egreso de Super
       </DialogTitle>
       <DialogContent>
         <Paper elevation={0} sx={{ p: 2, mb: 2 }}>

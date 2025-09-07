@@ -52,6 +52,7 @@ import BalanceSaleForm from './components/balance-sales/BalanceSaleForm';
 import PackagesList from './components/packages/PackagesList';
 import PackageForm from './components/packages/PackageForm';
 import { ConteoBilletesSuperList, ConteoBilletesSuperForm, ConteoBilletesSuperDetail } from './components/conteo-billetes-super';
+import ConteoBilletesSuperPage from './pages/conteo-billetes-super/ConteoBilletesSuperPage';
 
 // Adicionales Prestamos
 import AdicionalesPrestamosPage from './pages/adicionales-prestamos/AdicionalesPrestamosPage';
@@ -351,7 +352,7 @@ function App() {
                 {/* Rutas para conteo de billetes super */}
                 <Route path="/conteo-billetes-super" element={
                   <ProtectedRoute requiredPermission="ver_conteo_super">
-                    <ConteoBilletesSuperList />
+                    <ConteoBilletesSuperPage />
                   </ProtectedRoute>
                 } />
                 <Route path="/conteo-billetes-super/new" element={

@@ -99,20 +99,8 @@ const ConteoBilletesSuperList: React.FC = () => {
   };
 
   return (
-    <Paper sx={{ p: 3 }}>
-      <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
-        <Typography variant="h5">Historial de Conteos</Typography>
-        {canCreate && (
-          <Button
-            variant="contained"
-            color="primary"
-            startIcon={<AddIcon />}
-            onClick={handleCreate}
-          >
-            Nuevo Conteo
-          </Button>
-        )}
-      </Box>
+    <Box>
+      {/* Se ha eliminado el botón 'Nuevo Conteo' de esta vista */}
 
       {loading ? (
         <Typography>Cargando datos...</Typography>
@@ -206,7 +194,7 @@ const ConteoBilletesSuperList: React.FC = () => {
           </Button>
         </DialogActions>
       </Dialog>
-    </Paper>
+    </Box>
   );
 };
 

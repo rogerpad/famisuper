@@ -9,6 +9,13 @@ import {
   Button,
   Divider,
   InputAdornment,
+  CircularProgress,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow
 } from '@mui/material';
 // Importaciones de date-fns para formateo de fechas
 import { useConteoBilletesSuper } from '../../api/conteo-billetes-super/conteoBilletesSuperApi';
@@ -253,93 +260,92 @@ const ConteoBilletesSuperForm: React.FC = () => {
   const currentDate = format(new Date(), 'PPP', { locale: es });
 
   return (
-    <Paper sx={{ p: 3 }}>
-      <Typography variant="h5" mb={2}>
-        Contador de Efectivo
-      </Typography>
-      <Grid container spacing={2} mb={2}>
-        <Grid item xs={12} md={4}>
-          <Typography variant="body1">
-            <strong>Usuario:</strong> {state.user ? `${state.user.nombre} ${state.user.apellido || ''}` : 'Usuario actual'}
-          </Typography>
-        </Grid>
-        <Grid item xs={12} md={4}>
-          <Typography variant="body1">
-            <strong>Turno:</strong> Sin turno asignado
-          </Typography>
-        </Grid>
-        <Grid item xs={12} md={4}>
-          <Typography variant="body1">
-            <strong>Fecha:</strong> {currentDate}
-          </Typography>
-        </Grid>
-      </Grid>
+    <Box>
+      {isEditMode && (
+        <Typography variant="h6" gutterBottom>
+          Editar Conteo de Efectivo
+        </Typography>
+      )}
+
+      <Box sx={{ mb: 2 }}>
+        {isEditMode && conteoId && (
+          <>
+            <Typography variant="body1" gutterBottom>
+              <strong>Fecha:</strong> {currentDate}
+            </Typography>
+            <Typography variant="body1" gutterBottom>
+              <strong>ID:</strong> {conteoId}
+            </Typography>
+            <Typography variant="body1" gutterBottom>
+              <strong>Usuario:</strong> {state.user ? `${state.user.nombre} ${state.user.apellido || ''}` : 'Usuario actual'}
+            </Typography>
+          </>
+        )}
+      </Box>
 
       <Box component="form" onSubmit={handleSubmit}>
-        <Typography variant="body1" mb={2}>
-          Ingrese la cantidad de billetes y monedas para calcular el total de efectivo.
-        </Typography>
+        <Box sx={{ mb: 2 }}>
+          {/* El encabezado ahora está en la tabla */}
 
-        <Box sx={{ mb: 3 }}>
-          <Grid container sx={{ bgcolor: '#f5f5f5', p: 1 }}>
-            <Grid item xs={4}>
-              <Typography variant="subtitle1" fontWeight="bold">Denominación</Typography>
-            </Grid>
-            <Grid item xs={4}>
-              <Typography variant="subtitle1" fontWeight="bold">Cantidad</Typography>
-            </Grid>
-            <Grid item xs={4}>
-              <Typography variant="subtitle1" fontWeight="bold">Total</Typography>
-            </Grid>
-          </Grid>
-
-          {denominaciones.map((row) => (
-            <Grid container key={row.denominacion} sx={{ borderBottom: '1px solid #e0e0e0', py: 1 }}>
-              <Grid item xs={4}>
-                <Typography>{row.denominacion}</Typography>
-              </Grid>
-              <Grid item xs={4}>
-                <TextField
-                  name={row.field}
-                  type="number"
-                  value={row.cantidad}
-                  onChange={handleInputChange}
-                  size="small"
-                  inputProps={{ min: 0, style: { textAlign: 'right' } }}
-                  disabled={submitting}
-                  fullWidth
-                />
-              </Grid>
-              <Grid item xs={4}>
-                <TextField
-                  value={`L ${row.total.toFixed(2)}`}
-                  size="small"
-                  InputProps={{
-                    readOnly: true,
-                    style: { textAlign: 'right' }
-                  }}
-                  fullWidth
-                />
-              </Grid>
-            </Grid>
-          ))}
-
-          <Grid container sx={{ bgcolor: '#f5f5f5', p: 1, mt: 2 }}>
-            <Grid item xs={8}>
-              <Typography variant="subtitle1" fontWeight="bold">Total</Typography>
-            </Grid>
-            <Grid item xs={4}>
-              <TextField
-                value={`L ${totals.totalGeneral.toFixed(2)}`}
-                size="small"
-                InputProps={{
-                  readOnly: true,
-                  style: { fontWeight: 'bold', textAlign: 'right' }
-                }}
-                fullWidth
-              />
-            </Grid>
-          </Grid>
+          <TableContainer component={Paper} sx={{ mb: 2, maxWidth: '100%', overflowX: 'auto' }}>
+            <Table size="small">
+              <TableHead>
+                <TableRow sx={{ backgroundColor: '#f5f5f5' }}>
+                  <TableCell padding="checkbox" sx={{ pl: 2 }}>Denominación</TableCell>
+                  <TableCell padding="checkbox">Cantidad</TableCell>
+                  <TableCell padding="checkbox">Total</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {denominaciones.map((row, index) => (
+                  <TableRow 
+                    key={row.denominacion}
+                    sx={{ 
+                      backgroundColor: index % 2 === 0 ? '#ffffff' : '#f9f9f9',
+                      height: '40px'
+                    }}
+                  >
+                    <TableCell padding="checkbox" sx={{ pl: 2 }}>L {row.denominacion}</TableCell>
+                    <TableCell padding="checkbox" sx={{ width: '100px' }}>
+                      <TextField
+                        name={row.field}
+                        value={row.cantidad === 0 ? '' : row.cantidad}
+                        onChange={handleInputChange}
+                        variant="outlined"
+                        size="small"
+                        type="number"
+                        inputProps={{ 
+                          min: 0,
+                          style: { padding: '5px 8px', height: '15px' } 
+                        }}
+                        sx={{ width: '80px' }}
+                      />
+                    </TableCell>
+                    <TableCell padding="checkbox">
+                      <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                        <Typography component="span" variant="body2" sx={{ mr: 0.5 }}>L</Typography>
+                        <Typography component="span" variant="body2">{row.total.toFixed(2)}</Typography>
+                      </Box>
+                    </TableCell>
+                  </TableRow>
+                ))}
+                
+                {/* Total */}
+                <TableRow sx={{ backgroundColor: '#e0e0e0', height: '36px' }}>
+                  <TableCell padding="checkbox" sx={{ pl: 2 }}>
+                    <Typography variant="body1" fontWeight="bold">Total</Typography>
+                  </TableCell>
+                  <TableCell padding="checkbox" />
+                  <TableCell padding="checkbox">
+                    <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                      <Typography component="span" variant="body1" sx={{ mr: 0.5 }}>L</Typography>
+                      <Typography component="span" variant="body1" fontWeight="bold">{totals.totalGeneral.toFixed(2)}</Typography>
+                    </Box>
+                  </TableCell>
+                </TableRow>
+              </TableBody>
+            </Table>
+          </TableContainer>
         </Box>
 
         <Box display="flex" justifyContent="flex-end" gap={2} mt={3}>
@@ -355,12 +361,13 @@ const ConteoBilletesSuperForm: React.FC = () => {
             variant="contained"
             color="primary"
             disabled={submitting}
+            startIcon={submitting ? <CircularProgress size={20} /> : null}
           >
-            {submitting ? 'Guardando...' : 'Guardar'}
+            {submitting ? 'Actualizando...' : isEditMode ? 'Actualizar' : 'Guardar'}
           </Button>
         </Box>
       </Box>
-    </Paper>
+    </Box>
   );
 };
 

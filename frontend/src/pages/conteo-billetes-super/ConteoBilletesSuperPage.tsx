@@ -8,10 +8,11 @@ import {
   Tab,
   Divider
 } from '@mui/material';
-import CashCounter from '../../components/CashCounter';
-import CashCountList from '../../components/CashCountList';
+import { ConteoBilletesSuperForm, ConteoBilletesSuperList } from '../../components/conteo-billetes-super';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTurno } from '../../contexts/TurnoContext';
+import { format } from 'date-fns';
+import { es } from 'date-fns/locale';
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -26,8 +27,8 @@ function TabPanel(props: TabPanelProps) {
     <div
       role="tabpanel"
       hidden={value !== index}
-      id={`cash-tabpanel-${index}`}
-      aria-labelledby={`cash-tab-${index}`}
+      id={`conteo-tabpanel-${index}`}
+      aria-labelledby={`conteo-tab-${index}`}
       {...other}
     >
       {value === index && (
@@ -39,36 +40,26 @@ function TabPanel(props: TabPanelProps) {
   );
 }
 
-const CashCounterPage: React.FC = () => {
+const ConteoBilletesSuperPage: React.FC = () => {
   const [tabValue, setTabValue] = useState(0);
-  const { state } = useAuth(); // Corregido: useAuth() devuelve {state, login, logout, hasPermission, hasRole}
+  const { state } = useAuth();
   const { turnoActual } = useTurno();
   
   const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
     setTabValue(newValue);
   };
   
-  const handleSaveCashCount = (data: any) => {
-    // Aquí se implementaría la lógica para guardar el conteo en el backend
-    console.log('Guardando conteo de efectivo en el servidor:', data);
-    // Por ahora solo guardamos en localStorage (ya implementado en el componente)
-  };
-
   // Obtener información del usuario y turno actual
   const userName = state.user ? `${state.user.nombre} ${state.user.apellido}` : 'Usuario';
   const turnoName = turnoActual ? turnoActual.nombre : 'Sin turno asignado';
-  const currentDate = new Date().toLocaleDateString('es-ES', {
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric'
-  });
+  const currentDate = format(new Date(), 'PPP', { locale: es });
 
   return (
     <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
       <Paper sx={{ p: 3, borderRadius: 2 }}>
         <Box sx={{ mb: 3 }}>
           <Typography variant="h4" gutterBottom>
-            Contador de Efectivo Agentes
+            Contador de Efectivo Super
           </Typography>
           
           <Box sx={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', mb: 2 }}>
@@ -85,28 +76,24 @@ const CashCounterPage: React.FC = () => {
           
           <Divider sx={{ my: 2 }} />
           
-          <Tabs value={tabValue} onChange={handleTabChange} aria-label="cash counter tabs">
+          <Tabs value={tabValue} onChange={handleTabChange} aria-label="conteo billetes super tabs">
             <Tab label="Conteo de Efectivo" />
             <Tab label="Historial de Conteos" />
           </Tabs>
         </Box>
 
         <TabPanel value={tabValue} index={0}>
-          <Typography variant="body1" color="text.secondary" paragraph>
-            Ingrese la cantidad de billetes y monedas para calcular el total de efectivo.
-          </Typography>
-          <CashCounter onSave={handleSaveCashCount} />
+          <ConteoBilletesSuperForm />
         </TabPanel>
         
         <TabPanel value={tabValue} index={1}>
-          <Typography variant="body1" color="text.secondary" paragraph>
-            Consulta y administra los registros históricos de conteos de efectivo.
-          </Typography>
-          <CashCountList />
+          <Box sx={{ mt: 2 }}>
+            <ConteoBilletesSuperList />
+          </Box>
         </TabPanel>
       </Paper>
     </Container>
   );
 };
 
-export default CashCounterPage;
+export default ConteoBilletesSuperPage;

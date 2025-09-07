@@ -139,9 +139,19 @@ const ROLE_PERMISSIONS = {
     MENU_PERMISSIONS.VENDEDOR_DASHBOARD,
     MENU_PERMISSIONS.MIS_TURNOS,
     MENU_PERMISSIONS.VENTAS,
-    MENU_PERMISSIONS.CLIENTES,
-    MENU_PERMISSIONS.PRODUCTOS,
-    MENU_PERMISSIONS.DASHBOARD
+    MENU_PERMISSIONS.DASHBOARD,
+    // Permisos para Operación de Agentes
+    MENU_PERMISSIONS.TRANSACTIONS,
+    MENU_PERMISSIONS.REPORTS,
+    'ver_contador_efectivo',
+    MENU_PERMISSIONS.AGENT_CLOSINGS,
+    // Permisos para Operación de Super
+    MENU_PERMISSIONS.SUPER_EXPENSES,
+    MENU_PERMISSIONS.BALANCE_FLOWS,
+    MENU_PERMISSIONS.BALANCE_SALES,
+    MENU_PERMISSIONS.CONTEO_BILLETES_SUPER,
+    MENU_PERMISSIONS.CIERRES_SUPER,
+    MENU_PERMISSIONS.ADICIONALES_PRESTAMOS
   ]
 };
 
@@ -246,7 +256,7 @@ const menuItemsConfig: MenuItem[] = [
         permissionCode: MENU_PERMISSIONS.TRANSACTIONS 
       },
       { 
-        text: 'Reportes', 
+        text: 'Resumen de Transacciones', 
         icon: <AssessmentIcon />, 
         path: '/reports', 
         permissionCode: MENU_PERMISSIONS.REPORTS 
@@ -413,11 +423,36 @@ const menuItemsConfig: MenuItem[] = [
       });
     };
 
+    // Filtrar los grupos específicos que queremos mostrar para el rol Vendedor
+    const filterVendorGroups = (items: MenuItem[]): MenuItem[] => {
+      return items.filter(item => {
+        // Para elementos no agrupados, verificar si el usuario tiene el permiso
+        if (!item.isGroup) {
+          return !item.permissionCode || hasPermission(item.permissionCode);
+        }
+        
+        // Incluir específicamente los grupos "Operación de Agentes" y "Operación de Super"
+        if (item.text === 'Operación de Agentes' || item.text === 'Operación de Super') {
+          // Filtrar los hijos según permisos
+          if (item.children) {
+            item.children = item.children.filter(child => 
+              !child.permissionCode || hasPermission(child.permissionCode)
+            );
+          }
+          // Mostrar el grupo si tiene al menos un hijo con permiso
+          return item.children && item.children.length > 0;
+        }
+        
+        // Excluir otros grupos
+        return false;
+      });
+    };
+
     if (hasRole('Vendedor')) {
-      // Si el usuario tiene el rol de Vendedor, mostrar solo los menús de vendedor
-      // y excluir los grupos
+      // Si el usuario tiene el rol de Vendedor, mostrar los menús de vendedor
+      // y los grupos específicos "Operación de Agentes" y "Operación de Super"
       console.log('Mostrando menú para rol Vendedor');
-      return filterByPermission(menuItemsConfig.filter(item => !item.isGroup));
+      return filterVendorGroups(menuItemsConfig);
     } else {
       // Para cualquier otro rol (Admin), filtrar según permisos específicos
       console.log('Filtrando menús por permisos');

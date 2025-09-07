@@ -123,86 +123,72 @@ const ConteoBilletesSuperDetail: React.FC = () => {
 
   return (
     <Paper sx={{ p: 3 }}>
-      <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
-        <Typography variant="h5">Detalle de Conteo de Efectivo</Typography>
-        <Box>
-          <Button
-            variant="outlined"
-            startIcon={<ArrowBackIcon />}
-            onClick={handleBack}
-            sx={{ mr: 1 }}
-          >
-            Volver
-          </Button>
-          {canEdit && (
-            <Button
-              variant="contained"
-              color="primary"
-              startIcon={<EditIcon />}
-              onClick={handleEdit}
-            >
-              Editar
-            </Button>
-          )}
-        </Box>
-      </Box>
-
-      <Grid container spacing={2} mb={3}>
-        <Grid item xs={12} md={4}>
-          <Typography variant="body1">
-            <strong>ID:</strong> {conteo.id}
-          </Typography>
-        </Grid>
-        <Grid item xs={12} md={4}>
-          <Typography variant="body1">
-            <strong>Usuario:</strong> {conteo.usuario
-              ? `${conteo.usuario.nombre} ${conteo.usuario.apellido || ''}`
-              : `ID: ${conteo.usuarioId}`}
-          </Typography>
-        </Grid>
-        <Grid item xs={12} md={4}>
-          <Typography variant="body1">
-            <strong>Fecha:</strong> {formatDate(conteo.fecha)}
-          </Typography>
-        </Grid>
-      </Grid>
-
-      <Divider sx={{ my: 2 }} />
-
-      <Typography variant="h6" mb={2}>
-        Detalle de Billetes y Monedas
+      <Typography variant="h6" gutterBottom>
+        Efectivo Super #{conteo.id}
       </Typography>
 
-      <TableContainer>
-        <Table>
+      <Box sx={{ mb: 2 }}>
+        <Typography variant="body1" gutterBottom>
+          <strong>Fecha:</strong> {formatDate(conteo.fecha)}
+        </Typography>
+        <Typography variant="body1" gutterBottom>
+          <strong>Usuario:</strong> {conteo.usuario
+            ? `${conteo.usuario.nombre} ${conteo.usuario.apellido || ''}`
+            : `ID: ${conteo.usuarioId}`}
+        </Typography>
+        <Typography variant="body1" gutterBottom>
+          <strong>Total:</strong> L {ensureNumber(conteo.totalGeneral, 0).toFixed(2)}
+        </Typography>
+      </Box>
+
+      <TableContainer component={Paper} variant="outlined">
+        <Table size="small">
           <TableHead>
             <TableRow>
               <TableCell>Denominación</TableCell>
-              <TableCell align="right">Cantidad</TableCell>
+              <TableCell align="center">Cantidad</TableCell>
               <TableCell align="right">Total</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
             {getDenominaciones().map((row) => (
               <TableRow key={row.denominacion}>
-                <TableCell>L {row.denominacion}</TableCell>
-                <TableCell align="right">{row.cantidad}</TableCell>
+                <TableCell>{row.denominacion}</TableCell>
+                <TableCell align="center">{row.cantidad}</TableCell>
                 <TableCell align="right">L {ensureNumber(row.total, 0).toFixed(2)}</TableCell>
               </TableRow>
             ))}
-            <TableRow sx={{ bgcolor: '#f5f5f5' }}>
-              <TableCell colSpan={2}>
-                <Typography variant="subtitle1" fontWeight="bold">Total General</Typography>
+            <TableRow>
+              <TableCell colSpan={2} align="right">
+                <Typography variant="subtitle2" fontWeight="bold">Total General</Typography>
               </TableCell>
               <TableCell align="right">
-                <Typography variant="subtitle1" fontWeight="bold">
-                  L {ensureNumber(conteo.totalGeneral, 0).toFixed(2)}
+                <Typography variant="subtitle2" fontWeight="bold">
+                  L{ensureNumber(conteo.totalGeneral, 0).toFixed(2)}
                 </Typography>
               </TableCell>
             </TableRow>
           </TableBody>
         </Table>
       </TableContainer>
+      
+      <Box display="flex" justifyContent="flex-end" mt={2}>
+        <Button
+          variant="outlined"
+          color="primary"
+          onClick={handleBack}
+          sx={{ mr: 1 }}
+        >
+          Cerrar
+        </Button>
+        <Button
+          variant="contained"
+          color="primary"
+          onClick={() => window.print()}
+        >
+          Imprimir
+        </Button>
+      </Box>
     </Paper>
   );
 };

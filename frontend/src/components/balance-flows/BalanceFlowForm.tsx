@@ -93,6 +93,25 @@ const BalanceFlowForm: React.FC<BalanceFlowFormProps> = ({ open, balanceFlow, on
     setErrors({});
   }, [balanceFlow, open]);
 
+  // Función para asignar el nombre según la línea telefónica seleccionada
+  const asignarNombreSegunLinea = (telefonicaId: number) => {
+    console.log('[BalanceFlowForm] Asignando nombre según línea telefónica ID:', telefonicaId);
+    
+    if (telefonicaId === 1) {
+      // Si es Tigo (ID 1), asignar "Flujo Tigo"
+      console.log('[BalanceFlowForm] Asignando nombre: Flujo Tigo');
+      return 'Flujo Tigo';
+    } else if (telefonicaId === 2) {
+      // Si es Claro (ID 2), asignar "Flujo Claro"
+      console.log('[BalanceFlowForm] Asignando nombre: Flujo Claro');
+      return 'Flujo Claro';
+    }
+    
+    // Si no es ninguna de las anteriores, devolver cadena vacía
+    console.log('[BalanceFlowForm] No se reconoce la línea telefónica, no se asigna nombre');
+    return '';
+  };
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | { name?: string; value: unknown }> | SelectChangeEvent<number | string>) => {
     const { name, value } = e.target;
     if (name) {
@@ -262,9 +281,12 @@ const BalanceFlowForm: React.FC<BalanceFlowFormProps> = ({ open, balanceFlow, on
                   onChange={(e) => {
                     const value = e.target.value === '' ? 0 : Number(e.target.value);
                     console.log('[BalanceFlowForm] Seleccionado telefonicaId:', value);
+                    
+                    // Actualizar telefonicaId y nombre automáticamente
                     setFormData(prev => ({
                       ...prev,
-                      telefonicaId: value
+                      telefonicaId: value,
+                      nombre: asignarNombreSegunLinea(value)
                     }));
                   }}
                   label="Línea Telefónica"
@@ -284,24 +306,18 @@ const BalanceFlowForm: React.FC<BalanceFlowFormProps> = ({ open, balanceFlow, on
               </FormControl>
             </Grid>
             <Grid item xs={12} md={6}>
-              <FormControl fullWidth error={!!errors.nombre}>
-                <InputLabel id="nombre-label">Nombre</InputLabel>
-                <Select
-                  labelId="nombre-label"
-                  name="nombre"
-                  value={formData.nombre}
-                  onChange={handleChange}
-                  label="Nombre"
-                >
-                  <MenuItem value="Flujo Tigo">Flujo Tigo</MenuItem>
-                  <MenuItem value="Flujo Claro">Flujo Claro</MenuItem>
-                </Select>
-                {errors.nombre && (
-                  <Typography variant="caption" color="error">
-                    {errors.nombre}
-                  </Typography>
-                )}
-              </FormControl>
+              <TextField
+                fullWidth
+                label="Nombre"
+                name="nombre"
+                value={formData.nombre}
+                disabled
+                InputProps={{
+                  readOnly: true,
+                }}
+                error={!!errors.nombre}
+                helperText={errors.nombre || 'Este campo se completa automáticamente según la línea telefónica'}
+              />
             </Grid>
             <Grid item xs={12} md={4}>
               <TextField
