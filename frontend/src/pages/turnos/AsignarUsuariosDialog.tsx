@@ -35,10 +35,31 @@ const AsignarUsuariosDialog: React.FC<AsignarUsuariosDialogProps> = ({ open, onC
   const queryClient = useQueryClient();
 
   // Consulta para obtener los usuarios
-  const { data: users, isLoading: isLoadingUsers } = useQuery({
+  const { data: usersData, isLoading: isLoadingUsers } = useQuery({
     queryKey: ['users'],
     queryFn: usersApi.getAll,
   });
+
+  // Deduplicate users by ID to prevent duplicate keys
+  const users = React.useMemo(() => {
+    if (!usersData) return [];
+    
+    // Use Map to ensure unique IDs more efficiently
+    const uniqueUsersMap = new Map();
+    usersData.forEach(user => {
+      if (user && user.id !== undefined && user.id !== null) {
+        uniqueUsersMap.set(user.id, user);
+      }
+    });
+    
+    const uniqueUsers = Array.from(uniqueUsersMap.values());
+    console.log('[ASIGNAR USUARIOS] Datos originales:', usersData.length);
+    console.log('[ASIGNAR USUARIOS] Usuarios únicos después de deduplicación:', uniqueUsers.length);
+    console.log('[ASIGNAR USUARIOS] IDs únicos:', uniqueUsers.map(u => u.id));
+    console.log('[ASIGNAR USUARIOS] Usuarios completos:', uniqueUsers.map(u => ({ id: u.id, nombre: u.nombre, apellido: u.apellido, username: u.username })));
+    
+    return uniqueUsers;
+  }, [usersData]);
 
   // Cargar los usuarios ya asignados cuando se abre el diálogo
   useEffect(() => {
@@ -48,8 +69,12 @@ const AsignarUsuariosDialog: React.FC<AsignarUsuariosDialogProps> = ({ open, onC
         .map(u => toValidId(u.id))
         .filter((id): id is number => id !== undefined);
       
+      // Deduplicate selected user IDs as well
+      const uniqueValidUserIds = Array.from(new Set(validUserIds));
+      
       console.log('[ASIGNAR USUARIOS] IDs de usuarios cargados:', validUserIds);
-      setSelectedUsuarios(validUserIds);
+      console.log('[ASIGNAR USUARIOS] IDs únicos seleccionados:', uniqueValidUserIds);
+      setSelectedUsuarios(uniqueValidUserIds);
     } else {
       setSelectedUsuarios([]);
     }
@@ -86,22 +111,33 @@ const AsignarUsuariosDialog: React.FC<AsignarUsuariosDialogProps> = ({ open, onC
 
   const handleChange = (event: any) => {
     const value = event.target.value;
-    // Validar que los IDs seleccionados sean números válidos
+    console.log('[HANDLE CHANGE] Raw value received:', value, 'Type:', typeof value);
+    
+    // Material UI sends the actual selected values, not what was clicked
+    // So we need to directly use what Material UI gives us
     let selectedIds: number[] = [];
     
-    if (typeof value === 'string') {
-      // Si es un string, convertir a array de números y validar cada uno
-      selectedIds = value.split(',')
-        .map(id => toValidId(id))
-        .filter((id): id is number => id !== undefined);
-    } else if (Array.isArray(value)) {
-      // Si es un array, validar cada elemento
-      selectedIds = value
-        .map(id => toValidId(id))
-        .filter((id): id is number => id !== undefined);
+    if (Array.isArray(value)) {
+      // Count occurrences to detect if user is trying to remove
+      const counts = new Map<number, number>();
+      value.forEach(id => {
+        const numId = Number(id);
+        if (!isNaN(numId)) {
+          counts.set(numId, (counts.get(numId) || 0) + 1);
+        }
+      });
+      
+      // If a value appears more than once, user is trying to remove it
+      // Keep only values that appear exactly once
+      selectedIds = Array.from(counts.entries())
+        .filter(([_, count]) => count === 1)
+        .map(([id, _]) => id);
     }
     
-    console.log('[ASIGNAR USUARIOS] IDs seleccionados:', selectedIds);
+    console.log('[HANDLE CHANGE] IDs procesados:', selectedIds);
+    console.log('[HANDLE CHANGE] Estado anterior:', selectedUsuarios);
+    console.log('[HANDLE CHANGE] Nuevo estado:', selectedIds);
+    
     setSelectedUsuarios(selectedIds);
   };
 
@@ -152,20 +188,60 @@ const AsignarUsuariosDialog: React.FC<AsignarUsuariosDialogProps> = ({ open, onC
                 value={selectedUsuarios}
                 onChange={handleChange}
                 input={<OutlinedInput label="Usuarios" />}
-                renderValue={(selected) => (
-                  <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
-                    {selected.map((value) => {
-                      const user = users?.find(u => u.id === value);
-                      return (
-                        <Chip 
-                          key={value} 
-                          label={user ? `${user.nombre} ${user.apellido || ''}` : `Usuario ${value}`} 
-                          size="small"
-                        />
-                      );
-                    })}
-                  </Box>
-                )}
+                renderValue={(selected) => {
+                  console.log('[RENDER VALUE] Selected values:', selected);
+                  console.log('[RENDER VALUE] Available users:', users?.map(u => ({ id: u.id, nombre: u.nombre, apellido: u.apellido })));
+                  
+                  return (
+                    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                      {selected.map((value) => {
+                        // Convert both to numbers for comparison
+                        const user = users?.find(u => Number(u.id) === Number(value));
+                        console.log(`[RENDER VALUE] ID: ${value} (${typeof value}), User found:`, user);
+                        
+                        let displayName = `Usuario ${value}`;
+                        if (user) {
+                          console.log(`[RENDER VALUE] User object keys:`, Object.keys(user));
+                          console.log(`[RENDER VALUE] User object:`, user);
+                          
+                          // Try different possible field names
+                          const firstName = user.nombre || user.name || user.first_name || '';
+                          const lastName = user.apellido || user.lastname || user.last_name || '';
+                          const fullName = `${firstName}${lastName ? ` ${lastName}` : ''}`.trim();
+                          
+                          displayName = fullName || user.username || `Usuario ${value}`;
+                          console.log(`[RENDER VALUE] Display name for ${value}:`, displayName);
+                        }
+                        
+                        return (
+                          <Chip 
+                            key={value} 
+                            label={displayName}
+                            size="small"
+                            onDelete={() => {
+                              const newSelected = selectedUsuarios.filter(id => Number(id) !== Number(value));
+                              console.log(`[CHIP DELETE] Eliminando usuario ${value} (${typeof value})`);
+                              console.log(`[CHIP DELETE] Estado anterior:`, selectedUsuarios);
+                              console.log(`[CHIP DELETE] Nuevo estado:`, newSelected);
+                              setSelectedUsuarios(newSelected);
+                            }}
+                            sx={{ 
+                              backgroundColor: '#e3f2fd',
+                              color: '#1976d2',
+                              fontWeight: 500,
+                              '& .MuiChip-deleteIcon': {
+                                color: '#1976d2',
+                                '&:hover': {
+                                  color: '#d32f2f'
+                                }
+                              }
+                            }}
+                          />
+                        );
+                      })}
+                    </Box>
+                  );
+                }}
                 MenuProps={{
                   PaperProps: {
                     style: {
@@ -174,15 +250,21 @@ const AsignarUsuariosDialog: React.FC<AsignarUsuariosDialogProps> = ({ open, onC
                   },
                 }}
               >
-                {users?.map((user) => (
-                  <MenuItem key={user.id} value={user.id}>
-                    <Checkbox checked={selectedUsuarios.indexOf(user.id) > -1} />
-                    <ListItemText 
-                      primary={`${user.nombre} ${user.apellido || ''}`} 
-                      secondary={user.username} 
-                    />
-                  </MenuItem>
-                ))}
+                {users?.map((user) => {
+                  // Convert both to numbers for consistent comparison
+                  const isChecked = selectedUsuarios.some(selectedId => Number(selectedId) === Number(user.id));
+                  console.log(`[CHECKBOX] User ${user.id} (${user.nombre}), Selected IDs:`, selectedUsuarios, 'Is checked:', isChecked);
+                  
+                  return (
+                    <MenuItem key={user.id} value={user.id}>
+                      <Checkbox checked={isChecked} />
+                      <ListItemText 
+                        primary={`${user.nombre} ${user.apellido || ''}`} 
+                        secondary={user.username} 
+                      />
+                    </MenuItem>
+                  );
+                })}
               </Select>
             </FormControl>
           </>

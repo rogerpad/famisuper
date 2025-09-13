@@ -1,39 +1,55 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { Snackbar, Alert } from '@mui/material';
 import turnosApi, { Turno } from '../api/turnos/turnosApi';
+import usuariosTurnosApi, { UsuarioTurno } from '../api/turnos/usuarios-turnos';
 import { useAuth } from './AuthContext';
-import { isValidId, toValidId } from '../utils/idValidation';
+import { isValidId, toValidId } from '../utils/validationUtils';
 
 // Usamos la interfaz Turno importada de turnosApi
 
 interface TurnoContextType {
   turnoActual: Turno | null;
+  turnosActivos: UsuarioTurno[];
   loading: boolean;
   error: string | null;
   refetchTurno: () => void;
   notificacionVisible: boolean;
   tiempoRestante: number;
   cerrarNotificacion: () => void;
+  tieneTurnoActivo: boolean;
+  operacionActiva: 'agente' | 'super' | null;
+  setOperacionActiva: (operacion: 'agente' | 'super' | null) => void;
 }
 
 const TurnoContext = createContext<TurnoContextType>({
   turnoActual: null,
+  turnosActivos: [],
   loading: false,
   error: null,
   refetchTurno: () => {},
   notificacionVisible: false,
   tiempoRestante: 0,
-  cerrarNotificacion: () => {}
+  cerrarNotificacion: () => {},
+  tieneTurnoActivo: false,
+  operacionActiva: null,
+  setOperacionActiva: () => {}
 });
 
 export const useTurno = () => useContext(TurnoContext);
 
 export const TurnoProvider: React.FC<{children: React.ReactNode}> = ({ children }) => {
   const [turnoActual, setTurnoActual] = useState<Turno | null>(null);
+  const [turnosActivos, setTurnosActivos] = useState<UsuarioTurno[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [notificacionVisible, setNotificacionVisible] = useState<boolean>(false);
   const [tiempoRestante, setTiempoRestante] = useState<number>(0);
+  const [tieneTurnoActivo, setTieneTurnoActivo] = useState<boolean>(false);
+  const [operacionActiva, setOperacionActiva] = useState<'agente' | 'super' | null>(() => {
+    // Recuperar la operación activa del localStorage al inicializar
+    const savedOperacion = localStorage.getItem('operacionActiva');
+    return savedOperacion as 'agente' | 'super' | null;
+  });
 
   // Función para cerrar la notificación
   const cerrarNotificacion = () => {
@@ -80,6 +96,8 @@ export const TurnoProvider: React.FC<{children: React.ReactNode}> = ({ children 
     if (!token) {
       // Si no hay token, no hacemos la petición para evitar errores 401
       setTurnoActual(null);
+      setTurnosActivos([]);
+      setTieneTurnoActivo(false);
       setLoading(false);
       return;
     }
@@ -95,37 +113,93 @@ export const TurnoProvider: React.FC<{children: React.ReactNode}> = ({ children 
     setError(null);
     
     try {
-      // Si el usuario tiene un turno asignado, lo usamos
-      if (authState.user?.turno) {
-        // Validar que el turno tenga un ID válido
-        const turno = authState.user.turno;
-        
-        if (isValidId(turno.id)) {
-          console.log(`[TURNO_CONTEXT] Usuario tiene turno asignado con ID válido: ${turno.id}`);
-          setTurnoActual(turno);
-        } else {
-          console.error(`[TURNO_CONTEXT] Usuario tiene turno con ID inválido: ${turno.id}`);
-          // Intentar corregir el ID si es posible
-          const validId = toValidId(turno.id);
-          if (validId) {
-            turno.id = validId;
-            setTurnoActual(turno);
-            console.log(`[TURNO_CONTEXT] ID de turno corregido a: ${validId}`);
+      // Obtener los turnos activos del usuario usando la nueva tabla tbl_usuarios_turnos
+      if (authState.user?.id) {
+        try {
+          const usuarioTurnos = await usuariosTurnosApi.getTurnosActivosPorUsuario(authState.user.id);
+          console.log(`[TURNO_CONTEXT] Turnos activos encontrados para el usuario: ${usuarioTurnos.length}`);
+          // Usar el operador de propagación para crear un nuevo array y evitar problemas de tipo
+          setTurnosActivos([...usuarioTurnos]);
+          setTieneTurnoActivo(usuarioTurnos.length > 0);
+          
+          // Si hay turnos activos, detectar automáticamente la operación activa
+          if (usuarioTurnos.length > 0) {
+            const usuarioTurno = usuarioTurnos[0];
+            
+            // Detectar operación activa basándose en los campos agente/super
+            let operacionDetectada: 'agente' | 'super' | null = null;
+            if (usuarioTurno.agente) {
+              operacionDetectada = 'agente';
+            } else if (usuarioTurno.super) {
+              operacionDetectada = 'super';
+            }
+            
+            // Solo actualizar si hay una operación detectada y es diferente a la actual
+            if (operacionDetectada && operacionDetectada !== operacionActiva) {
+              console.log(`[TURNO_CONTEXT] Operación activa detectada desde BD: ${operacionDetectada}`);
+              setOperacionActiva(operacionDetectada);
+              localStorage.setItem('operacionActiva', operacionDetectada);
+            }
+            
+            // Obtener el detalle del turno
+            if (usuarioTurno.turnoId) {
+              try {
+                const turnoDetalle = await turnosApi.getById(usuarioTurno.turnoId);
+                setTurnoActual(turnoDetalle);
+                console.log(`[TURNO_CONTEXT] Turno actual establecido desde usuario-turno: ${turnoDetalle.id}`);
+              } catch (detailError) {
+                console.error('[TURNO_CONTEXT] Error al obtener detalle del turno:', detailError);
+              }
+            }
           } else {
-            // Si no se puede corregir, buscar un turno activo
-            console.log(`[TURNO_CONTEXT] Buscando turno activo alternativo...`);
-            await buscarTurnoActivo();
+            // Si no hay turnos activos, limpiar la operación activa
+            if (operacionActiva) {
+              console.log('[TURNO_CONTEXT] No hay turnos activos, limpiando operación activa');
+              setOperacionActiva(null);
+              localStorage.removeItem('operacionActiva');
+            }
           }
+        } catch (turnosActivosError) {
+          console.error('[TURNO_CONTEXT] Error al obtener turnos activos:', turnosActivosError);
         }
-      } else {
-        // Si no tiene turno asignado, buscamos cualquier turno activo
-        await buscarTurnoActivo();
+      }
+      
+      // Si no se encontraron turnos activos en tbl_usuarios_turnos, usar el método anterior
+      if (turnosActivos.length === 0) {
+        // Si el usuario tiene un turno asignado, lo usamos
+        if (authState.user?.turno) {
+          // Validar que el turno tenga un ID válido
+          const turno = authState.user.turno;
+          
+          if (isValidId(turno.id)) {
+            console.log(`[TURNO_CONTEXT] Usuario tiene turno asignado con ID válido: ${turno.id}`);
+            setTurnoActual(turno);
+          } else {
+            console.error(`[TURNO_CONTEXT] Usuario tiene turno con ID inválido: ${turno.id}`);
+            // Intentar corregir el ID si es posible
+            const validId = toValidId(turno.id);
+            if (validId) {
+              turno.id = validId;
+              setTurnoActual(turno);
+              console.log(`[TURNO_CONTEXT] ID de turno corregido a: ${validId}`);
+            } else {
+              // Si no se puede corregir, buscar un turno activo
+              console.log(`[TURNO_CONTEXT] Buscando turno activo alternativo...`);
+              await buscarTurnoActivo();
+            }
+          }
+        } else {
+          // Si no tiene turno asignado, buscamos cualquier turno activo
+          await buscarTurnoActivo();
+        }
       }
     } catch (err: any) {
       // Evitamos mostrar errores 401 en la consola
       if (err?.response?.status === 401) {
         // Silenciosamente manejamos el error de autenticación
         setTurnoActual(null);
+        setTurnosActivos([]);
+        setTieneTurnoActivo(false);
       } else {
         console.error('[TURNO_CONTEXT] Error al obtener el turno actual:', err);
         setError('No se pudo obtener el turno actual');
@@ -197,12 +271,24 @@ export const TurnoProvider: React.FC<{children: React.ReactNode}> = ({ children 
       <TurnoContext.Provider 
         value={{ 
           turnoActual, 
+          turnosActivos,
           loading, 
           error, 
           refetchTurno: fetchTurnoActual,
           notificacionVisible,
           tiempoRestante,
-          cerrarNotificacion
+          cerrarNotificacion,
+          tieneTurnoActivo,
+          operacionActiva,
+          setOperacionActiva: (operacion: 'agente' | 'super' | null) => {
+            setOperacionActiva(operacion);
+            // Persistir en localStorage
+            if (operacion) {
+              localStorage.setItem('operacionActiva', operacion);
+            } else {
+              localStorage.removeItem('operacionActiva');
+            }
+          }
         }}
       >
         {children}

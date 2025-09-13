@@ -17,6 +17,20 @@ export interface Turno {
   usuarios?: Usuario[];
   creadoEn?: Date;
   actualizadoEn?: Date;
+  // Propiedad adicional para manejar el ID de asignación en tbl_usuarios_turnos
+  asignacionId?: number;
+}
+
+export interface UsuarioTurno {
+  id: number;
+  usuarioId: number;
+  turnoId: number;
+  fechaAsignacion: Date;
+  horaInicioReal: string | null;
+  horaFinReal: string | null;
+  activo: boolean;
+  usuario?: Usuario;
+  turno?: Turno;
 }
 
 export interface Usuario {
@@ -116,6 +130,28 @@ const turnosApi = {
       console.error(`[TURNOS API] Error al obtener turnos por usuario ID ${validUsuarioId}:`, error);
       throw new Error(`Error al obtener turnos: ${error.message || 'Error desconocido'}`);
     }
+  },
+
+  // Obtener turnos activos por usuario
+  getTurnosActivosPorUsuario: async (usuarioId: number): Promise<UsuarioTurno[]> => {
+    console.log(`[TURNOS_API] Obteniendo turnos activos para usuario ID: ${usuarioId}`);
+    
+    if (!usuarioId || isNaN(Number(usuarioId))) {
+      throw new Error(`ID de usuario inválido: ${usuarioId}`);
+    }
+    
+    const response = await api.get(`/turnos/usuario/${usuarioId}/turnos-activos`);
+    return response.data;
+  },
+
+  // Obtener operaciones en uso
+  getOperacionesEnUso: async (): Promise<{
+    operacionAgente: { enUso: boolean; usuario?: any };
+    operacionSuper: { enUso: boolean; usuario?: any };
+  }> => {
+    console.log(`[TURNOS_API] Obteniendo estado de operaciones en uso`);
+    const response = await api.get('/turnos/operaciones-en-uso');
+    return response.data;
   },
 
   // Crear un nuevo turno
@@ -394,7 +430,10 @@ const turnosApi = {
   },
 
   // Iniciar un turno como vendedor (actualizar la hora de inicio con la hora actual)
-  iniciarTurnoVendedor: async (id: number | string): Promise<Turno> => {
+  iniciarTurnoVendedor: async (
+    id: number | string,
+    operationType?: { agente: boolean; super: boolean }
+  ): Promise<UsuarioTurno | Turno> => {
     // Validar el ID del turno
     const validId = toValidId(id);
     
@@ -409,16 +448,52 @@ const turnosApi = {
     
     try {
       console.log(`[TURNOS API] Iniciando turno como vendedor con ID validado: ${validId}`);
-      const response = await api.patch(`/turnos/${validId}/iniciar-vendedor`, {});
+      if (operationType) {
+        console.log(`[TURNOS API] Tipo de operación: Agente=${operationType.agente}, Super=${operationType.super}`);
+      }
+      
+      // Enviar los parámetros de tipo de operación si se proporcionan
+      const response = await api.patch(`/turnos/${validId}/iniciar-vendedor`, operationType || {});
+      
+      // Verificar si el usuario tiene rol de vendedor
+      // La respuesta puede ser un objeto UsuarioTurno o un objeto Turno dependiendo del rol
       return response.data;
     } catch (error: any) {
       console.error(`[TURNOS API] Error al iniciar turno como vendedor ID ${validId}:`, error);
+      
+      // Verificar si el error es porque el usuario ya tiene un turno activo
+      if (error.response?.data?.message?.includes('ya tiene un turno activo')) {
+        throw new Error(`Ya tienes un turno activo. Debes finalizar el turno actual antes de iniciar uno nuevo.`);
+      }
+      
       throw new Error(`Error al iniciar turno como vendedor: ${error.message || 'Error desconocido'}`);
+    }
+  },
+  
+  // Verificar si el usuario tiene un turno activo
+  verificarTurnoActivo: async (usuarioId: number | string): Promise<boolean> => {
+    // Validar el ID del usuario
+    const validId = toValidId(usuarioId);
+    
+    if (validId === undefined) {
+      console.error(`[TURNOS API] ID de usuario inválido para verificarTurnoActivo: ${usuarioId}`);
+      throw new Error(`ID de usuario inválido: ${usuarioId}`);
+    }
+    
+    try {
+      console.log(`[TURNOS API] Verificando si el usuario ${validId} tiene un turno activo`);
+      const response = await api.get(`/turnos/usuario/${validId}/turnos-activos`);
+      
+      // Si hay al menos un turno activo, devolver true
+      return Array.isArray(response.data) && response.data.length > 0;
+    } catch (error: any) {
+      console.error(`[TURNOS API] Error al verificar turno activo para usuario ${validId}:`, error);
+      return false; // En caso de error, asumir que no hay turno activo
     }
   },
 
   // Finalizar un turno como vendedor (actualizar la hora de fin con la hora actual)
-  finalizarTurnoVendedor: async (id: number | string): Promise<Turno> => {
+  finalizarTurnoVendedor: async (id: number | string): Promise<UsuarioTurno | Turno> => {
     // Validar el ID del turno
     const validId = toValidId(id);
     
@@ -442,7 +517,7 @@ const turnosApi = {
   },
 
   // Reiniciar un turno (eliminar hora de inicio y fin)
-  reiniciarTurno: async (id: number | string): Promise<Turno> => {
+  reiniciarTurno: async (id: number | string): Promise<UsuarioTurno | Turno> => {
     // Validar el ID del turno
     const validId = toValidId(id);
     

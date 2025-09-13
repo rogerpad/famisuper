@@ -287,6 +287,37 @@ function App() {
                   </ProtectedRoute>
                 } />
                 
+                {/* Rutas para Administración Super */}
+                <Route path="/admin-tipos-egresos" element={
+                  <ProtectedRoute requiredPermission="admin_tipos_egresos_super">
+                    <SuperExpenseTypesList />
+                  </ProtectedRoute>
+                } />
+                
+                <Route path="/admin-documentos-pago" element={
+                  <ProtectedRoute requiredPermission="admin_documentos_pago">
+                    <PaymentDocumentsList />
+                  </ProtectedRoute>
+                } />
+                
+                <Route path="/admin-forma-pago" element={
+                  <ProtectedRoute requiredPermission="admin_forma_pago">
+                    <PaymentMethodsList />
+                  </ProtectedRoute>
+                } />
+                
+                <Route path="/gestion-lineas" element={
+                  <ProtectedRoute requiredPermission="admin_lineas_telefonicas">
+                    <PhoneLinesList />
+                  </ProtectedRoute>
+                } />
+                
+                <Route path="/admin-paquetes" element={
+                  <ProtectedRoute requiredPermission="admin_paquetes">
+                    <PackagesList />
+                  </ProtectedRoute>
+                } />
+                
                 {/* Ruta para documentos de pago */}
                 <Route path="/payment-documents" element={
                   <ProtectedRoute requiredPermission="ver_documento_pago">

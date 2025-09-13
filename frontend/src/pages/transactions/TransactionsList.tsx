@@ -96,14 +96,7 @@ const TransactionsList: React.FC<{}> = () => {
       return;
     }
     
-    // Si es una nueva transacción, verificar si hay un turno activo
-    if (!turnoActual) {
-      console.log('[TRANSACTIONS_LIST] No hay turno activo. No se puede crear una nueva transacción.');
-      setShowNoTurnoAlert(true);
-      return;
-    }
-    
-    // Si hay turno activo, permitir crear la transacción
+    // Permitir crear nueva transacción sin restricción de turno
     setEditingTransaction(null);
     setOpenForm(true);
   };
@@ -306,20 +299,15 @@ const TransactionsList: React.FC<{}> = () => {
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
         <Typography variant="h5">Transacciones</Typography>
         <Box>
-          <Tooltip title={!turnoActual ? "Debe activar un turno para crear transacciones" : "Crear nueva transacción"}>
-            <span>
-              <Button 
-                variant="contained" 
-                color="primary" 
-                startIcon={<AddIcon />}
-                onClick={() => handleOpenForm()}
-                sx={{ mr: 1 }}
-                disabled={!turnoActual}
-              >
-                Nueva Transacción
-              </Button>
-            </span>
-          </Tooltip>
+          <Button 
+            variant="contained" 
+            color="primary" 
+            startIcon={<AddIcon />}
+            onClick={() => handleOpenForm()}
+            sx={{ mr: 1 }}
+          >
+            Nueva Transacción
+          </Button>
           <Button 
             variant="outlined" 
             color="primary" 

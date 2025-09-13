@@ -1,6 +1,9 @@
 import React, { useState, useMemo } from 'react';
 import { Outlet, useNavigate, Link } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '../contexts/AuthContext';
+import { useTurno } from '../contexts/TurnoContext';
+import turnosApi from '../api/turnos/turnosApi';
 import Copyright from '../components/Copyright';
 import TurnoIndicator from '../components/TurnoIndicator';
 import logoImage from '../assets/images/LogoFS.png';
@@ -69,7 +72,15 @@ const MainLayout: React.FC = () => {
     setAnchorEl(null);
   };
 
-  const { state: authState, hasPermission, hasRole, logout } = useAuth();
+  const { state: authState, hasPermission, hasRole, logout, isOperationType } = useAuth();
+  const { turnoActual, operacionActiva, tieneTurnoActivo } = useTurno();
+
+  // Obtener estado de operaciones en uso para filtrar menús
+  const { data: operacionesEnUso } = useQuery({
+    queryKey: ['turnos', 'operaciones-en-uso'],
+    queryFn: turnosApi.getOperacionesEnUso,
+    refetchInterval: 10000, // Actualizar cada 10 segundos para mayor responsividad
+  });
   
   const handleLogout = () => {
     logout();
@@ -101,7 +112,7 @@ const MENU_PERMISSIONS = {
   PAYMENT_METHODS: 'ver_forma_pago',
   ADMIN_PAYMENT_METHODS: 'admin_forma_pago',
   SUPER_EXPENSES: 'ver_egresos_super',
-  ADMIN_SUPER_EXPENSES: 'admin_egresos_super',
+  ADMIN_SUPER_EXPENSES: 'admin_tipos_egresos_super',
   PHONE_LINES: 'admin_lineas_telefonicas',
   BALANCE_FLOWS: 'ver_flujos_saldo',
   ADMIN_BALANCE_FLOWS: 'crear_editar_flujo',
@@ -113,7 +124,10 @@ const MENU_PERMISSIONS = {
   ADICIONALES_PRESTAMOS: 'ver_adic_presta',
   ADMIN_ADICIONALES_PRESTAMOS: 'crear_editar_adic_prest',
   CIERRES_SUPER: 'ver_cierre_super',
-  ADMIN_CIERRES_SUPER: 'crear_editar_cierre_super'
+  ADMIN_CIERRES_SUPER: 'crear_editar_cierre_super',
+  // Permisos específicos para VendedorB
+  MENU_OPERACION_AGENTE: 'ver_menu_operacion_agente',
+  MENU_OPERACION_SUPER: 'ver_menu_operacion_super'
 };
 
 // Definimos los permisos por rol
@@ -133,7 +147,19 @@ const ROLE_PERMISSIONS = {
     MENU_PERMISSIONS.PROVIDERS,
     MENU_PERMISSIONS.DASHBOARD,
     MENU_PERMISSIONS.ADICIONALES_PRESTAMOS,
-    MENU_PERMISSIONS.ADMIN_ADICIONALES_PRESTAMOS
+    MENU_PERMISSIONS.ADMIN_ADICIONALES_PRESTAMOS,
+    // Permisos para Administración Super
+    MENU_PERMISSIONS.ADMIN_SUPER_EXPENSES,
+    MENU_PERMISSIONS.ADMIN_PAYMENT_DOCUMENTS,
+    MENU_PERMISSIONS.ADMIN_PAYMENT_METHODS,
+    MENU_PERMISSIONS.PHONE_LINES,
+    MENU_PERMISSIONS.ADMIN_PACKAGES,
+    // Permisos para Operación de Super
+    MENU_PERMISSIONS.SUPER_EXPENSES,
+    MENU_PERMISSIONS.BALANCE_FLOWS,
+    MENU_PERMISSIONS.BALANCE_SALES,
+    MENU_PERMISSIONS.CONTEO_BILLETES_SUPER,
+    MENU_PERMISSIONS.CIERRES_SUPER
   ],
   VENDEDOR: [
     MENU_PERMISSIONS.VENDEDOR_DASHBOARD,
@@ -152,22 +178,30 @@ const ROLE_PERMISSIONS = {
     MENU_PERMISSIONS.CONTEO_BILLETES_SUPER,
     MENU_PERMISSIONS.CIERRES_SUPER,
     MENU_PERMISSIONS.ADICIONALES_PRESTAMOS
+  ],
+  VENDEDORB: [
+    MENU_PERMISSIONS.MIS_TURNOS,
+    MENU_PERMISSIONS.DASHBOARD,
+    // Los permisos específicos de operación se asignan individualmente según el tipo de VendedorB
+    // Estos permisos se verifican dinámicamente en el filtrado del menú
   ]
 };
 
 // Definir interfaces para los tipos de menú
-interface MenuItem {
+interface MenuItemType {
   text: string;
   icon: React.ReactNode;
   path?: string;
   permissionCode?: string | null;
   isGroup?: boolean;
-  children?: MenuItem[];
+  children?: MenuItemType[];
   showEmpty?: boolean; // Propiedad para indicar si un grupo debe mostrarse aunque esté vacío
+  operationType?: 'agente' | 'super' | 'both'; // Restringir por tipo de operación
+  adminOnly?: boolean; // Solo visible para administradores
 }
 
 // Definimos los elementos del menú con sus permisos requeridos
-const menuItemsConfig: MenuItem[] = [
+const menuItemsConfig: MenuItemType[] = [
   // Menú para Vendedores
   { 
     text: 'Dashboard Vendedor', 
@@ -248,6 +282,7 @@ const menuItemsConfig: MenuItem[] = [
     icon: <BusinessIcon />,
     isGroup: true,
     permissionCode: null, // No requiere permiso específico para ver el grupo
+    operationType: 'agente',
     children: [
       { 
         text: 'Transacciones', 
@@ -303,12 +338,54 @@ const menuItemsConfig: MenuItem[] = [
     ]
   },
   
+  // Grupo de Administración Super - Solo para Administradores
+  {
+    text: 'Administración Super',
+    icon: <SuperUserIcon />,
+    isGroup: true,
+    permissionCode: null, // No requiere permiso específico para ver el grupo
+    adminOnly: true, // Solo visible para administradores
+    children: [
+      { 
+        text: 'Admin Tipos de Egresos', 
+        icon: <ReceiptIcon />, 
+        path: '/admin-tipos-egresos', 
+        permissionCode: MENU_PERMISSIONS.ADMIN_SUPER_EXPENSES 
+      },
+      { 
+        text: 'Admin Documentos de Pago', 
+        icon: <ReceiptIcon />, 
+        path: '/admin-documentos-pago', 
+        permissionCode: MENU_PERMISSIONS.ADMIN_PAYMENT_DOCUMENTS 
+      },
+      { 
+        text: 'Admin Forma de Pago', 
+        icon: <ReceiptIcon />, 
+        path: '/admin-forma-pago', 
+        permissionCode: MENU_PERMISSIONS.ADMIN_PAYMENT_METHODS 
+      },
+      { 
+        text: 'Gestión de Líneas', 
+        icon: <SettingsIcon />, 
+        path: '/gestion-lineas', 
+        permissionCode: MENU_PERMISSIONS.PHONE_LINES 
+      },
+      { 
+        text: 'Admin Paquetes', 
+        icon: <BusinessIcon />, 
+        path: '/admin-paquetes', 
+        permissionCode: MENU_PERMISSIONS.ADMIN_PACKAGES 
+      },
+    ]
+  },
+  
   // Grupo de Operación de Super
   {
     text: 'Operación de Super',
     icon: <SuperUserIcon />,
     isGroup: true,
     permissionCode: null, // No requiere permiso específico para ver el grupo
+    operationType: 'super',
     showEmpty: true, // Propiedad para indicar que se debe mostrar aunque esté vacío
     children: [
       { 
@@ -349,47 +426,6 @@ const menuItemsConfig: MenuItem[] = [
       },
     ]
   },
-  
-  // Grupo de Administración Super
-  {
-    text: 'Administración Super',
-    icon: <SuperUserIcon />,
-    isGroup: true,
-    permissionCode: null, // No requiere permiso específico para ver el grupo
-    showEmpty: true, // Propiedad para indicar que se debe mostrar aunque esté vacío
-    children: [
-      { 
-        text: 'Tipos de Egresos del Super', 
-        icon: <TransactionTypesIcon />, 
-        path: '/super-expense-types', 
-        permissionCode: MENU_PERMISSIONS.SUPER_EXPENSE_TYPES 
-      },
-      { 
-        text: 'Documentos de Pago', 
-        icon: <ReceiptIcon />, 
-        path: '/payment-documents', 
-        permissionCode: MENU_PERMISSIONS.PAYMENT_DOCUMENTS 
-      },
-      { 
-        text: 'Formas de Pago', 
-        icon: <ReceiptIcon />, 
-        path: '/payment-methods', 
-        permissionCode: MENU_PERMISSIONS.PAYMENT_METHODS 
-      },
-      { 
-        text: 'Líneas Telefónicas', 
-        icon: <ReceiptIcon />, 
-        path: '/phone-lines', 
-        permissionCode: MENU_PERMISSIONS.PHONE_LINES 
-      },
-      { 
-        text: 'Paquetes', 
-        icon: <ReceiptIcon />, 
-        path: '/packages', 
-        permissionCode: MENU_PERMISSIONS.PACKAGES 
-      },
-    ]
-  },
 ];
 
   // Estado para controlar qué grupos están expandidos
@@ -402,66 +438,248 @@ const menuItemsConfig: MenuItem[] = [
       [groupName]: !prev[groupName]
     }));
   };
-  
-  // Filtrar el menú según los permisos del usuario
-  const menuItems = useMemo((): MenuItem[] => {
-    if (authState.loading) {
-      console.log('Cargando permisos...');
-      return []; // No mostrar menús mientras se cargan los permisos
-    }
-    
-    const filterByPermission = (items: MenuItem[]): MenuItem[] => {
-      return items.filter(item => {
-        // Si el ítem tiene hijos (es un grupo), filtrar sus hijos
-        if (item.isGroup && item.children) {
-          const filteredChildren: MenuItem[] = filterByPermission(item.children);
-          // Mostrar el grupo si tiene al menos un hijo con permiso O si está marcado para mostrarse vacío
-          return filteredChildren.length > 0 || item.showEmpty === true;
-        }
-        // Para ítems normales, verificar el permiso
-        return !item.permissionCode || hasPermission(item.permissionCode);
-      });
-    };
 
-    // Filtrar los grupos específicos que queremos mostrar para el rol Vendedor
-    const filterVendorGroups = (items: MenuItem[]): MenuItem[] => {
-      return items.filter(item => {
-        // Para elementos no agrupados, verificar si el usuario tiene el permiso
+  // Función para filtrar elementos del menú según permisos y operación activa
+  const filterByPermission = (items: MenuItemType[]): MenuItemType[] => {
+    return items.filter(item => {
+      console.log(`[MENU_FILTER] Evaluando item: ${item.text}`);
+      
+      // Verificar si el usuario es admin
+      const isAdmin = hasRole('Administrador') || hasRole('Admin');
+      const isVendedor = hasRole('Vendedor');
+      console.log(`[MENU_FILTER] Es admin: ${isAdmin}, Es vendedor: ${isVendedor}`);
+
+      // Ocultar menús adminOnly para usuarios no administradores
+      if (item.adminOnly && !isAdmin) {
+        console.log(`[MENU_FILTER] Ocultando menú adminOnly ${item.text} para usuario no admin`);
+        return false;
+      }
+
+      // Para usuarios vendedor y VendedorB, aplicar lógica especial de operación activa
+      if ((isVendedor || hasRole('VendedorB')) && !isAdmin) {
+        if (item.operationType && item.operationType !== 'both') {
+          // Si no hay operación activa, no mostrar ningún menú de operación
+          if (!operacionActiva) {
+            console.log(`[MENU_FILTER] Vendedor/VendedorB sin operación activa - ocultando ${item.text}`);
+            return false;
+          }
+          
+          // Si hay operación activa, solo mostrar el menú correspondiente
+          const operationMatches = item.operationType === operacionActiva;
+          console.log(`[MENU_FILTER] Item: ${item.text}, operationType: ${item.operationType}, operacionActiva: ${operacionActiva}, matches: ${operationMatches}`);
+          if (!operationMatches) return false;
+        }
+      } else if (!isAdmin) {
+        // Para otros roles (no admin, no vendedor), aplicar restricción de operationType original
+        if (item.operationType && item.operationType !== 'both') {
+          const hasOperationType = isOperationType(item.operationType);
+          console.log(`[MENU_FILTER] Verificando operationType ${item.operationType}: ${hasOperationType}`);
+          if (!hasOperationType) return false;
+        }
+      }
+
+      if (item.isGroup) {
+        console.log(`[MENU_FILTER] Item es grupo: ${item.text}`);
+
+        // Lógica especial para grupos de operación (Agentes y Super)
+        if (item.text === 'Operación de Agentes' || item.text === 'Operación de Super') {
+          console.log(`[MENU_FILTER] Procesando grupo de operación: ${item.text}`);
+          
+          // Verificar si la operación está en uso por otro usuario (solo para usuarios no admin)
+          if (!isAdmin) {
+            if (item.text === 'Operación de Agentes' && operacionesEnUso?.operacionAgente.enUso) {
+              const usuarioEnUso = operacionesEnUso.operacionAgente.usuario;
+              const esUsuarioActual = usuarioEnUso && authState.user && usuarioEnUso.id === authState.user.id;
+              if (!esUsuarioActual) {
+                console.log('Operación de Agentes en uso por otro usuario - ocultando menú para Vendedor');
+                return false;
+              }
+            }
+            
+            if (item.text === 'Operación de Super' && operacionesEnUso?.operacionSuper.enUso) {
+              const usuarioEnUso = operacionesEnUso.operacionSuper.usuario;
+              const esUsuarioActual = usuarioEnUso && authState.user && usuarioEnUso.id === authState.user.id;
+              if (!esUsuarioActual) {
+                console.log('Operación de Super en uso por otro usuario - ocultando menú para Vendedor');
+                return false;
+              }
+            }
+          }
+          
+          if (item.children) {
+            const filteredChildren = item.children.filter((child: MenuItemType) => {
+              console.log(`[MENU_FILTER] Evaluando hijo: ${child.text}`);
+              
+              // Para vendedores y VendedorB, aplicar lógica de operación activa
+              if ((isVendedor || hasRole('VendedorB')) && !isAdmin && child.operationType && child.operationType !== 'both') {
+                if (!operacionActiva) return false;
+                const childOperationMatches = child.operationType === operacionActiva;
+                console.log(`[MENU_FILTER] Hijo operationType ${child.operationType} vs activa ${operacionActiva}: ${childOperationMatches}`);
+                if (!childOperationMatches) return false;
+              } else if (!isAdmin && child.operationType && child.operationType !== 'both') {
+                const hasChildOperationType = isOperationType(child.operationType);
+                console.log(`[MENU_FILTER] Hijo operationType ${child.operationType}: ${hasChildOperationType}`);
+                if (!hasChildOperationType) return false;
+              }
+              
+              const hasChildPermission = !child.permissionCode || hasPermission(child.permissionCode);
+              console.log(`[MENU_FILTER] Hijo permiso ${child.permissionCode}: ${hasChildPermission}`);
+              return hasChildPermission;
+            });
+            
+            // Actualizar los hijos filtrados
+            item.children = filteredChildren;
+            console.log(`[MENU_FILTER] Hijos filtrados para ${item.text}: ${filteredChildren.length}`);
+          }
+          
+          // Mostrar el grupo si tiene hijos visibles
+          const shouldShow = item.children && item.children.length > 0;
+          console.log(`[MENU_FILTER] Mostrar grupo ${item.text}: ${shouldShow}`);
+          return shouldShow;
+        }
+        
+        // Para otros grupos, verificar si tienen hijos visibles
+        const hasVisibleChildren = item.children?.some((child: MenuItemType) => {
+          // Aplicar la misma lógica de operación activa para vendedores
+          if (isVendedor && !isAdmin && child.operationType && child.operationType !== 'both') {
+            if (!operacionActiva || child.operationType !== operacionActiva) return false;
+          } else if (!isAdmin && child.operationType && child.operationType !== 'both') {
+            if (!isOperationType(child.operationType)) return false;
+          }
+          return !child.permissionCode || hasPermission(child.permissionCode);
+        });
+        
+        console.log(`[MENU_FILTER] Grupo ${item.text} tiene hijos visibles: ${hasVisibleChildren}`);
+        return hasVisibleChildren || item.showEmpty;
+      }
+
+      // Para items individuales, verificar permisos
+      const hasItemPermission = !item.permissionCode || hasPermission(item.permissionCode);
+      console.log(`[MENU_FILTER] Item ${item.text} permiso: ${hasItemPermission}`);
+      return hasItemPermission;
+    });
+  };
+
+  // Filtrar elementos del menú usando useMemo para optimizar rendimiento
+  const menuItems = useMemo(() => {
+    // Debug: Mostrar información del usuario y permisos
+    console.log('=== DEBUG MENU FILTERING ===');
+    console.log('Usuario actual:', authState.user);
+    console.log('Rol del usuario:', authState.user?.rol?.nombre);
+    console.log('Permisos disponibles:', Object.keys(authState.permissions));
+    console.log('¿Es Admin?:', hasRole('Administrador') || hasRole('Admin'));
+    console.log('¿Es Vendedor?:', hasRole('Vendedor'));
+    console.log('¿Es VendedorB?:', hasRole('VendedorB'));
+    console.log('Turno del usuario:', authState.user?.turno);
+    
+    // Verificar permisos específicos para VendedorB
+    const tienePermisoOperacionAgentes = hasPermission('ver_menu_operacion_agente');
+    const tienePermisoOperacionSuper = hasPermission('ver_menu_operacion_super');
+    
+    console.log('Permisos VendedorB:');
+    console.log(`  ver_menu_operacion_agente: ${tienePermisoOperacionAgentes}`);
+    console.log(`  ver_menu_operacion_super: ${tienePermisoOperacionSuper}`);
+    
+    // Verificar permisos específicos para grupos de operación
+    const operacionAgentesPermisos = [
+      MENU_PERMISSIONS.TRANSACTIONS,
+      MENU_PERMISSIONS.REPORTS,
+      'ver_contador_efectivo',
+      MENU_PERMISSIONS.AGENT_CLOSINGS
+    ];
+    
+    const operacionSuperPermisos = [
+      MENU_PERMISSIONS.SUPER_EXPENSES,
+      MENU_PERMISSIONS.BALANCE_FLOWS,
+      MENU_PERMISSIONS.BALANCE_SALES,
+      MENU_PERMISSIONS.CONTEO_BILLETES_SUPER,
+      MENU_PERMISSIONS.CIERRES_SUPER,
+      MENU_PERMISSIONS.ADICIONALES_PRESTAMOS
+    ];
+    
+    console.log('Permisos para Operación Agentes:');
+    operacionAgentesPermisos.forEach(perm => {
+      console.log(`  ${perm}: ${hasPermission(perm)}`);
+    });
+    
+    console.log('Permisos para Operación Super:');
+    operacionSuperPermisos.forEach(perm => {
+      console.log(`  ${perm}: ${hasPermission(perm)}`);
+    });
+
+    // Lógica específica para VendedorB
+    if (hasRole('VendedorB')) {
+      console.log('Aplicando filtrado específico para VendedorB');
+      
+      const filteredItemsVendedorB = menuItemsConfig.filter(item => {
+        // Para elementos no agrupados, verificar permisos normales
         if (!item.isGroup) {
+          // Incluir específicamente "Mis Turnos" para VendedorB
+          if (item.text === 'Mis Turnos') {
+            return hasPermission(MENU_PERMISSIONS.MIS_TURNOS);
+          }
           return !item.permissionCode || hasPermission(item.permissionCode);
         }
         
-        // Incluir específicamente los grupos "Operación de Agentes" y "Operación de Super"
-        if (item.text === 'Operación de Agentes' || item.text === 'Operación de Super') {
-          // Filtrar los hijos según permisos
-          if (item.children) {
+        // Para grupos, aplicar lógica específica de VendedorB
+        if (item.text === 'Operación de Agentes') {
+          // Solo mostrar si tiene el permiso específico Y tiene turno activo Y la operación no está en uso por otro usuario
+          if (tienePermisoOperacionAgentes && tieneTurnoActivo && item.children) {
+            // Verificar si la operación está en uso por otro usuario (no por el usuario actual)
+            if (operacionesEnUso?.operacionAgente.enUso) {
+              const usuarioEnUso = operacionesEnUso.operacionAgente.usuario;
+              const esUsuarioActual = usuarioEnUso && authState.user && usuarioEnUso.id === authState.user.id;
+              if (!esUsuarioActual) {
+                console.log('Operación de Agentes en uso por otro usuario - ocultando menú para VendedorB');
+                return false;
+              }
+            }
             item.children = item.children.filter(child => 
               !child.permissionCode || hasPermission(child.permissionCode)
             );
+            return item.children.length > 0;
           }
-          // Mostrar el grupo si tiene al menos un hijo con permiso
-          return item.children && item.children.length > 0;
+          return false;
         }
         
-        // Excluir otros grupos
+        if (item.text === 'Operación de Super') {
+          // Solo mostrar si tiene el permiso específico Y tiene turno activo Y la operación no está en uso por otro usuario
+          if (tienePermisoOperacionSuper && tieneTurnoActivo && item.children) {
+            // Verificar si la operación está en uso por otro usuario (no por el usuario actual)
+            if (operacionesEnUso?.operacionSuper.enUso) {
+              const usuarioEnUso = operacionesEnUso.operacionSuper.usuario;
+              const esUsuarioActual = usuarioEnUso && authState.user && usuarioEnUso.id === authState.user.id;
+              if (!esUsuarioActual) {
+                console.log('Operación de Super en uso por otro usuario - ocultando menú para VendedorB');
+                return false;
+              }
+            }
+            item.children = item.children.filter(child => 
+              !child.permissionCode || hasPermission(child.permissionCode)
+            );
+            return item.children.length > 0;
+          }
+          return false;
+        }
+        
+        // Excluir otros grupos para VendedorB
         return false;
       });
-    };
-
-    if (hasRole('Vendedor')) {
-      // Si el usuario tiene el rol de Vendedor, mostrar los menús de vendedor
-      // y los grupos específicos "Operación de Agentes" y "Operación de Super"
-      console.log('Mostrando menú para rol Vendedor');
-      return filterVendorGroups(menuItemsConfig);
-    } else {
-      // Para cualquier otro rol (Admin), filtrar según permisos específicos
-      console.log('Filtrando menús por permisos');
-      return filterByPermission(menuItemsConfig);
+      
+      console.log('Elementos filtrados para VendedorB:', filteredItemsVendedorB.map(item => item.text));
+      return filteredItemsVendedorB;
     }
-  }, [authState.loading, hasPermission, hasRole]);
+    
+    // Filtrar menús usando la función filterByPermission que maneja tanto vendedores como admin
+    console.log('Filtrando menús por permisos y operación activa');
+    console.log('Operación activa actual:', operacionActiva);
+    const filteredItems = filterByPermission(menuItemsConfig);
+    console.log('Elementos de menú filtrados:', filteredItems.map((item: any) => item.text));
+    return filteredItems;
+  }, [authState.loading, hasPermission, hasRole, isOperationType, openGroups, operacionActiva, operacionesEnUso]);
   
   // Renderizar un ítem de menú (puede ser un grupo o un ítem normal)
-  const renderMenuItem = (item: MenuItem) => {
+  const renderMenuItem = (item: MenuItemType) => {
     // Si es un grupo con hijos
     if (item.isGroup && item.children) {
       const isOpen = openGroups[item.text] || false;
@@ -477,7 +695,7 @@ const menuItemsConfig: MenuItem[] = [
           </ListItem>
           <Collapse in={isOpen} timeout="auto" unmountOnExit>
             <List component="div" disablePadding>
-              {item.children.map((child: MenuItem) => (
+              {item.children.map((child: MenuItemType) => (
                 <ListItem 
                   key={child.text} 
                   disablePadding 

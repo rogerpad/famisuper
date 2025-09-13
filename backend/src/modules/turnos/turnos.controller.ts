@@ -1,5 +1,6 @@
 import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, Req, Query, BadRequestException } from '@nestjs/common';
 import { TurnosService } from './turnos.service';
+import { UsuariosTurnosService } from './usuarios-turnos.service';
 import { CreateTurnoDto } from './dto/create-turno.dto';
 import { UpdateTurnoDto } from './dto/update-turno.dto';
 import { IniciarTurnoDto } from './dto/iniciar-turno.dto';
@@ -12,6 +13,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { RegistroActividad } from './entities/registro-actividad.entity';
 import { Turno } from './entities/turno.entity';
+import { UsuarioTurno } from './entities/usuario-turno.entity';
 import { User } from '../users/entities/user.entity';
 
 @Controller('turnos')
@@ -19,12 +21,15 @@ import { User } from '../users/entities/user.entity';
 export class TurnosController {
   constructor(
     private readonly turnosService: TurnosService,
+    private readonly usuariosTurnosService: UsuariosTurnosService,
     @InjectRepository(RegistroActividad)
     private readonly registroActividadRepository: Repository<RegistroActividad>,
     @InjectRepository(Turno)
     private readonly turnoRepository: Repository<Turno>,
     @InjectRepository(User)
-    private readonly userRepository: Repository<User>
+    private readonly userRepository: Repository<User>,
+    @InjectRepository(UsuarioTurno)
+    private readonly usuarioTurnoRepository: Repository<UsuarioTurno>
   ) {}
 
   @Post()
@@ -65,6 +70,18 @@ export class TurnosController {
   @UseGuards(JwtAuthGuard)
   async getTurnosPorUsuario(@Param('usuarioId') usuarioId: string) {
     return this.turnosService.getTurnosPorUsuario(+usuarioId);
+  }
+  
+  @Get('usuario/:usuarioId/turnos-activos')
+  @UseGuards(JwtAuthGuard)
+  async getTurnosActivosPorUsuario(@Param('usuarioId') usuarioId: string) {
+    return this.usuariosTurnosService.getTurnosActivosPorUsuario(+usuarioId);
+  }
+
+  @Get('operaciones-en-uso')
+  @UseGuards(JwtAuthGuard)
+  async getOperacionesEnUso() {
+    return this.usuariosTurnosService.getOperacionesEnUso();
   }
 
   @Get(':id')
@@ -109,34 +126,98 @@ export class TurnosController {
   @Patch(':id/iniciar-vendedor')
   @UseGuards(JwtAuthGuard, PermisosGuard)
   @RequierePermiso('iniciar_turnos')
-  iniciarTurnoVendedor(
+  async iniciarTurnoVendedor(
     @Req() req,
-    @Param('id') id: string
+    @Param('id') id: string,
+    @Body() operationData?: { agente: boolean; super: boolean }
   ) {
-    const userId = req.user.id;
-    return this.turnosService.iniciarTurnoVendedor(+id, userId);
+    console.log(`[TURNOS_CONTROLLER] Iniciando turno ID: ${id} para vendedor ID: ${req.user.id}`);
+    if (operationData) {
+      console.log(`[TURNOS_CONTROLLER] Tipo de operación recibido: Agente=${operationData.agente}, Super=${operationData.super}`);
+    }
+    
+    // Verificar si el usuario tiene rol de vendedor
+    const user = await this.userRepository.findOne({
+      where: { id: req.user.id },
+      relations: ['rol']
+    });
+    
+    if (!user) {
+      throw new BadRequestException(`Usuario con ID ${req.user.id} no encontrado`);
+    }
+    
+    // Verificar si el usuario tiene rol de vendedor o vendedorB
+    const esVendedor = user.rol && (user.rol.nombre === 'Vendedor' || user.rol.nombre === 'VendedorB');
+    if (!esVendedor) {
+      console.log(`[TURNOS_CONTROLLER] El usuario ${user.nombre} no tiene rol de vendedor o vendedorB`);
+      // Si no es vendedor ni vendedorB, usar el método original
+      return this.turnosService.iniciarTurnoVendedor(+id, req.user.id);
+    }
+    
+    // Si es vendedor, usar el nuevo método que actualiza tbl_usuarios_turnos
+    return this.usuariosTurnosService.iniciarTurnoVendedor(req.user.id, +id, operationData);
   }
 
   @Patch(':id/finalizar-vendedor')
   @UseGuards(JwtAuthGuard, PermisosGuard)
   @RequierePermiso('finalizar_turnos')
-  finalizarTurnoVendedor(
+  async finalizarTurnoVendedor(
     @Req() req,
     @Param('id') id: string
   ) {
-    const userId = req.user.id;
-    return this.turnosService.finalizarTurnoVendedor(+id, userId);
+    console.log(`[TURNOS_CONTROLLER] Finalizando turno ID: ${id} para vendedor ID: ${req.user.id}`);
+    
+    // Verificar si el usuario tiene rol de vendedor
+    const user = await this.userRepository.findOne({
+      where: { id: req.user.id },
+      relations: ['rol']
+    });
+    
+    if (!user) {
+      throw new BadRequestException(`Usuario con ID ${req.user.id} no encontrado`);
+    }
+    
+    // Verificar si el usuario tiene rol de vendedor o vendedorB
+    const esVendedor = user.rol && (user.rol.nombre === 'Vendedor' || user.rol.nombre === 'VendedorB');
+    if (!esVendedor) {
+      console.log(`[TURNOS_CONTROLLER] El usuario ${user.nombre} no tiene rol de vendedor o vendedorB`);
+      // Si no es vendedor ni vendedorB, usar el método original
+      return this.turnosService.finalizarTurnoVendedor(+id, req.user.id);
+    }
+    
+    // Si es vendedor, usar el nuevo método que actualiza tbl_usuarios_turnos
+    return this.usuariosTurnosService.finalizarTurnoVendedor(req.user.id, +id);
   }
 
   @Patch(':id/reiniciar')
   @UseGuards(JwtAuthGuard, PermisosGuard)
   @RequierePermiso('reiniciar_turnos')
-  reiniciarTurno(
+  async reiniciarTurno(
     @Req() req,
     @Param('id') id: string
   ) {
-    const userId = req.user.id;
-    return this.turnosService.reiniciarTurno(+id, userId);
+    console.log(`[TURNOS_CONTROLLER] Reiniciando turno ID: ${id} para usuario ID: ${req.user.id}`);
+    
+    // Verificar si el usuario tiene rol de vendedor
+    const user = await this.userRepository.findOne({
+      where: { id: req.user.id },
+      relations: ['rol']
+    });
+    
+    if (!user) {
+      throw new BadRequestException(`Usuario con ID ${req.user.id} no encontrado`);
+    }
+    
+    // Verificar si el usuario tiene rol de vendedor o vendedorB
+    const esVendedor = user.rol && (user.rol.nombre === 'Vendedor' || user.rol.nombre === 'VendedorB');
+    if (!esVendedor) {
+      console.log(`[TURNOS_CONTROLLER] El usuario ${user.nombre} no tiene rol de vendedor o vendedorB`);
+      // Si no es vendedor ni vendedorB, usar el método original
+      return this.turnosService.reiniciarTurno(+id, req.user.id);
+    }
+    
+    // Si es vendedor, usar el nuevo método que actualiza tbl_usuarios_turnos
+    return this.usuariosTurnosService.reiniciarTurnoVendedor(req.user.id, +id);
   }
 
   @Get('verificar-registros-actividad')

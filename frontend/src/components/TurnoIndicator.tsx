@@ -1,13 +1,25 @@
 import React from 'react';
-import { Box, Chip, Typography, Tooltip } from '@mui/material';
-import { Schedule as ScheduleIcon } from '@mui/icons-material';
+import { Box, Chip, Typography, Tooltip, Badge } from '@mui/material';
+import { Schedule as ScheduleIcon, Person as PersonIcon } from '@mui/icons-material';
 import { useTurno } from '../contexts/TurnoContext';
+
+// Formatear las horas para mostrar
+const formatHora = (horaString: string | undefined) => {
+  if (!horaString) return 'N/A';
+  try {
+    const [horas, minutos] = horaString.split(':');
+    return `${horas}:${minutos}`;
+  } catch (err) {
+    console.error('Error al formatear hora:', err);
+    return 'N/A';
+  }
+};
 
 const TurnoIndicator: React.FC = () => {
   // Agregar log para depuración
   console.log('Renderizando TurnoIndicator');
-  const { turnoActual, loading } = useTurno();
-  console.log('Estado del turno:', { turnoActual, loading });
+  const { turnoActual, turnosActivos, loading, tieneTurnoActivo } = useTurno();
+  console.log('Estado del turno:', { turnoActual, turnosActivos, loading, tieneTurnoActivo });
 
   if (loading) {
     return (
@@ -24,6 +36,40 @@ const TurnoIndicator: React.FC = () => {
         <ScheduleIcon sx={{ color: '#1976d2', mr: 1 }} />
         <Typography variant="body2" sx={{ fontWeight: 'bold', color: '#1976d2' }}>
           Cargando turno...
+        </Typography>
+      </Box>
+    );
+  }
+
+  // Si hay turnos activos en tbl_usuarios_turnos pero no hay turno actual
+  if (tieneTurnoActivo && !turnoActual) {
+    // Obtener el nombre del primer turno activo si existe
+    const nombreTurno = turnosActivos && turnosActivos.length > 0 && turnosActivos[0].turno ? 
+      turnosActivos[0].turno.nombre : 'Turno';
+    
+    // Obtener las horas de inicio y fin si existen
+    const horaInicio = turnosActivos && turnosActivos.length > 0 ? 
+      turnosActivos[0].horaInicioReal : null;
+    const horaFin = turnosActivos && turnosActivos.length > 0 ? 
+      turnosActivos[0].horaFinReal : null;
+    
+    // Determinar colores basados en el nombre del turno
+    const textColor = '#e65100'; // Color naranja por defecto para este caso
+    
+    return (
+      <Box sx={{ 
+        display: 'flex', 
+        alignItems: 'center', 
+        ml: 2, 
+        border: '2px solid #ff9800', 
+        borderRadius: '8px', 
+        padding: '6px 12px', 
+        backgroundColor: '#fff3e0',
+        boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+      }}>
+        <ScheduleIcon sx={{ color: textColor, mr: 1 }} />
+        <Typography variant="body2" sx={{ fontWeight: 'bold', color: textColor }}>
+          {nombreTurno}: {formatHora(horaInicio || undefined)} - {horaFin ? formatHora(horaFin) : 'En curso'}
         </Typography>
       </Box>
     );
@@ -49,18 +95,6 @@ const TurnoIndicator: React.FC = () => {
       </Box>
     );
   }
-
-  // Formatear las horas para mostrar
-  const formatHora = (horaString: string | undefined) => {
-    if (!horaString) return 'N/A';
-    try {
-      const [horas, minutos] = horaString.split(':');
-      return `${horas}:${minutos}`;
-    } catch (err) {
-      console.error('Error al formatear hora:', err);
-      return 'N/A';
-    }
-  };
 
   // Determinar color según el turno
   const getColorByTurno = (nombreTurno: string) => {

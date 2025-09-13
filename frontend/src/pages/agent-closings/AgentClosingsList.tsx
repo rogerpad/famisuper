@@ -132,13 +132,7 @@ const AgentClosingsList = () => {
 
   // Manejadores de eventos
   const handleAddClick = () => {
-    // Verificar si hay un turno activo
-    if (!turnoActual) {
-      console.log('[AGENT_CLOSINGS_LIST] No hay turno activo. No se puede crear un nuevo cierre.');
-      setShowNoTurnoAlert(true);
-      return;
-    }
-    
+    // Permitir crear cierre sin restricción de turno
     navigate('/agent-closings/new');
   };
 
@@ -351,29 +345,20 @@ const AgentClosingsList = () => {
               Finalizar Turno
             </Button>
           )}
-          <Tooltip title={!turnoActual ? "Debe activar un turno para crear cierres" : "Crear nuevo cierre"}>
-            <span>
-              <Button
-                variant="contained"
-                startIcon={<AddIcon />}
-                onClick={handleAddClick}
-                disabled={!turnoActual}
-                sx={{
-                  backgroundColor: '#dc7633',
-                  '&:hover': {
-                    backgroundColor: '#b35c20'
-                  },
-                  boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-                  '&.Mui-disabled': {
-                    backgroundColor: 'rgba(220, 118, 51, 0.5)',
-                    color: 'rgba(255, 255, 255, 0.7)'
-                  }
-                }}
-              >
-                Nuevo Cierre
-              </Button>
-            </span>
-          </Tooltip>
+          <Button
+            variant="contained"
+            startIcon={<AddIcon />}
+            onClick={handleAddClick}
+            sx={{
+              backgroundColor: '#dc7633',
+              '&:hover': {
+                backgroundColor: '#b35c20'
+              },
+              boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+            }}
+          >
+            Nuevo Cierre
+          </Button>
         </Box>
       </Box>
 

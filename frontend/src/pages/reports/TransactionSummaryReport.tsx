@@ -498,7 +498,6 @@ const TransactionSummaryReport: React.FC = () => {
               fullWidth
               variant="contained"
               onClick={handleGenerarCierre}
-              disabled={!turnoActual}
               sx={{ 
                 bgcolor: '#4caf50', // Verde
                 '&:hover': { bgcolor: '#388e3c' },
@@ -506,8 +505,7 @@ const TransactionSummaryReport: React.FC = () => {
                 fontWeight: 'medium',
                 textTransform: 'none',
                 fontSize: '1rem',
-                boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
-                opacity: turnoActual ? 1 : 0.7
+                boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
               }}
             >
               Crear Cierre

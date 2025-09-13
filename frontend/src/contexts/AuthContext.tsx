@@ -22,6 +22,8 @@ interface User {
     horaFin: string;
     descripcion?: string;
     activo: boolean;
+    agente: boolean;
+    super: boolean;
   };
 }
 
@@ -40,6 +42,7 @@ interface AuthState {
   user: User | null;
   permissions: Record<string, boolean>;
   loading: boolean;
+  operationType?: 'agente' | 'super' | null;
 }
 
 interface AuthContextType {
@@ -48,6 +51,7 @@ interface AuthContextType {
   logout: () => void;
   hasPermission: (permissionCode: string) => boolean;
   hasRole: (roleName: string) => boolean;
+  isOperationType: (type: 'agente' | 'super') => boolean;
 }
 
 // Función para verificar si hay un token válido en localStorage
@@ -85,11 +89,21 @@ const loadInitialUser = (): User | null => {
   return null;
 };
 
+// Función para determinar el tipo de operación basado en el turno del usuario
+const getOperationType = (user: User | null): 'agente' | 'super' | null => {
+  if (!user?.turno) return null;
+  if (user.turno.agente) return 'agente';
+  if (user.turno.super) return 'super';
+  return null;
+};
+
+const initialUser = loadInitialUser();
 const initialState: AuthState = {
   isAuthenticated: checkInitialAuth(),
-  user: loadInitialUser(),
+  user: initialUser,
   permissions: {},
   loading: true,
+  operationType: getOperationType(initialUser)
 };
 
 const AuthContext = createContext<AuthContextType>({
@@ -98,6 +112,7 @@ const AuthContext = createContext<AuthContextType>({
   logout: () => {},
   hasPermission: () => false,
   hasRole: () => false,
+  isOperationType: () => false,
 });
 
 export const AuthProvider: React.FC<{children: React.ReactNode}> = ({ children }) => {
@@ -246,7 +261,7 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({ children }
           isAuthenticated: true,
           user: user,
           permissions: permissionsMap,
-          loading: false
+          loading: false,
         });
         
         console.log('Estado de autenticación inicial establecido:', { isAuthenticated: true });
@@ -320,6 +335,15 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({ children }
         });
         
         console.log('Estado de autenticación actualizado completamente');
+        
+        // Redirigir según el rol del usuario
+        if (response.user?.rol?.nombre === 'VendedorB' || response.user?.rol?.nombre === 'Vendedor') {
+          console.log(`Usuario ${response.user.rol.nombre} detectado, redirigiendo a /turnos/vendedor`);
+          navigate('/turnos/vendedor');
+        } else {
+          console.log('Usuario no es Vendedor/VendedorB, redirigiendo al dashboard');
+          navigate('/dashboard');
+        }
       } catch (decodeError) {
         console.error('Error al decodificar token en handleLogin:', decodeError);
         
@@ -330,6 +354,15 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({ children }
           permissions: {},
           loading: false,
         });
+        
+        // Redirigir según el rol del usuario (incluso si hay error al decodificar)
+        if (response.user?.rol?.nombre === 'VendedorB' || response.user?.rol?.nombre === 'Vendedor') {
+          console.log(`Usuario ${response.user.rol.nombre} detectado (fallback), redirigiendo a /turnos/vendedor`);
+          navigate('/turnos/vendedor');
+        } else {
+          console.log('Usuario no es Vendedor/VendedorB (fallback), redirigiendo al dashboard');
+          navigate('/dashboard');
+        }
       }
       
       return response;
@@ -363,8 +396,27 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({ children }
 
   const hasRole = (roleName: string): boolean => {
     if (!state.user || !state.user.rol) return false;
-    return state.user.rol.nombre === roleName;
+    return state.user.rol.nombre.toLowerCase() === roleName.toLowerCase();
   };
+
+  // Función para verificar el tipo de operación actual
+  const isOperationType = (type: 'agente' | 'super'): boolean => {
+    if (!state.user?.turno) return false;
+    return type === 'agente' ? state.user.turno.agente : state.user.turno.super;
+  };
+
+  // Efecto para actualizar el tipo de operación cuando cambia el usuario
+  useEffect(() => {
+    if (state.user?.turno) {
+      const newOperationType = getOperationType(state.user);
+      if (newOperationType !== state.operationType) {
+        setState(prev => ({
+          ...prev,
+          operationType: newOperationType
+        }));
+      }
+    }
+  }, [state.user?.turno]);
 
   return (
     <AuthContext.Provider value={{
@@ -373,6 +425,7 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({ children }
       logout: handleLogout,
       hasPermission,
       hasRole,
+      isOperationType
     }}>
       {children}
     </AuthContext.Provider>
