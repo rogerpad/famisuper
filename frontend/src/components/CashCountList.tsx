@@ -163,12 +163,15 @@ const CashCountList: React.FC = () => {
     setError(null);
     
     try {
-      const billetes = await cashApi.getAllBilletes();
+      const allBilletes = await cashApi.getAllBilletes();
       
-      if (!billetes || billetes.length === 0) {
+      if (!allBilletes || allBilletes.length === 0) {
         setCashCounts([]);
         return;
       }
+      
+      // Filtrar solo billetes activos
+      const billetes = allBilletes.filter(billete => Boolean(billete.estado));
       
       // Agrupar billetes por conteo (mismo ID y fecha)
       const groupedCounts: { [key: string]: GroupedCashCount } = {};

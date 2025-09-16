@@ -9,7 +9,7 @@ export interface Turno {
   id: number;
   nombre: string;
   horaInicio: string;
-  horaFin: string;
+  horaFin: string | null;
   descripcion?: string;
   activo: boolean;
   usuarioId?: number;
@@ -17,8 +17,12 @@ export interface Turno {
   usuarios?: Usuario[];
   creadoEn?: Date;
   actualizadoEn?: Date;
-  // Propiedad adicional para manejar el ID de asignación en tbl_usuarios_turnos
+  // Propiedades adicionales para datos reales de tbl_usuarios_turnos
   asignacionId?: number;
+  usuarioTurnoId?: number;
+  fechaAsignacion?: Date;
+  agente?: boolean;
+  super?: boolean;
 }
 
 export interface UsuarioTurno {

@@ -3,7 +3,7 @@ import { Routes, Route } from 'react-router-dom';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
 import { AuthProvider } from './contexts/AuthContext';
-import TurnoProvider from './contexts/TurnoContext';
+import { TurnoProvider } from './contexts/TurnoContext';
 import { SnackbarProvider } from 'notistack';
 import TokenDebugger from './components/debug/TokenDebugger';
 import TokenManagerDebugger from './components/debug/TokenManagerDebugger';

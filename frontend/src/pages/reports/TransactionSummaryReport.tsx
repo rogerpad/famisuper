@@ -39,17 +39,17 @@ const TransactionSummaryReport: React.FC = () => {
   const [horaActual, setHoraActual] = useState<string>(''); // Hora actual del sistema
   const [usuario, setUsuario] = useState<string>(''); // Usuario que ingresó las transacciones
   const { state: authState } = useAuth(); // Obtener el contexto de autenticación
-  const { turnoActual, loading: isLoadingTurno } = useTurno(); // Obtener el turno actual del contexto
+  const { turnoActual, loading: isLoadingTurno, turnosActivos, tieneTurnoActivo } = useTurno(); // Obtener el turno actual del contexto
   const reportRef = useRef<HTMLDivElement>(null);
   
-  // Consulta para obtener los turnos disponibles
-  const { data: turnosData } = useReactQuery({
-    queryKey: ['turnos'],
-    queryFn: () => turnosApi.getAll(),
-    onSuccess: (data) => {
-      setTurnos(data);
-    }
-  });
+  // CONSULTA OBSOLETA - Ya no necesitamos turnos de tbl_turnos
+  // const { data: turnosData } = useReactQuery({
+  //   queryKey: ['turnos'],
+  //   queryFn: () => turnosApi.getAll(),
+  //   onSuccess: (data) => {
+  //     setTurnos(data);
+  //   }
+  // });
 
   // Función para obtener la hora actual formateada como HH:MM
   const getCurrentTime = () => {
@@ -83,26 +83,48 @@ const TransactionSummaryReport: React.FC = () => {
   
   // Efecto para establecer el turno actual desde el contexto TurnoContext
   useEffect(() => {
+    console.log('[TRANSACTION_SUMMARY] === ESTADO COMPLETO DEL CONTEXTO ===');
+    console.log('[TRANSACTION_SUMMARY] turnoActual:', turnoActual);
+    console.log('[TRANSACTION_SUMMARY] isLoadingTurno:', isLoadingTurno);
+    console.log('[TRANSACTION_SUMMARY] turnosActivos:', turnosActivos);
+    console.log('[TRANSACTION_SUMMARY] tieneTurnoActivo:', tieneTurnoActivo);
+    console.log('[TRANSACTION_SUMMARY] === FIN ESTADO CONTEXTO ===');
+    
+    if (isLoadingTurno) {
+      console.log('[TRANSACTION_SUMMARY] Esperando carga del turno...');
+      return;
+    }
+    
     if (turnoActual) {
       // Usar el turno actual del contexto global
-      setTurno(turnoActual.nombre || '');
-      setTurnoId(turnoActual.id || '');
-      setHoraInicio(turnoActual.horaInicio || '08:00');
-      setHoraFin(turnoActual.horaFin || '16:00');
-    } else if (turnos.length > 0) {
-      // Si no hay turno activo pero hay turnos disponibles, usar el primero
-      setTurno(turnos[0].nombre || '');
-      setTurnoId(turnos[0].id || '');
-      setHoraInicio(turnos[0].horaInicio || '08:00');
-      setHoraFin(turnos[0].horaFin || '16:00');
+      console.log('[TRANSACTION_SUMMARY] Estableciendo datos del turno:', {
+        nombre: turnoActual.nombre,
+        id: turnoActual.id,
+        horaInicio: turnoActual.horaInicio,
+        horaFin: turnoActual.horaFin
+      });
+      
+      setTurno(turnoActual.nombre);
+      setHoraInicio(turnoActual.horaInicio);
+      setHoraFin(turnoActual.horaFin || '');
+    } else if (turnosActivos && turnosActivos.length > 0) {
+      // Fallback: usar el primer turno activo si turnoActual es null
+      const primerTurno = turnosActivos[0];
+      console.log('[TRANSACTION_SUMMARY] FALLBACK: Usando primer turno activo:', primerTurno);
+      
+      if (primerTurno.turno) {
+        setTurno(primerTurno.turno.nombre);
+        setHoraInicio(primerTurno.horaInicioReal || '');
+        setHoraFin(primerTurno.horaFinReal || '');
+      }
     } else {
-      // Si no hay turno activo ni turnos disponibles, usar valores por defecto
+      console.log('[TRANSACTION_SUMMARY] No hay turno actual ni turnos activos disponibles');
+      // Si no hay turno actual, usar valores por defecto
       setTurno('');
-      setTurnoId('');
-      setHoraInicio('08:00');
-      setHoraFin('16:00');
+      setHoraInicio('');
+      setHoraFin('');
     }
-  }, [turnoActual, turnos]);
+  }, [turnoActual, isLoadingTurno, turnosActivos, tieneTurnoActivo]);
   
   // Consulta para obtener los datos del reporte
   const { data, isLoading, isError, refetch } = useQuery<TransactionReportData>({
@@ -348,24 +370,10 @@ const TransactionSummaryReport: React.FC = () => {
             <TextField
               fullWidth
               label="Turno"
-              select
-              value={turnoId || ''}
-              onChange={(e) => {
-                const selectedId = e.target.value;
-                const selectedTurno = turnos.find(t => t.id === Number(selectedId));
-                if (selectedTurno) {
-                  setTurnoId(selectedTurno.id);
-                  setTurno(selectedTurno.nombre);
-                  setHoraInicio(selectedTurno.horaInicio);
-                  setHoraFin(selectedTurno.horaFin);
-                } else {
-                  setTurnoId('');
-                  setTurno('');
-                }
-              }}
+              value={turno}
               disabled={true} // Siempre deshabilitado para usar el turno actual
               InputLabelProps={{ shrink: true }}
-              helperText={turnoActual ? "Turno actual activo" : "No hay turno activo"}
+              helperText={turno ? "Turno actual activo" : "No hay turno activo"}
               sx={{
                 '& .MuiInputBase-root': {
                   bgcolor: turnoActual ? 'rgba(76, 175, 80, 0.1)' : 'rgba(255, 255, 255, 0.9)',
@@ -567,7 +575,20 @@ const TransactionSummaryReport: React.FC = () => {
                 </TableRow>
               </TableHead>
               <TableBody>
-                {reportData.transactionTypes.map((row) => (
+                {[...reportData.transactionTypes]
+                  .sort((a, b) => {
+                    console.log('[SORT] Comparando:', a.tipoTransaccion, 'vs', b.tipoTransaccion);
+                    // Mover "Saldo inicial" al principio (case insensitive)
+                    const aEsSaldoInicial = a.tipoTransaccion.toLowerCase().includes('saldo inicial');
+                    const bEsSaldoInicial = b.tipoTransaccion.toLowerCase().includes('saldo inicial');
+                    
+                    if (aEsSaldoInicial && !bEsSaldoInicial) return -1;
+                    if (!aEsSaldoInicial && bEsSaldoInicial) return 1;
+                    
+                    // Mantener el orden original para el resto
+                    return 0;
+                  })
+                  .map((row) => (
                   <TableRow key={row.tipoTransaccionId} sx={{ '& > *': { fontSize: '0.875rem', lineHeight: 1.2 } }}>
                     <TableCell>{row.tipoTransaccion}</TableCell>
                     {allAgentes.map((agente) => (

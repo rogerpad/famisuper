@@ -55,14 +55,13 @@ export class TransactionsService {
     console.log(`[TS] Verificando turno activo para usuario ${usuarioId}`);
     
     try {
-      // Consultar si el usuario tiene un turno activo asignado
+      // Consultar si el usuario tiene un turno activo en tbl_usuarios_turnos
       const turnoActivo = await this.dataSource
         .createQueryBuilder()
         .select('ut.usuario_id')
         .from('tbl_usuarios_turnos', 'ut')
-        .innerJoin('tbl_turnos', 't', 'ut.turno_id = t.id')
         .where('ut.usuario_id = :usuarioId', { usuarioId })
-        .andWhere('t.activo = :activo', { activo: true })
+        .andWhere('ut.activo = :activo', { activo: true })
         .getRawOne();
       
       if (!turnoActivo) {

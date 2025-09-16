@@ -122,7 +122,8 @@ const AgentClosingForm: React.FC = () => {
       return response;
     },
   });
-  const providers = providersQuery.data;
+  // Filtrar solo proveedores activos
+  const providers = providersQuery.data?.filter(provider => Boolean(provider.activo));
 
   // Nota: Usamos isValidId definido al principio del archivo para validar IDs
 
@@ -373,7 +374,7 @@ const AgentClosingForm: React.FC = () => {
   const validationSchema = yup.object({
     proveedorId: yup.number().min(1, 'El agente es requerido').required('El agente es requerido'),
     fechaCierre: yup.date().required('La fecha de cierre es requerida'),
-    saldoInicial: yup.number().required('El saldo inicial es requerido'),
+    saldoInicial: yup.number().typeError('El saldo inicial debe ser un número válido').required('El saldo inicial es requerido'),
     adicionalCta: yup.number().required('El adicional CTA es requerido'),
     resultadoFinal: yup.number().required('El resultado final es requerido'),
     saldoFinal: yup.number().required('El saldo final es requerido'),
@@ -1317,7 +1318,7 @@ const AgentClosingForm: React.FC = () => {
                       name="saldoInicial"
                       type="number"
                       InputProps={{
-                        inputProps: { min: 0, step: 0.01 },
+                        inputProps: { step: 0.01 },
                         // Añadir un indicador visual para mostrar que el valor se obtiene automáticamente
                         startAdornment: values.proveedorId > 0 ? (
                           <InputAdornment position="start">

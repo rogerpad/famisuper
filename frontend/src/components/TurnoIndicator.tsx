@@ -161,7 +161,7 @@ const TurnoIndicator: React.FC = () => {
     }}>
       <ScheduleIcon sx={{ color: textColor, mr: 1 }} />
       <Typography variant="body2" sx={{ fontWeight: 'bold', color: textColor }}>
-        {turnoActual.nombre || 'Turno Activo'}: {formatHora(turnoActual.horaInicio)} - {formatHora(turnoActual.horaFin)}
+        {turnoActual.nombre || 'Turno Activo'}: {formatHora(turnoActual.horaInicio)} - {turnoActual.horaFin ? formatHora(turnoActual.horaFin) : 'en curso'}
       </Typography>
     </Box>
   );

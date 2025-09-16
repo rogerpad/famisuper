@@ -85,16 +85,31 @@ const AgentClosingsList = () => {
   
   // Manejador para finalizar turno
   const handleFinalizarTurno = async () => {
-    if (!turnoActual) return;
+    if (!turnoActual) {
+      console.log('[AGENT_CLOSINGS] No hay turno actual para finalizar');
+      return;
+    }
+    
+    console.log('[AGENT_CLOSINGS] Iniciando finalización de turno:', turnoActual);
     
     try {
-      await turnosApi.finalizarTurno(turnoActual.id);
+      // Usar el método específico para vendedores que actualiza tbl_usuarios_turnos
+      await turnosApi.finalizarTurnoVendedor(turnoActual.id);
+      console.log('[AGENT_CLOSINGS] Turno finalizado exitosamente');
+      
       setFinalizarTurnoDialogOpen(false);
-      refetchTurno();
+      
+      // Limpiar localStorage inmediatamente para evitar inconsistencias
+      localStorage.removeItem('turnoActual');
+      localStorage.removeItem('operacionActiva');
+      
+      // Refrescar datos del servidor inmediatamente
+      await refetchTurno();
       refetch();
+      
       enqueueSnackbar('Turno finalizado correctamente', { variant: 'success' });
     } catch (error: any) {
-      console.error('Error al finalizar turno:', error);
+      console.error('[AGENT_CLOSINGS] Error al finalizar turno:', error);
       
       // Extraer mensaje de error detallado
       let errorMessage = 'Error desconocido al finalizar el turno';
@@ -108,6 +123,7 @@ const AgentClosingsList = () => {
         errorMessage = error.message;
       }
       
+      console.error('[AGENT_CLOSINGS] Mensaje de error:', errorMessage);
       enqueueSnackbar(errorMessage, { variant: 'error' });
     }
   };
@@ -258,7 +274,10 @@ const AgentClosingsList = () => {
       // Crear cuerpo de la tabla
       const tbody = document.createElement('tbody');
       
-      closings.forEach(closing => {
+      // Filtrar solo cierres activos para el PDF
+      const activeClosings = closings.filter(closing => closing.estado === 'activo');
+      
+      activeClosings.forEach(closing => {
         const row = document.createElement('tr');
         
         // Crear celdas con los datos
@@ -471,7 +490,7 @@ const AgentClosingsList = () => {
               </TableRow>
             </TableHead>
             <TableBody>
-              {closings?.map((closing) => (
+              {closings?.filter(closing => closing.estado === 'activo')?.map((closing) => (
                 <TableRow key={closing.id}>
                   <TableCell sx={{ padding: '12px 16px', verticalAlign: 'middle' }}>{closing.id}</TableCell>
                   <TableCell sx={{ padding: '12px 16px', verticalAlign: 'middle' }}>{closing.proveedor?.nombre || 'N/A'}</TableCell>

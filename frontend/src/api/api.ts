@@ -45,39 +45,6 @@ api.interceptors.response.use(
     return response;
   },
   (error) => {
-    // Verificar si es un error de autenticación (401) y no estamos en la página de login
-    if (error.response && error.response.status === 401 && 
-        !window.location.pathname.includes('/login')) {
-      console.log('Error 401 detectado, redirigiendo a login');
-      // Limpiar datos de autenticación
-      localStorage.removeItem('token');
-      localStorage.removeItem('user');
-      
-      // Usar setTimeout para evitar problemas de redirección durante una solicitud en curso
-      setTimeout(() => {
-        window.location.href = '/login';
-      }, 100);
-    }
-    
-    // Mejorar el mensaje de error para depuración
-    if (error.response) {
-      console.error(`Error API ${error.response.status}:`, error.response.data);
-    } else if (error.request) {
-      console.error('Error de red, no se recibió respuesta:', error.request);
-    } else {
-      console.error('Error al configurar la solicitud:', error.message);
-    }
-    
-    return Promise.reject(error);
-  }
-);
-
-// Interceptor para manejar errores
-api.interceptors.response.use(
-  (response) => {
-    return response;
-  },
-  (error) => {
     // Mostrar información detallada sobre el error en la consola para depuración
     console.error('Error en la solicitud API:', error);
     
@@ -86,6 +53,20 @@ api.interceptors.response.use(
       console.error('Respuesta del servidor:', error.response.data);
       console.error('Código de estado:', error.response.status);
       console.error('Cabeceras:', error.response.headers);
+      
+      // Verificar si es un error de autenticación (401) y no estamos en la página de login
+      if (error.response.status === 401 && !window.location.pathname.includes('/login')) {
+        console.log('Error 401 detectado, redirigiendo a login');
+        // Limpiar datos de autenticación
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        localStorage.removeItem('operacionActiva');
+        
+        // Usar setTimeout para evitar problemas de redirección durante una solicitud en curso
+        setTimeout(() => {
+          window.location.href = '/login';
+        }, 100);
+      }
     } else if (error.request) {
       // La solicitud se realizó pero no se recibió respuesta
       console.error('No se recibió respuesta del servidor', error.request);

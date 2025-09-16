@@ -23,6 +23,7 @@ import transactionsApi, { Transaction, CreateTransactionDto } from '../../api/tr
 import providerTypesApi from '../../api/provider-types/providerTypesApi';
 import providersApi from '../../api/providers/providersApi';
 import transactionTypesApi from '../../api/transaction-types/transactionTypesApi';
+import { useAuth } from '../../contexts/AuthContext';
 import { format } from 'date-fns';
 
 interface TransactionFormProps {
@@ -50,8 +51,9 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ open, onClose, transa
   const queryClient = useQueryClient();
   const isEditing = !!transaction;
 
-  // Obtener el ID del usuario actual (en una aplicación real, esto vendría del contexto de autenticación)
-  const currentUserId = 1; // Usuario administrador por defecto
+  // Obtener el ID del usuario actual desde el contexto de autenticación
+  const { state: authState } = useAuth();
+  const currentUserId = authState.user?.id || 1;
 
   // Consulta para obtener los tipos de proveedores (para filtrar agentes)
   const { data: providerTypes = [] } = useQuery({
@@ -64,11 +66,14 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ open, onClose, transa
     type.nombre.toLowerCase().includes('agente'))?.id;
 
   // Consulta para obtener los proveedores tipo agente
-  const { data: providers = [], isLoading: isLoadingProviders } = useQuery({
+  const { data: allProviders = [], isLoading: isLoadingProviders } = useQuery({
     queryKey: ['providers', agentTypeId],
     queryFn: () => providersApi.getByType(agentTypeId || 0),
     enabled: !!agentTypeId,
   });
+
+  // Filtrar solo proveedores activos
+  const providers = allProviders.filter(provider => Boolean(provider.activo));
 
   // Consulta para obtener los tipos de transacción activos
   const { data: transactionTypes = [], isLoading: isLoadingTransactionTypes } = useQuery({

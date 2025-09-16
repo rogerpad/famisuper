@@ -233,14 +233,17 @@ export class UsuariosTurnosService {
   }
 
   async finalizarTurnoVendedor(usuarioId: number, turnoId: number): Promise<UsuarioTurno> {
+    console.log(`[USUARIOS_TURNOS] ========== INICIANDO FINALIZACION DE TURNO ==========`);
     console.log(`[USUARIOS_TURNOS] Finalizando turno ID: ${turnoId} para vendedor ID: ${usuarioId}`);
     
     // Validar IDs
     if (!usuarioId || isNaN(Number(usuarioId))) {
+      console.error(`[USUARIOS_TURNOS] ERROR: ID de usuario inválido: ${usuarioId}`);
       throw new BadRequestException(`ID de usuario inválido: ${usuarioId}`);
     }
     
     if (!turnoId || isNaN(Number(turnoId))) {
+      console.error(`[USUARIOS_TURNOS] ERROR: ID de turno inválido: ${turnoId}`);
       throw new BadRequestException(`ID de turno inválido: ${turnoId}`);
     }
     
@@ -257,15 +260,90 @@ export class UsuariosTurnosService {
     const currentMinutes = now.getMinutes().toString().padStart(2, '0');
     const currentTimeString = `${currentHour}:${currentMinutes}`;
     
-    // Actualizar la asignación
-    asignacion.horaFinReal = currentTimeString;
-    asignacion.activo = false;
-    // Resetear los campos de operación al finalizar el turno
-    asignacion.agente = false;
-    asignacion.super = false;
-    
-    await this.usuarioTurnoRepository.save(asignacion);
-    console.log(`[USUARIOS_TURNOS] Asignación finalizada: ${asignacion.id}`);
+    try {
+      console.log(`[USUARIOS_TURNOS] Asignación encontrada:`, {
+        id: asignacion.id,
+        usuarioId: asignacion.usuarioId,
+        turnoId: asignacion.turnoId,
+        activo: asignacion.activo
+      });
+
+      // 1. Actualizar la asignación del turno
+      console.log(`[USUARIOS_TURNOS] === PASO 1: Actualizando asignación de turno ===`);
+      asignacion.horaFinReal = currentTimeString;
+      asignacion.activo = false;
+      // Resetear los campos de operación al finalizar el turno
+      asignacion.agente = false;
+      asignacion.super = false;
+      
+      await this.usuarioTurnoRepository.save(asignacion);
+      console.log(`[USUARIOS_TURNOS] ✅ Asignación finalizada: ${asignacion.id}`);
+      
+      // 2. Verificar si las tablas existen antes de actualizar
+      console.log(`[USUARIOS_TURNOS] === PASO 2: Verificando tablas existentes ===`);
+      
+      // Verificar tabla tbl_transacciones_agentes
+      try {
+        const tableExists1 = await this.usuarioTurnoRepository.manager.query(
+          "SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'tbl_transacciones_agentes'"
+        );
+        console.log(`[USUARIOS_TURNOS] Tabla tbl_transacciones_agentes existe:`, tableExists1.length > 0);
+        
+        if (tableExists1.length > 0) {
+          const agentTransactionsResult = await this.usuarioTurnoRepository.manager.query(
+            'UPDATE tbl_transacciones_agentes SET estado = 0 WHERE usuario_id = $1 AND estado = 1',
+            [usuarioId]
+          );
+          console.log(`[USUARIOS_TURNOS] ✅ Transacciones de agentes actualizadas: ${agentTransactionsResult[1] || 0} registros`);
+        }
+      } catch (agentTransError) {
+        console.error(`[USUARIOS_TURNOS] ❌ Error con tbl_transacciones_agentes:`, agentTransError.message);
+      }
+      
+      // Verificar tabla tbl_cierre_final_agentes
+      try {
+        const tableExists2 = await this.usuarioTurnoRepository.manager.query(
+          "SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'tbl_cierre_final_agentes'"
+        );
+        console.log(`[USUARIOS_TURNOS] Tabla tbl_cierre_final_agentes existe:`, tableExists2.length > 0);
+        
+        if (tableExists2.length > 0) {
+          const agentClosingsResult = await this.usuarioTurnoRepository.manager.query(
+            'UPDATE tbl_cierre_final_agentes SET estado = $1 WHERE turno_id = $2 AND estado = $3',
+            ['inactivo', turnoId, 'activo']
+          );
+          console.log(`[USUARIOS_TURNOS] ✅ Cierres finales de agentes actualizados: ${agentClosingsResult[1] || 0} registros`);
+        }
+      } catch (agentClosingsError) {
+        console.error(`[USUARIOS_TURNOS] ❌ Error con tbl_cierre_final_agentes:`, agentClosingsError.message);
+      }
+      
+      // Verificar tabla tbl_conteo_billetes
+      try {
+        const tableExists3 = await this.usuarioTurnoRepository.manager.query(
+          "SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'tbl_conteo_billetes'"
+        );
+        console.log(`[USUARIOS_TURNOS] Tabla tbl_conteo_billetes existe:`, tableExists3.length > 0);
+        
+        if (tableExists3.length > 0) {
+          const cashCountsResult = await this.usuarioTurnoRepository.manager.query(
+            'UPDATE tbl_conteo_billetes SET estado = 0 WHERE turno_id = $1 AND usuario_id = $2 AND estado = 1',
+            [turnoId, usuarioId]
+          );
+          console.log(`[USUARIOS_TURNOS] ✅ Conteos de billetes actualizados: ${cashCountsResult[1] || 0} registros`);
+        }
+      } catch (cashError) {
+        console.error(`[USUARIOS_TURNOS] ❌ Error con tbl_conteo_billetes:`, cashError.message);
+      }
+      
+      console.log(`[USUARIOS_TURNOS] ========== FINALIZACION COMPLETADA ==========`);
+      console.log(`[USUARIOS_TURNOS] ✅ Turno finalizado completamente para usuario ${usuarioId}, turno ${turnoId}`);
+      
+    } catch (error) {
+      console.error(`[USUARIOS_TURNOS] ❌ ERROR CRÍTICO al finalizar turno:`, error);
+      console.error(`[USUARIOS_TURNOS] Stack trace:`, error.stack);
+      throw new BadRequestException(`Error al finalizar turno: ${error.message}`);
+    }
     
     return this.findOne(asignacion.id);
   }
@@ -314,10 +392,15 @@ export class UsuariosTurnosService {
       throw new BadRequestException(`ID de usuario inválido: ${usuarioId}`);
     }
     
-    return this.usuarioTurnoRepository.find({
+    const result = await this.usuarioTurnoRepository.find({
       where: { usuarioId, activo: true },
       relations: ['usuario', 'turno'],
     });
+    
+    console.log(`[USUARIOS_TURNOS_SERVICE] Turnos activos encontrados:`, result);
+    console.log(`[USUARIOS_TURNOS_SERVICE] Primer turno horaInicioReal:`, result[0]?.horaInicioReal);
+    
+    return result;
   }
 
   async getOperacionesEnUso(): Promise<{
