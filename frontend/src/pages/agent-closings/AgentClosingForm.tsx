@@ -1338,7 +1338,7 @@ const AgentClosingForm: React.FC = () => {
                     />
                   </Grid>
 
-                  <Grid item xs={12} md={6}>
+                  <Grid item xs={12} md={6} style={{ display: 'none' }}>
                     <Typography variant="subtitle1" gutterBottom>Adicional CTA (L)</Typography>
                     <Field
                       as={TextField}

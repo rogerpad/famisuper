@@ -158,35 +158,37 @@ export class TurnosController {
     return this.usuariosTurnosService.iniciarTurnoVendedor(req.user.id, +id, operationData);
   }
 
-  @Patch(':id/finalizar-vendedor')
+  @Patch(':id/finalizar-turno-vendedor')
   @UseGuards(JwtAuthGuard, PermisosGuard)
   @RequierePermiso('finalizar_turnos')
   async finalizarTurnoVendedor(
     @Req() req,
     @Param('id') id: string
   ) {
-    console.log(`[TURNOS_CONTROLLER] Finalizando turno ID: ${id} para vendedor ID: ${req.user.id}`);
-    
-    // Verificar si el usuario tiene rol de vendedor
-    const user = await this.userRepository.findOne({
-      where: { id: req.user.id },
-      relations: ['rol']
-    });
-    
-    if (!user) {
-      throw new BadRequestException(`Usuario con ID ${req.user.id} no encontrado`);
-    }
-    
-    // Verificar si el usuario tiene rol de vendedor o vendedorB
-    const esVendedor = user.rol && (user.rol.nombre === 'Vendedor' || user.rol.nombre === 'VendedorB');
-    if (!esVendedor) {
-      console.log(`[TURNOS_CONTROLLER] El usuario ${user.nombre} no tiene rol de vendedor o vendedorB`);
-      // Si no es vendedor ni vendedorB, usar el método original
-      return this.turnosService.finalizarTurnoVendedor(+id, req.user.id);
-    }
-    
-    // Si es vendedor, usar el nuevo método que actualiza tbl_usuarios_turnos
+    console.log(`[TURNOS_CONTROLLER] Finalizando turno Vendedor ID: ${id} para vendedor ID: ${req.user.id}`);
     return this.usuariosTurnosService.finalizarTurnoVendedor(req.user.id, +id);
+  }
+
+  @Patch(':id/finalizar-turno-super')
+  @UseGuards(JwtAuthGuard, PermisosGuard)
+  @RequierePermiso('finalizar_turnos')
+  async finalizarTurnoSuper(
+    @Req() req,
+    @Param('id') id: string
+  ) {
+    console.log(`[TURNOS_CONTROLLER] Finalizando turno Super ID: ${id} para vendedor ID: ${req.user.id}`);
+    return this.usuariosTurnosService.finalizarTurnoSuper(req.user.id, +id);
+  }
+
+  @Patch(':id/finalizar-turno-agente')
+  @UseGuards(JwtAuthGuard, PermisosGuard)
+  @RequierePermiso('finalizar_turnos')
+  async finalizarTurnoAgente(
+    @Req() req,
+    @Param('id') id: string
+  ) {
+    console.log(`[TURNOS_CONTROLLER] Finalizando turno Agente ID: ${id} para vendedor ID: ${req.user.id}`);
+    return this.usuariosTurnosService.finalizarTurnoAgente(req.user.id, +id);
   }
 
   @Patch(':id/reiniciar')

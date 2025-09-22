@@ -70,7 +70,7 @@ export const useConteoBilletesSuper = () => {
   const [error, setError] = useState<string | null>(null);
 
   // Obtener todos los conteos
-  const fetchConteoBilletesSuper = useCallback(async () => {
+  const fetchConteoBilletesSuper = useCallback(async (activo?: boolean) => {
     setLoading(true);
     setError(null);
     try {
@@ -79,7 +79,12 @@ export const useConteoBilletesSuper = () => {
         throw new Error('No se encontró token de autenticación');
       }
 
-      const response = await fetch(`${API_URL}/conteo-billetes-super`, {
+      let url = `${API_URL}/conteo-billetes-super`;
+      if (activo !== undefined) {
+        url += `?activo=${activo}`;
+      }
+
+      const response = await fetch(url, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
@@ -246,12 +251,11 @@ export const useConteoBilletesSuper = () => {
 
   // Obtener el último conteo de billetes activo
   const getLastActiveConteoBilletes = useCallback(async () => {
-    setLoading(true);
-    setError(null);
     try {
       const token = localStorage.getItem('token');
       if (!token) {
-        throw new Error('No se encontró token de autenticación');
+        console.log('No se encontró token de autenticación para conteo de billetes');
+        return null;
       }
 
       const response = await fetch(`${API_URL}/conteo-billetes-super/last-active`, {
@@ -263,21 +267,22 @@ export const useConteoBilletesSuper = () => {
 
       if (!response.ok) {
         if (response.status === 404) {
-          console.log('No se encontró ningún conteo de billetes activo');
+          // Manejo silencioso del 404 - es esperado cuando no hay conteos activos
           return null;
         }
-        throw new Error(`Error al obtener último conteo activo: ${response.statusText}`);
+        console.error(`Error al obtener último conteo activo: ${response.statusText}`);
+        return null;
       }
 
       const data = await response.json();
       // Normalizar los datos para asegurar tipos correctos
       return normalizeConteoData(data);
     } catch (err: any) {
-      console.error('Error al cargar último conteo de billetes activo:', err);
-      setError(err.message || 'Error al cargar último conteo de billetes activo');
+      // Solo loggear errores que no sean de red/404
+      if (err.name !== 'TypeError' && !err.message?.includes('fetch')) {
+        console.error('Error inesperado al cargar último conteo de billetes activo:', err);
+      }
       return null;
-    } finally {
-      setLoading(false);
     }
   }, []);
 

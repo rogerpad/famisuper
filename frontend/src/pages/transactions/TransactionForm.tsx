@@ -334,12 +334,42 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ open, onClose, transa
                 label="Valor"
                 type="number"
                 value={formik.values.valor}
-                onChange={formik.handleChange}
+                onChange={(e) => {
+                  // Solo permitir números, punto decimal y eliminar caracteres no numéricos
+                  const value = e.target.value;
+                  const numericValue = value.replace(/[^0-9.]/g, '');
+                  
+                  // Evitar múltiples puntos decimales
+                  const parts = numericValue.split('.');
+                  const cleanValue = parts.length > 2 
+                    ? parts[0] + '.' + parts.slice(1).join('') 
+                    : numericValue;
+                  
+                  // Actualizar el valor en formik
+                  formik.setFieldValue('valor', cleanValue);
+                }}
+                onKeyPress={(e) => {
+                  // Prevenir caracteres no numéricos excepto punto decimal
+                  const char = e.key;
+                  if (!/[0-9.]/.test(char)) {
+                    e.preventDefault();
+                  }
+                  
+                  // Prevenir múltiples puntos decimales
+                  if (char === '.' && formik.values.valor.toString().includes('.')) {
+                    e.preventDefault();
+                  }
+                }}
                 error={formik.touched.valor && Boolean(formik.errors.valor)}
                 helperText={formik.touched.valor && formik.errors.valor}
                 margin="normal"
                 InputProps={{
                   startAdornment: <InputAdornment position="start">L</InputAdornment>,
+                  inputProps: {
+                    min: 0,
+                    step: 0.01,
+                    pattern: "[0-9]+(\\.[0-9]+)?"
+                  }
                 }}
               />
             </Grid>

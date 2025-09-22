@@ -28,6 +28,10 @@ export class CierresSuperService {
   }
 
   async findOne(id: number): Promise<CierreSuper> {
+    if (!id || isNaN(id)) {
+      throw new NotFoundException(`ID inválido: ${id}`);
+    }
+    
     const cierreSuper = await this.cierresSuperRepository.findOne({
       where: { id },
       relations: ['usuario'],
@@ -77,5 +81,34 @@ export class CierresSuperService {
       relations: ['usuario'],
       order: { fechaCierre: 'DESC' },
     });
+  }
+
+  async getUltimoCierreInactivoDelDia(): Promise<{ efectivoCierreTurno: number } | null> {
+    try {
+      console.log(`[CIERRES_SUPER_SERVICE] Iniciando búsqueda de último cierre inactivo del día`);
+      
+      // Simplificar la consulta para evitar problemas con fechas
+      const ultimoCierre = await this.cierresSuperRepository.findOne({
+        where: {
+          activo: false,
+        },
+        order: { fechaCierre: 'DESC' },
+      });
+
+      console.log(`[CIERRES_SUPER_SERVICE] Último cierre inactivo encontrado:`, ultimoCierre);
+
+      if (ultimoCierre) {
+        const result = { efectivoCierreTurno: Number(ultimoCierre.efectivoCierreTurno) || 0 };
+        console.log(`[CIERRES_SUPER_SERVICE] Retornando:`, result);
+        return result;
+      }
+
+      console.log(`[CIERRES_SUPER_SERVICE] No se encontró ningún cierre inactivo`);
+      return null;
+    } catch (error) {
+      console.error(`[CIERRES_SUPER_SERVICE] Error al obtener último cierre inactivo:`, error);
+      console.error(`[CIERRES_SUPER_SERVICE] Stack trace:`, error.stack);
+      throw error;
+    }
   }
 }

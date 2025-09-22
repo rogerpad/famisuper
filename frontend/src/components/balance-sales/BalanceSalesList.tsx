@@ -61,7 +61,7 @@ const BalanceSalesList: React.FC = () => {
   };
 
   const loadBalanceSales = async () => {
-    const data = await fetchBalanceSales();
+    const data = await fetchBalanceSales(true); // Solo cargar registros activos
     setBalanceSales(data);
   };
 

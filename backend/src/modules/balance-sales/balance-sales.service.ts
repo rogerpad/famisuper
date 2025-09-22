@@ -33,10 +33,18 @@ export class BalanceSalesService {
     }
   }
 
-  async findAll(): Promise<BalanceSale[]> {
+  async findAll(activo?: boolean): Promise<BalanceSale[]> {
+    const whereCondition: any = {};
+    if (activo !== undefined) {
+      whereCondition.activo = activo;
+    } else {
+      // Si no se especifica, mantener el comportamiento anterior (solo activos)
+      whereCondition.activo = true;
+    }
+
     return this.balanceSaleRepository.find({
       relations: ['usuario', 'telefonica', 'flujoSaldo'],
-      where: { activo: true },
+      where: whereCondition,
       order: { fecha: 'DESC' },
     });
   }

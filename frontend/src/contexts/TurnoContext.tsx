@@ -46,14 +46,14 @@ export const TurnoProvider: React.FC<{children: React.ReactNode}> = ({ children 
   console.log('[TURNO_CONTEXT] TurnoProvider inicializando...');
   
   const [turnoActual, setTurnoActual] = useState<Turno | null>(() => {
-    // Recuperar turno del localStorage al inicializar
+    // Recuperar turno del localStorage al inicializar y mostrarlo inmediatamente
     const savedTurno = localStorage.getItem('turnoActual');
     console.log('[TURNO_CONTEXT] Verificando localStorage al inicializar:', savedTurno);
     if (savedTurno) {
       try {
         const parsed = JSON.parse(savedTurno);
-        console.log('[TURNO_CONTEXT] Turno recuperado del localStorage:', parsed);
-        return parsed;
+        console.log('[TURNO_CONTEXT] Turno recuperado del localStorage y mostrado inmediatamente:', parsed);
+        return parsed; // ✅ Mostrar inmediatamente para eliminar desfase
       } catch (error) {
         console.error('[TURNO_CONTEXT] Error al parsear turno del localStorage:', error);
         localStorage.removeItem('turnoActual');
@@ -138,7 +138,10 @@ export const TurnoProvider: React.FC<{children: React.ReactNode}> = ({ children 
       return;
     }
     
-    setLoading(true);
+    // Solo hacer loading si no hay turno en localStorage (evitar parpadeo)
+    if (!turnoActual) {
+      setLoading(true);
+    }
     setError(null);
     
     try {
@@ -148,7 +151,7 @@ export const TurnoProvider: React.FC<{children: React.ReactNode}> = ({ children 
         try {
           const usuarioTurnos = await usuariosTurnosApi.getTurnosActivosPorUsuario(authState.user.id);
           console.log(`[TURNO_CONTEXT] Turnos activos encontrados para el usuario: ${usuarioTurnos.length}`);
-          console.log(`[TURNO_CONTEXT] Datos completos del usuario turno:`, usuarioTurnos);
+          
           // Usar el operador de propagación para crear un nuevo array y evitar problemas de tipo
           setTurnosActivos([...usuarioTurnos]);
           setTieneTurnoActivo(usuarioTurnos.length > 0);
@@ -187,35 +190,31 @@ export const TurnoProvider: React.FC<{children: React.ReactNode}> = ({ children 
               super: usuarioTurno.super
             };
             
-            console.log(`[TURNO_CONTEXT] Antes de setTurnoActual - turnoActual actual:`, turnoActual);
-            setTurnoActual(turnoReal);
-            // Persistir turno en localStorage
-            localStorage.setItem('turnoActual', JSON.stringify(turnoReal));
-            console.log(`[TURNO_CONTEXT] Turno real creado y guardado en localStorage:`, turnoReal);
-            console.log(`[TURNO_CONTEXT] Verificando localStorage después de guardar:`, localStorage.getItem('turnoActual'));
-            console.log(`[TURNO_CONTEXT] Hora inicio real:`, usuarioTurno.horaInicioReal);
+            // Solo actualizar si hay cambios significativos (evitar re-renders innecesarios)
+            const turnoChanged = !turnoActual || 
+              turnoActual.id !== turnoReal.id || 
+              turnoActual.activo !== turnoReal.activo ||
+              turnoActual.horaFin !== turnoReal.horaFin;
+              
+            if (turnoChanged) {
+              console.log(`[TURNO_CONTEXT] Actualizando turno con cambios:`, turnoReal);
+              setTurnoActual(turnoReal);
+              localStorage.setItem('turnoActual', JSON.stringify(turnoReal));
+            }
           } else {
-            // Si no hay turnos activos, limpiar la operación activa
-            if (operacionActiva) {
-              console.log('[TURNO_CONTEXT] No hay turnos activos, limpiando operación activa');
+            // Si no hay turnos activos, limpiar solo si había un turno antes
+            if (turnoActual || operacionActiva) {
+              console.log('[TURNO_CONTEXT] No hay turnos activos, limpiando estado');
+              setTurnoActual(null);
               setOperacionActiva(null);
+              localStorage.removeItem('turnoActual');
               localStorage.removeItem('operacionActiva');
             }
-            // También limpiar turnoActual si no hay turnos activos
-            console.log('[TURNO_CONTEXT] No hay turnos activos, limpiando turnoActual');
-            setTurnoActual(null);
-            localStorage.removeItem('turnoActual');
           }
         } catch (turnosActivosError) {
           console.error('[TURNO_CONTEXT] Error al obtener turnos activos:', turnosActivosError);
+          // No limpiar el turno si hay error de red, mantener el localStorage
         }
-      }
-      
-      // Si no se encontraron turnos activos en tbl_usuarios_turnos, limpiar turno actual
-      if (turnosActivos.length === 0) {
-        console.log('[TURNO_CONTEXT] No hay turnos activos en tbl_usuarios_turnos, limpiando turno actual');
-        setTurnoActual(null);
-        localStorage.removeItem('turnoActual');
       }
     } catch (err: any) {
       // Evitamos mostrar errores 401 en la consola
@@ -247,10 +246,10 @@ export const TurnoProvider: React.FC<{children: React.ReactNode}> = ({ children 
     if (authState.user?.id) {
       console.log('[TURNO_CONTEXT] Usuario autenticado, cargando turno inicial');
       
-      // Si ya hay un turno en localStorage, mostrar inmediatamente
-      const savedTurno = localStorage.getItem('turnoActual');
-      if (savedTurno && !turnoActual) {
-        console.log('[TURNO_CONTEXT] Mostrando turno desde localStorage mientras se valida con servidor');
+      // El turno ya se muestra inmediatamente desde el useState inicial
+      // Solo necesitamos actualizar tieneTurnoActivo si hay turno
+      if (turnoActual) {
+        console.log('[TURNO_CONTEXT] Turno ya disponible desde localStorage, actualizando tieneTurnoActivo');
         setTieneTurnoActivo(true);
       }
       

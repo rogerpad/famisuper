@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, HttpStatus } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, HttpStatus, Query } from '@nestjs/common';
 import { LoggerService } from '../../common/services/logger.service';
 import { BalanceFlowsService } from './balance-flows.service';
 import { CreateBalanceFlowDto } from './dto/create-balance-flow.dto';
@@ -23,8 +23,9 @@ export class BalanceFlowsController {
 
   @Get()
   @RequierePermiso('ver_flujos_saldo')
-  findAll() {
-    return this.balanceFlowsService.findAll();
+  findAll(@Query('activo') activo?: string) {
+    const activoFilter = activo !== undefined ? activo === 'true' : undefined;
+    return this.balanceFlowsService.findAll(activoFilter);
   }
 
   @Get('active')

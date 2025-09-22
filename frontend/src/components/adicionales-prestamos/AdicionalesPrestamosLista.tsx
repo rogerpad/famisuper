@@ -66,7 +66,7 @@ const AdicionalesPrestamosLista: React.FC = () => {
   const fetchData = async () => {
     try {
       setLoading(true);
-      const data = await getAdicionalesPrestamos();
+      const data = await getAdicionalesPrestamos(true); // Solo cargar registros activos
       setAdicionales(data);
       setError(null);
     } catch (err) {

@@ -59,8 +59,14 @@ export class ConteoBilletesSuperService {
     return this.mapToDto(conteoConUsuario);
   }
 
-  async findAll(): Promise<ConteoBilletesSuperDto[]> {
+  async findAll(activo?: boolean): Promise<ConteoBilletesSuperDto[]> {
+    const whereCondition: any = {};
+    if (activo !== undefined) {
+      whereCondition.activo = activo;
+    }
+
     const conteos = await this.conteoBilletesSuperRepository.find({
+      where: whereCondition,
       relations: ['usuario'],
       order: { fecha: 'DESC' },
     }) as ConteoBilletesSuper[];

@@ -17,7 +17,7 @@ import { DateTimePicker } from '@mui/x-date-pickers/DateTimePicker';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import { es } from 'date-fns/locale';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { useCierresSuper } from '../../api/cierres-super/cierresSuperApi';
 import { CierreSuperFormData } from '../../api/cierres-super/types';
 import { useAuth } from '../../contexts/AuthContext';
@@ -29,8 +29,12 @@ import { useConteoBilletesSuper } from '../../api/conteo-billetes-super/conteoBi
 const CierreSuperForm: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
   const isEditing = !!id;
   const { state: authState } = useAuth();
+  
+  // Obtener el efectivo inicial del state de navegación si existe
+  const efectivoInicialFromNavigation = location.state?.efectivoInicial || 0;
   const { loading, error, fetchCierreSuperById, createCierreSuper, updateCierreSuper } = useCierresSuper();
   const { getSumSaldoVendido } = useBalanceFlows();
   const { getSumPagoProductosEfectivo, getSumGastosEfectivo } = useSuperExpenses();
@@ -38,7 +42,7 @@ const CierreSuperForm: React.FC = () => {
 
   const [formData, setFormData] = useState<CierreSuperFormData>({
     usuarioId: authState.user?.id || 0,
-    efectivoInicial: 0,
+    efectivoInicial: efectivoInicialFromNavigation,
     adicionalCasa: 0,
     adicionalAgente: 0,
     ventaContado: 0,
@@ -65,17 +69,28 @@ const CierreSuperForm: React.FC = () => {
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showConteoWarning, setShowConteoWarning] = useState(false);
+  const [isLoadingData, setIsLoadingData] = useState(false);
+  const [shouldRecalculate, setShouldRecalculate] = useState(false);
+  const [isUpdatingValues, setIsUpdatingValues] = useState(false);
 
   useEffect(() => {
     if (isEditing && id) {
       const fetchCierre = async () => {
+        setIsLoadingData(true);
         const cierre = await fetchCierreSuperById(parseInt(id));
         if (cierre) {
+          // Cargar todos los datos del cierre existente sin recalcular campos calculados
           setFormData({
             ...cierre,
             fechaCierre: new Date(cierre.fechaCierre),
+            // Preservar los valores calculados originales del registro
+            totalSpv: cierre.totalSpv,
+            efectivoTotal: cierre.efectivoTotal,
+            faltanteSobrante: cierre.faltanteSobrante
           });
         }
+        setIsLoadingData(false);
       };
       fetchCierre();
     } else {
@@ -98,12 +113,45 @@ const CierreSuperForm: React.FC = () => {
           efectivoCierreTurno: ultimoConteo.totalGeneral
         }));
         
+        // Ocultar la advertencia si se carga exitosamente
+        setShowConteoWarning(false);
+        
         console.log(`Efectivo Cierre Turno cargado automáticamente: ${ultimoConteo.totalGeneral}`);
       } else {
-        console.log('No se encontró ningún conteo de billetes activo');
+        console.log('No se encontró ningún conteo de billetes activo - establecer en 0');
+        
+        // Establecer efectivoCierreTurno en 0 cuando no hay conteo activo
+        setFormData(prevData => ({
+          ...prevData,
+          efectivoCierreTurno: 0
+        }));
+        
+        setShowConteoWarning(true);
       }
-    } catch (error) {
-      console.error('Error al cargar el último conteo de billetes activo:', error);
+    } catch (error: any) {
+      // Verificar si es un error 404 (no encontrado) para manejarlo silenciosamente
+      if (error?.response?.status === 404) {
+        console.log('No hay conteos de billetes activos disponibles - establecer en 0');
+        
+        // Establecer efectivoCierreTurno en 0 cuando no hay conteo disponible
+        setFormData(prevData => ({
+          ...prevData,
+          efectivoCierreTurno: 0
+        }));
+        
+        setShowConteoWarning(true);
+      } else {
+        // Solo mostrar errores que no sean 404
+        console.error('Error inesperado al cargar el último conteo de billetes activo:', error);
+        
+        // En caso de error inesperado, también establecer en 0
+        setFormData(prevData => ({
+          ...prevData,
+          efectivoCierreTurno: 0
+        }));
+        
+        setShowConteoWarning(true);
+      }
     }
   };
 
@@ -161,27 +209,29 @@ const CierreSuperForm: React.FC = () => {
     }
   };
 
-  // Función para calcular el Total SPV
-  const calcularTotalSPV = (): number => {
-    return (
-      formData.ventaContado +
-      formData.ventaCredito +
-      formData.ventaPos +
-      formData.transfOccidente +
-      formData.transfAtlantida +
-      formData.transfBac +
-      formData.transfBanpais
-    );
-  };
-
-  // Actualizar Total SPV cuando cambien los campos relacionados
   useEffect(() => {
-    const totalSpv = calcularTotalSPV();
-    
-    setFormData(prev => ({
-      ...prev,
-      totalSpv
-    }));
+    // Solo calcular automáticamente si no estamos cargando datos de un cierre existente Y (no estamos editando O el usuario activó el recálculo)
+    if (!isLoadingData && (!isEditing || shouldRecalculate)) {
+      // Calcular totalSpv - asegurar que todos los valores sean números
+      const totalSpv = 
+        Number(formData.ventaContado || 0) +
+        Number(formData.ventaCredito || 0) +
+        Number(formData.ventaPos || 0) +
+        Number(formData.transfOccidente || 0) +
+        Number(formData.transfAtlantida || 0) +
+        Number(formData.transfBac || 0) +
+        Number(formData.transfBanpais || 0);
+      
+      setFormData(prev => ({
+        ...prev,
+        totalSpv
+      }));
+      
+      // Resetear el flag de recálculo después de calcular
+      if (shouldRecalculate) {
+        setShouldRecalculate(false);
+      }
+    }
   }, [
     formData.ventaContado,
     formData.ventaCredito,
@@ -189,30 +239,41 @@ const CierreSuperForm: React.FC = () => {
     formData.transfOccidente,
     formData.transfAtlantida,
     formData.transfBac,
-    formData.transfBanpais
+    formData.transfBanpais,
+    isLoadingData,
+    isEditing,
+    shouldRecalculate
   ]);
 
   useEffect(() => {
-    // Calcular efectivoTotal
-    const efectivoTotal = 
-      formData.efectivoInicial +
-      formData.adicionalCasa +
-      formData.adicionalAgente +
-      formData.ventaContado +
-      formData.abonoCredito +
-      formData.ventaSaldo -
-      formData.pagoProductos -
-      formData.gastos -
-      formData.prestaAgentes;
-    
-    // Calcular faltanteSobrante
-    const faltanteSobrante = formData.efectivoCierreTurno - efectivoTotal;
-    
-    setFormData(prev => ({
-      ...prev,
-      efectivoTotal,
-      faltanteSobrante
-    }));
+    // Solo calcular automáticamente si no estamos cargando datos de un cierre existente Y (no estamos editando O el usuario activó el recálculo)
+    if (!isLoadingData && (!isEditing || shouldRecalculate)) {
+      // Calcular efectivoTotal - asegurar que todos los valores sean números
+      const efectivoTotal = 
+        Number(formData.efectivoInicial || 0) +
+        Number(formData.adicionalCasa || 0) +
+        Number(formData.adicionalAgente || 0) +
+        Number(formData.ventaContado || 0) +
+        Number(formData.abonoCredito || 0) +
+        Number(formData.ventaSaldo || 0) -
+        Number(formData.pagoProductos || 0) -
+        Number(formData.gastos || 0) -
+        Number(formData.prestaAgentes || 0);
+      
+      // Calcular faltanteSobrante
+      const faltanteSobrante = Number(formData.efectivoCierreTurno || 0) - efectivoTotal;
+      
+      setFormData(prev => ({
+        ...prev,
+        efectivoTotal,
+        faltanteSobrante
+      }));
+      
+      // Resetear el flag de recálculo después de calcular
+      if (shouldRecalculate) {
+        setShouldRecalculate(false);
+      }
+    }
   }, [
     formData.efectivoInicial,
     formData.adicionalCasa,
@@ -223,7 +284,10 @@ const CierreSuperForm: React.FC = () => {
     formData.pagoProductos,
     formData.gastos,
     formData.prestaAgentes,
-    formData.efectivoCierreTurno
+    formData.efectivoCierreTurno,
+    isLoadingData,
+    isEditing,
+    shouldRecalculate
   ]);
 
   const validateForm = (): boolean => {
@@ -251,7 +315,26 @@ const CierreSuperForm: React.FC = () => {
     if (type === 'checkbox') {
       setFormData({ ...formData, [name]: checked });
     } else if (type === 'number') {
-      setFormData({ ...formData, [name]: parseFloat(value) || 0 });
+      // Asegurar que el valor sea un número válido
+      const numericValue = value === '' ? 0 : parseFloat(value);
+      const validValue = isNaN(numericValue) ? 0 : numericValue;
+      
+      setFormData(prev => ({ ...prev, [name]: validValue }));
+      
+      // Si estamos editando y se modifica un campo que afecta los cálculos, activar recálculo
+      if (isEditing) {
+        const fieldsAffectingCalculations = [
+          'efectivoInicial', 'adicionalCasa', 'adicionalAgente', 'ventaContado', 
+          'ventaCredito', 'ventaPos', 'transfOccidente', 'transfAtlantida', 
+          'transfBac', 'transfBanpais', 'abonoCredito', 'ventaSaldo', 
+          'pagoProductos', 'gastos', 'prestaAgentes', 'efectivoCierreTurno'
+        ];
+        
+        if (fieldsAffectingCalculations.includes(name)) {
+          // Usar setTimeout para asegurar que el estado se actualice antes del recálculo
+          setTimeout(() => setShouldRecalculate(true), 0);
+        }
+      }
     } else {
       setFormData({ ...formData, [name]: value });
     }
@@ -293,6 +376,25 @@ const CierreSuperForm: React.FC = () => {
     }
   };
 
+  // Función para actualizar valores automáticos en modo edición
+  const handleActualizarValoresAutomaticos = async () => {
+    setIsUpdatingValues(true);
+    try {
+      // Cargar los valores actualizados de adicionales, préstamos, venta saldo, etc.
+      await cargarValoresAdicionalesPrestamos();
+      
+      // Activar recálculo de campos calculados
+      setShouldRecalculate(true);
+      
+      console.log('Valores automáticos actualizados correctamente');
+    } catch (error) {
+      console.error('Error al actualizar valores automáticos:', error);
+      alert('Error al actualizar los valores automáticos');
+    } finally {
+      setIsUpdatingValues(false);
+    }
+  };
+
   const handleCancel = () => {
     navigate('/cierres-super');
   };
@@ -320,14 +422,15 @@ const CierreSuperForm: React.FC = () => {
             <Grid item xs={12} md={6}>
               <TextField
                 fullWidth
-                label="ID de Usuario"
+                label="Usuario"
                 name="usuarioId"
-                type="number"
-                value={formData.usuarioId}
-                onChange={handleInputChange}
+                value={authState.user?.nombre || 'Usuario no disponible'}
                 error={!!formErrors.usuarioId}
                 helperText={formErrors.usuarioId}
-                disabled={isEditing}
+                InputProps={{
+                  readOnly: true,
+                }}
+                disabled
               />
             </Grid>
             
@@ -336,13 +439,18 @@ const CierreSuperForm: React.FC = () => {
                 label="Fecha y Hora de Cierre"
                 value={formData.fechaCierre}
                 onChange={handleDateChange}
+                readOnly
                 slotProps={{ 
                   textField: { 
                     fullWidth: true,
                     error: !!formErrors.fechaCierre,
-                    helperText: formErrors.fechaCierre
+                    helperText: formErrors.fechaCierre,
+                    InputProps: {
+                      readOnly: true,
+                    }
                   } 
                 }}
+                disabled
               />
             </Grid>
             
@@ -645,6 +753,19 @@ const CierreSuperForm: React.FC = () => {
                   startAdornment: <InputAdornment position="start">L.</InputAdornment>,
                 }}
               />
+              {showConteoWarning && (
+                <Typography
+                  variant="caption"
+                  sx={{
+                    color: 'error.main',
+                    mt: 0.5,
+                    display: 'block',
+                    fontSize: '0.75rem'
+                  }}
+                >
+                  Debes realizar el conteo de efectivo
+                </Typography>
+              )}
             </Grid>
             
             <Grid item xs={12} md={4}>
@@ -677,22 +798,43 @@ const CierreSuperForm: React.FC = () => {
             </Grid>
             
             <Grid item xs={12}>
-              <Box display="flex" justifyContent="flex-end" gap={2} mt={3}>
-                <Button
-                  variant="outlined"
-                  onClick={handleCancel}
-                  disabled={isSubmitting}
-                >
-                  Cancelar
-                </Button>
-                <Button
-                  type="submit"
-                  variant="contained"
-                  color="primary"
-                  disabled={isSubmitting}
-                >
-                  {isSubmitting ? <CircularProgress size={24} /> : isEditing ? 'Actualizar' : 'Guardar'}
-                </Button>
+              <Box display="flex" justifyContent="space-between" alignItems="center" mt={3}>
+                {/* Botón de actualizar valores automáticos en la esquina izquierda */}
+                {isEditing && (
+                  <Button
+                    variant="contained"
+                    size="small"
+                    color="success"
+                    onClick={handleActualizarValoresAutomaticos}
+                    disabled={isUpdatingValues}
+                    startIcon={isUpdatingValues ? <CircularProgress size={14} /> : undefined}
+                    sx={{ 
+                      fontSize: '0.75rem',
+                      textTransform: 'none'
+                    }}
+                  >
+                    {isUpdatingValues ? 'Actualizando...' : 'Actualizar Valores Automáticos'}
+                  </Button>
+                )}
+                
+                {/* Botones principales en la derecha */}
+                <Box display="flex" gap={2}>
+                  <Button
+                    variant="outlined"
+                    onClick={handleCancel}
+                    disabled={isSubmitting}
+                  >
+                    Cancelar
+                  </Button>
+                  <Button
+                    type="submit"
+                    variant="contained"
+                    color="primary"
+                    disabled={isSubmitting}
+                  >
+                    {isSubmitting ? <CircularProgress size={24} /> : isEditing ? 'Actualizar' : 'Guardar'}
+                  </Button>
+                </Box>
               </Box>
             </Grid>
           </Grid>

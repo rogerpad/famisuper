@@ -481,7 +481,9 @@ const BalanceSaleForm: React.FC = () => {
                 disabled={submitting}
               >
                 <MenuItem value="">Seleccione una línea</MenuItem>
-                {phoneLines?.map((phoneLine: PhoneLine) => (
+                {phoneLines?.filter(phoneLine => 
+                  phoneLine.nombre.toLowerCase().includes('tigo')
+                ).map((phoneLine: PhoneLine) => (
                   <MenuItem key={phoneLine.id} value={phoneLine.id}>
                     {phoneLine.nombre}
                   </MenuItem>

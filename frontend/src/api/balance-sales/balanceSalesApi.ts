@@ -6,11 +6,16 @@ export const useBalanceSales = () => {
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchBalanceSales = async (): Promise<BalanceSale[]> => {
+  const fetchBalanceSales = async (activo?: boolean): Promise<BalanceSale[]> => {
     setLoading(true);
     setError(null);
     try {
-      const response = await fetch(`${API_BASE_URL}/balance-sales`, {
+      let url = `${API_BASE_URL}/balance-sales`;
+      if (activo !== undefined) {
+        url += `?activo=${activo}`;
+      }
+      
+      const response = await fetch(url, {
         headers: {
           Authorization: `Bearer ${localStorage.getItem('token')}`,
         },

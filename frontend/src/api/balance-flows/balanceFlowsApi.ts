@@ -42,17 +42,25 @@ export const useBalanceFlows = () => {
   const [error, setError] = useState<string | null>(null);
 
   // Obtener todos los flujos de saldo
-  const fetchBalanceFlows = useCallback(async () => {
+  const fetchBalanceFlows = useCallback(async (activo?: boolean) => {
     setLoading(true);
     setError(null);
 
     try {
       if (USE_MOCK) {
         // Usar datos mock
-        setBalanceFlows(mockBalanceFlows);
+        const filteredFlows = activo !== undefined 
+          ? mockBalanceFlows.filter(flow => flow.activo === activo)
+          : mockBalanceFlows;
+        setBalanceFlows(filteredFlows);
       } else {
         // Usar API real
-        const response = await fetch(`${API_BASE_URL}/balance-flows`, {
+        let url = `${API_BASE_URL}/balance-flows`;
+        if (activo !== undefined) {
+          url += `?activo=${activo}`;
+        }
+        
+        const response = await fetch(url, {
           headers: {
             Authorization: `Bearer ${localStorage.getItem('token')}`,
           },

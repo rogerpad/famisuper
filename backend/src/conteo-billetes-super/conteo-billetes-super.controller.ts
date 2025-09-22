@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, Req } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, Req, Query } from '@nestjs/common';
 import { ConteoBilletesSuperService } from './conteo-billetes-super.service';
 import { CreateConteoBilletesSuperDto } from './dto/create-conteo-billetes-super.dto';
 import { UpdateConteoBilletesSuperDto } from './dto/update-conteo-billetes-super.dto';
@@ -23,8 +23,9 @@ export class ConteoBilletesSuperController {
 
   @Get()
   @RequirePermissions('ver_conteo_super')
-  findAll() {
-    return this.conteoBilletesSuperService.findAll();
+  findAll(@Query('activo') activo?: string) {
+    const activoFilter = activo !== undefined ? activo === 'true' : undefined;
+    return this.conteoBilletesSuperService.findAll(activoFilter);
   }
 
   @Get('last-active')

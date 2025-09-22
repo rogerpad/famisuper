@@ -48,8 +48,9 @@ export class BalanceSalesController {
 
   @Get()
   @RequierePermiso('ver_venta_paquete')
-  findAll() {
-    return this.balanceSalesService.findAll();
+  findAll(@Query('activo') activo?: string) {
+    const activoFilter = activo !== undefined ? activo === 'true' : undefined;
+    return this.balanceSalesService.findAll(activoFilter);
   }
 
   @Get('phone-line/:id')

@@ -22,6 +22,7 @@ const Login: React.FC = () => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [userInactiveError, setUserInactiveError] = useState(false);
 
   const formik = useFormik<LoginFormValues>({
     initialValues: {
@@ -38,6 +39,7 @@ const Login: React.FC = () => {
       try {
         setLoading(true);
         setError('');
+        setUserInactiveError(false);
         
         console.log('Intentando iniciar sesión con:', { 
           username: values.username, 
@@ -74,9 +76,9 @@ const Login: React.FC = () => {
           // Determinar la ruta de redirección según el rol del usuario
           let redirectPath = '/';
           
-          // Si el usuario tiene rol de Vendedor, redirigir a la página de turnos de vendedor
-          if (response.user && response.user.rol && response.user.rol.nombre === 'Vendedor') {
-            console.log('Usuario con rol Vendedor detectado, redirigiendo a /turnos/vendedor');
+          // Si el usuario tiene rol de Vendedor o VendedorB, redirigir a la página de turnos de vendedor
+          if (response.user && response.user.rol && (response.user.rol.nombre === 'Vendedor' || response.user.rol.nombre === 'VendedorB')) {
+            console.log(`Usuario con rol ${response.user.rol.nombre} detectado, redirigiendo a /turnos/vendedor`);
             redirectPath = '/turnos/vendedor';
           } else {
             console.log(`Usuario con rol ${response.user?.rol?.nombre || 'desconocido'}, redirigiendo a /`);
@@ -96,7 +98,21 @@ const Login: React.FC = () => {
         // Mostrar mensaje de error apropiado
         if (error.response) {
           if (error.response.status === 401) {
-            setErrors({ submit: 'Credenciales incorrectas o usuario inactivo' });
+            const errorMessage = error.response.data?.message || '';
+            console.log('[LOGIN] Mensaje de error recibido:', errorMessage);
+            console.log('[LOGIN] Datos completos del error:', error.response.data);
+            
+            // Detectar específicamente el error de usuario inactivo
+            if (errorMessage === 'Usuario inactivo') {
+              console.log('[LOGIN] Detectado usuario inactivo, configurando estado específico');
+              setUserInactiveError(true);
+              setErrors({ 
+                submit: 'No puede iniciar sesión con un usuario inactivo. Contacte al administrador.' 
+              });
+            } else {
+              console.log('[LOGIN] Error 401 pero no es usuario inactivo:', errorMessage);
+              setErrors({ submit: 'Credenciales incorrectas' });
+            }
           } else if (error.response.status >= 500) {
             setErrors({ submit: 'Error en el servidor. Inténtelo de nuevo más tarde.' });
           } else {
@@ -139,8 +155,12 @@ const Login: React.FC = () => {
         value={formik.values.username}
         onChange={formik.handleChange}
         onBlur={formik.handleBlur}
-        error={formik.touched.username && Boolean(formik.errors.username)}
-        helperText={formik.touched.username && formik.errors.username}
+        error={(formik.touched.username && Boolean(formik.errors.username)) || userInactiveError}
+        helperText={
+          userInactiveError 
+            ? 'Usuario inactivo' 
+            : (formik.touched.username && formik.errors.username)
+        }
       />
       
       <TextField

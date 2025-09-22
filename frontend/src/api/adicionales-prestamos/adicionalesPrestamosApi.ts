@@ -56,9 +56,14 @@ const normalizeAdicionalesPrestamosData = (data: any): AdicionalesPrestamosData 
 };
 
 // Obtener todos los adicionales/préstamos
-export const getAdicionalesPrestamos = async (): Promise<AdicionalesPrestamosData[]> => {
+export const getAdicionalesPrestamos = async (activo?: boolean): Promise<AdicionalesPrestamosData[]> => {
   try {
-    const response = await api.get(`${API_BASE_URL}/adicionales-prestamos`);
+    let url = `${API_BASE_URL}/adicionales-prestamos`;
+    if (activo !== undefined) {
+      url += `?activo=${activo}`;
+    }
+    
+    const response = await api.get(url);
     return response.data.map(normalizeAdicionalesPrestamosData);
   } catch (error) {
     console.error('[ADICIONALES_PRESTAMOS_API] Error al obtener adicionales/préstamos:', error);

@@ -77,7 +77,10 @@ export const useCierresSuper = () => {
     setLoading(true);
     setError(null);
     try {
-      const response = await api.patch<CierreSuper>(`${API_BASE_URL}/cierres-super/${id}`, data);
+      // Filtrar propiedades que no deben enviarse en la actualización
+      const { id: _, usuario, ...updateData } = data as any;
+      
+      const response = await api.patch<CierreSuper>(`${API_BASE_URL}/cierres-super/${id}`, updateData);
       return response.data;
     } catch (err: any) {
       setError(err.response?.data?.message || `Error al actualizar el cierre con ID ${id}`);
@@ -169,6 +172,20 @@ export const useCierresSuper = () => {
     }
   }, []);
 
+  // Obtener el último cierre inactivo del día para efectivo inicial
+  const getUltimoCierreInactivoDelDia = useCallback(async () => {
+    setError(null);
+    try {
+      const response = await api.get<{ efectivoCierreTurno: number } | null>(
+        `${API_BASE_URL}/cierres-super/ultimo-cierre-inactivo-dia`
+      );
+      return response.data;
+    } catch (err: any) {
+      setError(err.response?.data?.message || 'Error al obtener el último cierre inactivo del día');
+      return null;
+    }
+  }, []);
+
   return {
     loading,
     error,
@@ -183,5 +200,6 @@ export const useCierresSuper = () => {
     fetchCierresSuperByUsuario,
     fetchCierresSuperByFecha,
     filterCierresSuper,
+    getUltimoCierreInactivoDelDia,
   };
 };

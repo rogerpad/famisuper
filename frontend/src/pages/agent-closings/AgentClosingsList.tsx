@@ -93,8 +93,8 @@ const AgentClosingsList = () => {
     console.log('[AGENT_CLOSINGS] Iniciando finalización de turno:', turnoActual);
     
     try {
-      // Usar el método específico para vendedores que actualiza tbl_usuarios_turnos
-      await turnosApi.finalizarTurnoVendedor(turnoActual.id);
+      // Usar el método específico para agentes que actualiza tablas de operación de agentes
+      await turnosApi.finalizarTurnoAgente(turnoActual.id);
       console.log('[AGENT_CLOSINGS] Turno finalizado exitosamente');
       
       setFinalizarTurnoDialogOpen(false);
@@ -108,6 +108,9 @@ const AgentClosingsList = () => {
       refetch();
       
       enqueueSnackbar('Turno finalizado correctamente', { variant: 'success' });
+      
+      // Redireccionar a Mis turnos después de finalizar
+      navigate('/turnos/vendedor');
     } catch (error: any) {
       console.error('[AGENT_CLOSINGS] Error al finalizar turno:', error);
       
@@ -361,7 +364,7 @@ const AgentClosingsList = () => {
                 },
               }}
             >
-              Finalizar Turno
+              Finalizar Turno Agente
             </Button>
           )}
           <Button
@@ -481,7 +484,6 @@ const AgentClosingsList = () => {
                 <TableCell sx={{ fontWeight: 'bold', padding: '12px 16px', verticalAlign: 'middle' }}>Agente</TableCell>
                 <TableCell sx={{ fontWeight: 'bold', padding: '12px 16px', verticalAlign: 'middle' }}>Fecha de Cierre</TableCell>
                 <TableCell align="right" sx={{ fontWeight: 'bold', padding: '12px 16px', verticalAlign: 'middle' }}>Saldo Inicial</TableCell>
-                <TableCell align="right" sx={{ fontWeight: 'bold', padding: '12px 16px', verticalAlign: 'middle' }}>Adicional CTA</TableCell>
                 <TableCell align="right" sx={{ fontWeight: 'bold', padding: '12px 16px', verticalAlign: 'middle' }}>Resultado Final</TableCell>
                 <TableCell align="right" sx={{ fontWeight: 'bold', padding: '12px 16px', verticalAlign: 'middle' }}>Saldo Final</TableCell>
                 <TableCell align="right" sx={{ fontWeight: 'bold', padding: '12px 16px', verticalAlign: 'middle' }}>Diferencia</TableCell>
@@ -497,9 +499,6 @@ const AgentClosingsList = () => {
                   <TableCell sx={{ padding: '12px 16px', verticalAlign: 'middle' }}>{formatDate(closing.fechaCierre)}</TableCell>
                   <TableCell align="right" sx={{ padding: '12px 16px', verticalAlign: 'middle', fontFamily: 'monospace' }}>
                     {(closing.saldoInicial !== null && closing.saldoInicial !== undefined) ? Number(closing.saldoInicial).toFixed(2) : '0.00'}
-                  </TableCell>
-                  <TableCell align="right" sx={{ padding: '12px 16px', verticalAlign: 'middle', fontFamily: 'monospace' }}>
-                    {(closing.adicionalCta !== null && closing.adicionalCta !== undefined) ? Number(closing.adicionalCta).toFixed(2) : '0.00'}
                   </TableCell>
                   <TableCell align="right" sx={{ padding: '12px 16px', verticalAlign: 'middle', fontFamily: 'monospace' }}>
                     {(closing.resultadoFinal !== null && closing.resultadoFinal !== undefined) ? Number(closing.resultadoFinal).toFixed(2) : '0.00'}

@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, In } from 'typeorm';
+import { Repository, In, Between } from 'typeorm';
 import { CreateTurnoDto } from './dto/create-turno.dto';
 import { UpdateTurnoDto } from './dto/update-turno.dto';
 import { IniciarTurnoDto } from './dto/iniciar-turno.dto';
@@ -11,6 +11,12 @@ import { RegistroActividad } from './entities/registro-actividad.entity';
 import { AgentClosingsService } from '../agent-closings/agent-closings.service';
 import { TransactionsService } from '../transactions/transactions.service';
 import { BilletesService } from '../cash/services/billetes.service';
+import { CierreSuper } from '../cierres-super/entities/cierre-super.entity';
+import { SuperExpense } from '../../super-expenses/entities/super-expense.entity';
+import { BalanceFlow } from '../balance-flows/entities/balance-flow.entity';
+import { BalanceSale } from '../balance-sales/entities/balance-sale.entity';
+import { ConteoBilletesSuper } from '../../database/entities/conteo-billetes-super.entity';
+import { AdicionalesPrestamos } from '../../adicionales-prestamos/entities/adicionales-prestamos.entity';
 
 @Injectable()
 export class TurnosService {
@@ -21,6 +27,18 @@ export class TurnosService {
     private usersRepository: Repository<User>,
     @InjectRepository(RegistroActividad)
     private registroActividadRepository: Repository<RegistroActividad>,
+    @InjectRepository(CierreSuper)
+    private cierresSuperRepository: Repository<CierreSuper>,
+    @InjectRepository(SuperExpense)
+    private superExpensesRepository: Repository<SuperExpense>,
+    @InjectRepository(BalanceFlow)
+    private balanceFlowsRepository: Repository<BalanceFlow>,
+    @InjectRepository(BalanceSale)
+    private balanceSalesRepository: Repository<BalanceSale>,
+    @InjectRepository(ConteoBilletesSuper)
+    private conteoBilletesSuperRepository: Repository<ConteoBilletesSuper>,
+    @InjectRepository(AdicionalesPrestamos)
+    private adicionalesPrestamosRepository: Repository<AdicionalesPrestamos>,
     private agentClosingsService: AgentClosingsService,
     private transactionsService: TransactionsService,
     private billetesService: BilletesService,
@@ -605,6 +623,9 @@ export class TurnosService {
         horaFin: currentTimeString,
         activo: false // Al finalizar un turno, lo marcamos como inactivo
       });
+
+      // Desactivar registros activos en múltiples tablas relacionadas con el turno
+      await this.desactivarRegistrosDelTurno(id, userId);
       
       // Registrar la actividad
       await this.registroActividadRepository.save({
@@ -838,10 +859,123 @@ export class TurnosService {
         console.log('[TURNOS] Primeros registros encontrados:', registros.slice(0, 2));
       }
       
-      return { registros, total };
-    } catch (error) {
-      console.error(`[TURNOS] Error al obtener registros de actividad:`, error);
-      throw new BadRequestException(`Error al obtener registros de actividad: ${error.message}`);
-    }
+      // Obtener el total de registros que coinciden con los filtros
+      const totalQuery = this.registroActividadRepository.createQueryBuilder('registro')
+        .leftJoinAndSelect('registro.turno', 'turno')
+        .leftJoinAndSelect('registro.usuario', 'usuario');
+      
+      // Aplicar los mismos filtros para el conteo
+      if (validatedOptions?.turnoId !== undefined) {
+        totalQuery.andWhere('registro.turno_id = :turnoId', { turnoId: validatedOptions.turnoId });
+      }
+      
+      if (validatedOptions?.usuarioId !== undefined) {
+        totalQuery.andWhere('registro.usuario_id = :usuarioId', { usuarioId: validatedOptions.usuarioId });
+      }
+      
+      if (validatedOptions?.fechaInicio && validatedOptions.fechaInicio instanceof Date && !isNaN(validatedOptions.fechaInicio.getTime())) {
+        totalQuery.andWhere('registro.fecha_hora >= :fechaInicio', { 
+          fechaInicio: validatedOptions.fechaInicio 
+        });
+      }
+      
+      if (validatedOptions?.fechaFin && validatedOptions.fechaFin instanceof Date && !isNaN(validatedOptions.fechaFin.getTime())) {
+        totalQuery.andWhere('registro.fecha_hora <= :fechaFin', { 
+          fechaFin: validatedOptions.fechaFin 
+        });
+      }
+      
+      const totalCount = await totalQuery.getCount();
+      
+      return { registros, total: totalCount };
+  } catch (error) {
+    console.error('[TURNOS] Error al obtener registros de actividad:', error);
+    throw new BadRequestException(`Error al obtener registros de actividad: ${error.message}`);
   }
+}
+
+// Método privado para desactivar todos los registros relacionados con un turno
+private async desactivarRegistrosDelTurno(turnoId: number, usuarioId: number): Promise<void> {
+  console.log(`[TURNOS] Desactivando registros relacionados con el turno ${turnoId} para usuario ${usuarioId}`);
+  
+  try {
+    // Obtener la fecha actual para filtrar registros del día (solo año-mes-día)
+    const today = new Date();
+    const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+    const endOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 23, 59, 59, 999);
+
+    console.log(`[TURNOS] Filtrando registros del ${startOfDay.toISOString()} al ${endOfDay.toISOString()}`);
+
+    // 1. Desactivar cierres super del usuario del día actual
+    const cierresResult = await this.cierresSuperRepository.update(
+      {
+        usuarioId: usuarioId,
+        activo: true,
+        fechaCierre: Between(startOfDay, endOfDay)
+      },
+      { activo: false }
+    );
+    console.log(`[TURNOS] Desactivados ${cierresResult.affected} cierres super del usuario ${usuarioId}`);
+
+    // 2. Desactivar gastos super del usuario del día actual
+    const gastosResult = await this.superExpensesRepository.update(
+      {
+        usuarioId: usuarioId,
+        activo: true,
+        fechaEgreso: Between(startOfDay, endOfDay)
+      },
+      { activo: false }
+    );
+    console.log(`[TURNOS] Desactivados ${gastosResult.affected} gastos super del usuario ${usuarioId}`);
+
+    // 3. Desactivar flujos de saldo del día actual (no tiene usuarioId, se desactivan todos del día)
+    const flujosResult = await this.balanceFlowsRepository.update(
+      {
+        activo: true,
+        fecha: Between(startOfDay, endOfDay)
+      },
+      { activo: false }
+    );
+    console.log(`[TURNOS] Desactivados ${flujosResult.affected} flujos de saldo del día`);
+
+    // 4. Desactivar ventas de saldo del usuario del día actual
+    const ventasResult = await this.balanceSalesRepository.update(
+      {
+        usuarioId: usuarioId,
+        activo: true,
+        fecha: Between(startOfDay, endOfDay)
+      },
+      { activo: false }
+    );
+    console.log(`[TURNOS] Desactivadas ${ventasResult.affected} ventas de saldo del usuario ${usuarioId}`);
+
+    // 5. Desactivar conteos de billetes super del usuario del día actual
+    const conteosResult = await this.conteoBilletesSuperRepository.update(
+      {
+        usuarioId: usuarioId,
+        activo: true,
+        fecha: Between(startOfDay, endOfDay)
+      },
+      { activo: false }
+    );
+    console.log(`[TURNOS] Desactivados ${conteosResult.affected} conteos de billetes super del usuario ${usuarioId}`);
+
+    // 6. Desactivar adicionales y préstamos del usuario del día actual
+    const adicionalesResult = await this.adicionalesPrestamosRepository.update(
+      {
+        usuarioId: usuarioId,
+        activo: true,
+        fecha: Between(startOfDay, endOfDay)
+      },
+      { activo: false }
+    );
+    console.log(`[TURNOS] Desactivados ${adicionalesResult.affected} adicionales y préstamos del usuario ${usuarioId}`);
+
+    console.log(`[TURNOS] Finalizada desactivación de registros para el turno ${turnoId} del usuario ${usuarioId}`);
+  } catch (error) {
+    console.error(`[TURNOS] Error al desactivar registros del turno ${turnoId}:`, error);
+    // No lanzamos el error para no interrumpir el flujo principal de finalización del turno
+    // Solo logueamos el error para debugging
+  }
+}
 }

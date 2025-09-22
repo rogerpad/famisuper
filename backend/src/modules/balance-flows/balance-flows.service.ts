@@ -26,8 +26,14 @@ export class BalanceFlowsService {
     return this.balanceFlowsRepository.save(balanceFlow);
   }
 
-  async findAll(): Promise<BalanceFlow[]> {
+  async findAll(activo?: boolean): Promise<BalanceFlow[]> {
+    const whereCondition: any = {};
+    if (activo !== undefined) {
+      whereCondition.activo = activo;
+    }
+
     return this.balanceFlowsRepository.find({
+      where: whereCondition,
       relations: ['telefonica'],
       order: { fecha: 'DESC' },
     });
@@ -172,6 +178,12 @@ export class BalanceFlowsService {
       // 2. Para cada flujo, recalcular su saldo vendido y saldo final
       for (const flujo of flujosActivos) {
         try {
+          // 2.0 Verificar si es un flujo "Flujo Claro" y omitirlo
+          if (flujo.nombre && flujo.nombre.toLowerCase().includes('flujo claro')) {
+            this.logger.log(`Omitiendo recálculo para flujo "${flujo.nombre}" (ID: ${flujo.id})`, 'BalanceFlowsService');
+            continue; // Saltar este flujo y continuar con el siguiente
+          }
+          
           // 2.1 Obtener la suma de montos de ventas activas para este flujo
           this.logger.log(`Consultando ventas para flujo ID ${flujo.id}`, 'BalanceFlowsService');
           

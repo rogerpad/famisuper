@@ -359,10 +359,6 @@ const TurnosVendedor: React.FC = () => {
         <Typography variant="h4" component="h1" gutterBottom>
           Mis Turnos
         </Typography>
-        <FormControlLabel
-          control={<Switch checked={showDebug} onChange={(e) => setShowDebug(e.target.checked)} />}
-          label="Mostrar depuración"
-        />
       </Box>
       
       {showDebug && <PermissionsDebug />}
@@ -547,15 +543,6 @@ const TurnosVendedor: React.FC = () => {
         </Box>
       )}
 
-      {/* Mensaje si no hay turno actual pero hay turnos asignados */}
-      {!turnoActual && misTurnos.length > 0 && (
-        <Alert severity="info" sx={{ mb: 4 }}>
-          <AlertTitle>Sin turno activo</AlertTitle>
-          <Typography variant="body2">
-            No tienes un turno activo en este momento. Selecciona uno de tus turnos asignados para iniciarlo.
-          </Typography>
-        </Alert>
-      )}
 
       {/* Lista de todos mis turnos */}
       <Box mt={4}>
@@ -686,19 +673,6 @@ const TurnosVendedor: React.FC = () => {
                     {finalizarTurnoMutation.isLoading && finalizarTurnoMutation.variables === turno.id ? 'Finalizando...' : 'Finalizar'}
                   </Button>
 
-                  {/* Botón para reiniciar turno - Visible para usuarios con permiso reiniciar_turnos */}
-                  {hasPermission('reiniciar_turnos') && (
-                    <Button
-                      fullWidth
-                      variant="contained"
-                      color="secondary"
-                      onClick={() => handleReiniciarTurno(turno.id)}
-                      disabled={reiniciarTurnoMutation.isLoading}
-                      sx={{ mt: 1 }}
-                    >
-                      {reiniciarTurnoMutation.isLoading && reiniciarTurnoMutation.variables === turno.id ? 'Reiniciando...' : 'Reiniciar Turno'}
-                    </Button>
-                  )}
                 </CardActions>
               </Card>
             </Grid>

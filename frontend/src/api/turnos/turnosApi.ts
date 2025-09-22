@@ -496,7 +496,7 @@ const turnosApi = {
     }
   },
 
-  // Finalizar un turno como vendedor (actualizar la hora de fin con la hora actual)
+  // Finalizar un turno Vendedor (solo actualizar la hora de fin sin desactivar tablas de operación)
   finalizarTurnoVendedor: async (id: number | string): Promise<UsuarioTurno | Turno> => {
     // Validar el ID del turno
     const validId = toValidId(id);
@@ -511,12 +511,60 @@ const turnosApi = {
     }
     
     try {
-      console.log(`[TURNOS API] Finalizando turno como vendedor con ID validado: ${validId}`);
-      const response = await api.patch(`/turnos/${validId}/finalizar-vendedor`, {});
+      console.log(`[TURNOS API] Finalizando turno Vendedor con ID validado: ${validId}`);
+      const response = await api.patch(`/turnos/${validId}/finalizar-turno-vendedor`, {});
       return response.data;
     } catch (error: any) {
-      console.error(`[TURNOS API] Error al finalizar turno como vendedor ID ${validId}:`, error);
-      throw new Error(`Error al finalizar turno como vendedor: ${error.message || 'Error desconocido'}`);
+      console.error(`[TURNOS API] Error al finalizar turno Vendedor ID ${validId}:`, error);
+      throw new Error(`Error al finalizar turno Vendedor: ${error.message || 'Error desconocido'}`);
+    }
+  },
+
+  // Finalizar un turno Super (actualizar la hora de fin con la hora actual y desactivar tablas de operación Super)
+  finalizarTurnoSuper: async (id: number | string): Promise<UsuarioTurno | Turno> => {
+    // Validar el ID del turno
+    const validId = toValidId(id);
+    
+    if (validId === undefined) {
+      console.error(`[TURNOS API] ID de turno inválido para finalizarTurnoSuper: ${id}`);
+      throw new Error(`ID de turno inválido: ${id}`);
+    }
+    
+    if (USE_MOCK) {
+      return turnosMockApi.finalizarTurno(validId);
+    }
+    
+    try {
+      console.log(`[TURNOS API] Finalizando turno Super con ID validado: ${validId}`);
+      const response = await api.patch(`/turnos/${validId}/finalizar-turno-super`, {});
+      return response.data;
+    } catch (error: any) {
+      console.error(`[TURNOS API] Error al finalizar turno Super ID ${validId}:`, error);
+      throw new Error(`Error al finalizar turno Super: ${error.message || 'Error desconocido'}`);
+    }
+  },
+
+  // Finalizar un turno Agente (actualizar la hora de fin con la hora actual y desactivar tablas de operación Agente)
+  finalizarTurnoAgente: async (id: number | string): Promise<UsuarioTurno | Turno> => {
+    // Validar el ID del turno
+    const validId = toValidId(id);
+    
+    if (validId === undefined) {
+      console.error(`[TURNOS API] ID de turno inválido para finalizarTurnoAgente: ${id}`);
+      throw new Error(`ID de turno inválido: ${id}`);
+    }
+    
+    if (USE_MOCK) {
+      return turnosMockApi.finalizarTurno(validId);
+    }
+    
+    try {
+      console.log(`[TURNOS API] Finalizando turno Agente con ID validado: ${validId}`);
+      const response = await api.patch(`/turnos/${validId}/finalizar-turno-agente`, {});
+      return response.data;
+    } catch (error: any) {
+      console.error(`[TURNOS API] Error al finalizar turno Agente ID ${validId}:`, error);
+      throw new Error(`Error al finalizar turno Agente: ${error.message || 'Error desconocido'}`);
     }
   },
 

@@ -71,19 +71,21 @@ const authApi = {
       
       return response.data;
     } catch (error: any) {
-      // Mejorar el mensaje de error para el usuario
+      // Preservar el error original para que el componente Login pueda manejarlo específicamente
+      console.error('Error en la solicitud API:', error);
+      
       if (error.response) {
-        if (error.response.status === 401) {
-          console.error('Credenciales incorrectas o usuario inactivo');
-          throw new Error('Credenciales incorrectas o usuario inactivo');
-        } else {
-          console.error(`Error del servidor (${error.response.status}):`, error.response.data);
-          throw new Error(`Error del servidor: ${error.response.data.message || 'Error desconocido'}`);
-        }
+        console.error('Respuesta del servidor:', error.response.data);
+        console.error('Código de estado:', error.response.status);
+        console.error('Cabeceras:', error.response.headers);
+        
+        // Re-lanzar el error original para que el componente Login pueda acceder a error.response
+        throw error;
       } else if (error.request) {
         console.error('No se recibió respuesta del servidor');
         throw new Error('No se pudo conectar con el servidor. Verifique su conexión a internet.');
       }
+      
       console.error('Error en la solicitud de login:', error);
       throw error;
     }

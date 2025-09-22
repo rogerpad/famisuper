@@ -48,9 +48,9 @@ const ConteoBilletesSuperList: React.FC = () => {
   const canEdit = !!state.permissions['crear_editar_conteo_super'];
   const canDelete = !!state.permissions['eliminar_conteo_super'];
 
-  // Cargar datos al montar el componente
+  // Cargar datos al montar el componente (solo registros activos)
   useEffect(() => {
-    fetchConteoBilletesSuper();
+    fetchConteoBilletesSuper(true);
   }, [fetchConteoBilletesSuper]);
 
   // Manejar creación de nuevo conteo

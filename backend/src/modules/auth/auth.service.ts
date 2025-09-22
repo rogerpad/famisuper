@@ -51,6 +51,7 @@ export class AuthService {
     }
     
     if (!user.activo) {
+      console.log(`Error en login: Usuario inactivo`);
       throw new UnauthorizedException('Usuario inactivo');
     }
     

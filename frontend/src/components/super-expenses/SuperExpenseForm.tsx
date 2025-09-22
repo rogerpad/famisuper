@@ -16,6 +16,8 @@ import {
   Box,
   Typography,
   SelectChangeEvent,
+  FormControlLabel,
+  Switch,
 } from '@mui/material';
 import { SuperExpense, CreateSuperExpenseDto } from '../../api/super-expenses/types';
 import { useSuperExpenses } from '../../api/super-expenses/superExpensesApi';
@@ -201,6 +203,14 @@ const SuperExpenseForm: React.FC<SuperExpenseFormProps> = ({
         [name]: '',
       }));
     }
+  };
+
+  const handleSwitchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, checked } = e.target;
+    setFormData((prev) => ({
+      ...prev,
+      [name]: checked,
+    }));
   };
 
   // useEffect para mantener sincronizado el total cuando cambien los valores que lo componen
@@ -565,6 +575,22 @@ const SuperExpenseForm: React.FC<SuperExpenseFormProps> = ({
                   <FormHelperText>{errors.formaPagoId}</FormHelperText>
                 )}
               </FormControl>
+            </Grid>
+
+            <Grid item xs={12} md={6}>
+              <Box sx={{ display: 'flex', alignItems: 'center', height: '100%' }}>
+                <FormControlLabel
+                  control={
+                    <Switch
+                      checked={formData.activo}
+                      onChange={handleSwitchChange}
+                      name="activo"
+                      color="primary"
+                    />
+                  }
+                  label="Activo"
+                />
+              </Box>
             </Grid>
           </Grid>
 

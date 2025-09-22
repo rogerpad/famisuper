@@ -48,7 +48,7 @@ const BalanceFlowsList: React.FC = () => {
   const canDelete = hasPermission('eliminar_flujo');
 
   useEffect(() => {
-    fetchBalanceFlows();
+    fetchBalanceFlows(true);
   }, [fetchBalanceFlows]);
 
   const handleOpenForm = (balanceFlow?: BalanceFlow) => {
@@ -64,7 +64,7 @@ const BalanceFlowsList: React.FC = () => {
     setOpenForm(false);
     setSelectedBalanceFlow(null);
     if (refreshData) {
-      fetchBalanceFlows();
+      fetchBalanceFlows(true);
     }
   };
 

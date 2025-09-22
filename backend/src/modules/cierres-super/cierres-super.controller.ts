@@ -32,25 +32,13 @@ export class CierresSuperController {
     return this.cierresSuperService.findActivos();
   }
 
-  @Get(':id')
-  @UseGuards(PermissionsGuard)
-  @RequirePermissions('ver_cierre_super')
-  findOne(@Param('id') id: string) {
-    return this.cierresSuperService.findOne(+id);
-  }
-
-  @Patch(':id')
-  @UseGuards(PermissionsGuard)
-  @RequirePermissions('crear_editar_cierre_super')
-  update(@Param('id') id: string, @Body() updateCierreSuperDto: UpdateCierreSuperDto) {
-    return this.cierresSuperService.update(+id, updateCierreSuperDto);
-  }
-
-  @Delete(':id')
-  @UseGuards(PermissionsGuard)
-  @RequirePermissions('eliminar_cierre_super')
-  remove(@Param('id') id: string) {
-    return this.cierresSuperService.remove(+id);
+  @Get('ultimo-cierre-inactivo-dia')
+  @UseGuards(JwtAuthGuard)
+  async getUltimoCierreInactivoDelDia() {
+    console.log('[CIERRES_SUPER_CONTROLLER] Endpoint ultimo-cierre-inactivo-dia llamado');
+    const result = await this.cierresSuperService.getUltimoCierreInactivoDelDia();
+    console.log('[CIERRES_SUPER_CONTROLLER] Resultado del servicio:', result);
+    return result;
   }
 
   @Get('usuario/:usuarioId')
@@ -71,5 +59,30 @@ export class CierresSuperController {
       new Date(fechaInicio),
       new Date(fechaFin),
     );
+  }
+
+  @Get(':id')
+  @UseGuards(PermissionsGuard)
+  @RequirePermissions('ver_cierre_super')
+  findOne(@Param('id') id: string) {
+    const numericId = parseInt(id, 10);
+    if (isNaN(numericId)) {
+      throw new Error(`ID inválido: ${id}`);
+    }
+    return this.cierresSuperService.findOne(numericId);
+  }
+
+  @Patch(':id')
+  @UseGuards(PermissionsGuard)
+  @RequirePermissions('crear_editar_cierre_super')
+  update(@Param('id') id: string, @Body() updateCierreSuperDto: UpdateCierreSuperDto) {
+    return this.cierresSuperService.update(+id, updateCierreSuperDto);
+  }
+
+  @Delete(':id')
+  @UseGuards(PermissionsGuard)
+  @RequirePermissions('eliminar_cierre_super')
+  remove(@Param('id') id: string) {
+    return this.cierresSuperService.remove(+id);
   }
 }

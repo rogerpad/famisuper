@@ -232,7 +232,7 @@ export class UsuariosTurnosService {
     return this.findOne(asignacion.id);
   }
 
-  async finalizarTurnoVendedor(usuarioId: number, turnoId: number): Promise<UsuarioTurno> {
+  async finalizarTurnoSuper(usuarioId: number, turnoId: number): Promise<UsuarioTurno> {
     console.log(`[USUARIOS_TURNOS] ========== INICIANDO FINALIZACION DE TURNO ==========`);
     console.log(`[USUARIOS_TURNOS] Finalizando turno ID: ${turnoId} para vendedor ID: ${usuarioId}`);
     
@@ -270,82 +270,279 @@ export class UsuariosTurnosService {
 
       // 1. Actualizar la asignación del turno
       console.log(`[USUARIOS_TURNOS] === PASO 1: Actualizando asignación de turno ===`);
+      // Actualizar la asignación
       asignacion.horaFinReal = currentTimeString;
-      asignacion.activo = false;
-      // Resetear los campos de operación al finalizar el turno
-      asignacion.agente = false;
-      asignacion.super = false;
+      asignacion.activo = false; // Marcar como inactivo
+      asignacion.super = false; // Finalizar operación super
       
       await this.usuarioTurnoRepository.save(asignacion);
       console.log(`[USUARIOS_TURNOS] ✅ Asignación finalizada: ${asignacion.id}`);
       
-      // 2. Verificar si las tablas existen antes de actualizar
-      console.log(`[USUARIOS_TURNOS] === PASO 2: Verificando tablas existentes ===`);
+      // 2. Desactivar registros en las tablas correctas del día actual
+      console.log(`[USUARIOS_TURNOS] === PASO 2: Desactivando registros del día actual ===`);
       
-      // Verificar tabla tbl_transacciones_agentes
+      // Obtener fecha actual para filtrar registros del día
+      const today = new Date();
+      const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+      const endOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 23, 59, 59, 999);
+      
+      console.log(`[USUARIOS_TURNOS] Filtrando registros del ${startOfDay.toISOString()} al ${endOfDay.toISOString()}`);
+      
+      // 1. Desactivar cierres super del usuario del día actual
       try {
-        const tableExists1 = await this.usuarioTurnoRepository.manager.query(
-          "SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'tbl_transacciones_agentes'"
+        const cierresResult = await this.usuarioTurnoRepository.manager.query(
+          'UPDATE tbl_cierres_super SET activo = false WHERE usuario_id = $1 AND activo = true AND fecha_cierre >= $2 AND fecha_cierre <= $3',
+          [usuarioId, startOfDay, endOfDay]
         );
-        console.log(`[USUARIOS_TURNOS] Tabla tbl_transacciones_agentes existe:`, tableExists1.length > 0);
-        
-        if (tableExists1.length > 0) {
-          const agentTransactionsResult = await this.usuarioTurnoRepository.manager.query(
-            'UPDATE tbl_transacciones_agentes SET estado = 0 WHERE usuario_id = $1 AND estado = 1',
-            [usuarioId]
-          );
-          console.log(`[USUARIOS_TURNOS] ✅ Transacciones de agentes actualizadas: ${agentTransactionsResult[1] || 0} registros`);
-        }
-      } catch (agentTransError) {
-        console.error(`[USUARIOS_TURNOS] ❌ Error con tbl_transacciones_agentes:`, agentTransError.message);
+        console.log(`[USUARIOS_TURNOS] ✅ Cierres super desactivados: ${cierresResult[1] || 0} registros`);
+      } catch (error) {
+        console.error(`[USUARIOS_TURNOS] ❌ Error con tbl_cierres_super:`, error.message);
       }
       
-      // Verificar tabla tbl_cierre_final_agentes
+      // 2. Desactivar gastos super del usuario del día actual (excluyendo forma_pago_id = 1 que es Crédito)
       try {
-        const tableExists2 = await this.usuarioTurnoRepository.manager.query(
-          "SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'tbl_cierre_final_agentes'"
+        // Para campos DATE, usar solo la fecha actual sin hora
+        const todayDate = today.toISOString().split('T')[0]; // Formato YYYY-MM-DD
+        const gastosResult = await this.usuarioTurnoRepository.manager.query(
+          'UPDATE tbl_egresos_super SET activo = false WHERE usuario_id = $1 AND activo = true AND fecha_egreso = $2 AND forma_pago_id != 1',
+          [usuarioId, todayDate]
         );
-        console.log(`[USUARIOS_TURNOS] Tabla tbl_cierre_final_agentes existe:`, tableExists2.length > 0);
-        
-        if (tableExists2.length > 0) {
-          const agentClosingsResult = await this.usuarioTurnoRepository.manager.query(
-            'UPDATE tbl_cierre_final_agentes SET estado = $1 WHERE turno_id = $2 AND estado = $3',
-            ['inactivo', turnoId, 'activo']
-          );
-          console.log(`[USUARIOS_TURNOS] ✅ Cierres finales de agentes actualizados: ${agentClosingsResult[1] || 0} registros`);
-        }
-      } catch (agentClosingsError) {
-        console.error(`[USUARIOS_TURNOS] ❌ Error con tbl_cierre_final_agentes:`, agentClosingsError.message);
+        console.log(`[USUARIOS_TURNOS] ✅ Gastos super desactivados (excluyendo Crédito): ${gastosResult[1] || 0} registros`);
+      } catch (error) {
+        console.error(`[USUARIOS_TURNOS] ❌ Error con tbl_egresos_super:`, error.message);
       }
       
-      // Verificar tabla tbl_conteo_billetes
+      // 3. Desactivar flujos de saldo del día actual (no tiene usuarioId)
       try {
-        const tableExists3 = await this.usuarioTurnoRepository.manager.query(
-          "SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'tbl_conteo_billetes'"
+        const flujosResult = await this.usuarioTurnoRepository.manager.query(
+          'UPDATE tbl_flujos_saldo SET activo = false WHERE activo = true AND fecha >= $1 AND fecha <= $2',
+          [startOfDay, endOfDay]
         );
-        console.log(`[USUARIOS_TURNOS] Tabla tbl_conteo_billetes existe:`, tableExists3.length > 0);
-        
-        if (tableExists3.length > 0) {
-          const cashCountsResult = await this.usuarioTurnoRepository.manager.query(
-            'UPDATE tbl_conteo_billetes SET estado = 0 WHERE turno_id = $1 AND usuario_id = $2 AND estado = 1',
-            [turnoId, usuarioId]
-          );
-          console.log(`[USUARIOS_TURNOS] ✅ Conteos de billetes actualizados: ${cashCountsResult[1] || 0} registros`);
-        }
-      } catch (cashError) {
-        console.error(`[USUARIOS_TURNOS] ❌ Error con tbl_conteo_billetes:`, cashError.message);
+        console.log(`[USUARIOS_TURNOS] ✅ Flujos de saldo desactivados: ${flujosResult[1] || 0} registros`);
+      } catch (error) {
+        console.error(`[USUARIOS_TURNOS] ❌ Error con tbl_flujos_saldo:`, error.message);
+      }
+      
+      // 4. Desactivar ventas de saldo del usuario del día actual
+      try {
+        const ventasResult = await this.usuarioTurnoRepository.manager.query(
+          'UPDATE tbl_ventas_saldo SET activo = false WHERE usuario_id = $1 AND activo = true AND fecha >= $2 AND fecha <= $3',
+          [usuarioId, startOfDay, endOfDay]
+        );
+        console.log(`[USUARIOS_TURNOS] ✅ Ventas de saldo desactivadas: ${ventasResult[1] || 0} registros`);
+      } catch (error) {
+        console.error(`[USUARIOS_TURNOS] ❌ Error con tbl_ventas_saldo:`, error.message);
+      }
+      
+      // 5. Desactivar conteos de billetes super del usuario del día actual
+      try {
+        const conteosResult = await this.usuarioTurnoRepository.manager.query(
+          'UPDATE tbl_conteo_billetes_super SET activo = false WHERE usuario_id = $1 AND activo = true AND fecha >= $2 AND fecha <= $3',
+          [usuarioId, startOfDay, endOfDay]
+        );
+        console.log(`[USUARIOS_TURNOS] ✅ Conteos de billetes super desactivados: ${conteosResult[1] || 0} registros`);
+      } catch (error) {
+        console.error(`[USUARIOS_TURNOS] ❌ Error con tbl_conteo_billetes_super:`, error.message);
+      }
+      
+      // 6. Desactivar adicionales y préstamos del usuario del día actual
+      try {
+        const adicionalesResult = await this.usuarioTurnoRepository.manager.query(
+          'UPDATE tbl_adic_prest SET activo = false WHERE usuario_id = $1 AND activo = true AND fecha >= $2 AND fecha <= $3',
+          [usuarioId, startOfDay, endOfDay]
+        );
+        console.log(`[USUARIOS_TURNOS] ✅ Adicionales y préstamos desactivados: ${adicionalesResult[1] || 0} registros`);
+      } catch (error) {
+        console.error(`[USUARIOS_TURNOS] ❌ Error con tbl_adic_prest:`, error.message);
       }
       
       console.log(`[USUARIOS_TURNOS] ========== FINALIZACION COMPLETADA ==========`);
-      console.log(`[USUARIOS_TURNOS] ✅ Turno finalizado completamente para usuario ${usuarioId}, turno ${turnoId}`);
+      console.log(`[USUARIOS_TURNOS] ✅ Turno Super finalizado completamente para usuario ${usuarioId}, turno ${turnoId}`);
       
     } catch (error) {
-      console.error(`[USUARIOS_TURNOS] ❌ ERROR CRÍTICO al finalizar turno:`, error);
+      console.error(`[USUARIOS_TURNOS] ❌ ERROR CRÍTICO al finalizar turno Super:`, error);
       console.error(`[USUARIOS_TURNOS] Stack trace:`, error.stack);
-      throw new BadRequestException(`Error al finalizar turno: ${error.message}`);
+      throw new BadRequestException(`Error al finalizar turno Super: ${error.message}`);
     }
     
     return this.findOne(asignacion.id);
+  }
+
+  async finalizarTurnoAgente(usuarioId: number, turnoId: number): Promise<UsuarioTurno> {
+    console.log(`[USUARIOS_TURNOS] ========== INICIANDO FINALIZACION DE TURNO AGENTE ==========`);
+    console.log(`[USUARIOS_TURNOS] Finalizando turno ID: ${turnoId} para agente ID: ${usuarioId}`);
+    
+    // Validar IDs
+    if (!usuarioId || isNaN(Number(usuarioId))) {
+      console.error(`[USUARIOS_TURNOS] ERROR: ID de usuario inválido: ${usuarioId}`);
+      throw new BadRequestException(`ID de usuario inválido: ${usuarioId}`);
+    }
+    
+    if (!turnoId || isNaN(Number(turnoId))) {
+      console.error(`[USUARIOS_TURNOS] ERROR: ID de turno inválido: ${turnoId}`);
+      throw new BadRequestException(`ID de turno inválido: ${turnoId}`);
+    }
+
+    try {
+      // Buscar la asignación activa
+      const asignacion = await this.usuarioTurnoRepository.findOne({
+        where: {
+          usuarioId: usuarioId,
+          turnoId: turnoId,
+          activo: true
+        }
+      });
+
+      if (!asignacion) {
+        console.error(`[USUARIOS_TURNOS] ERROR: No se encontró asignación activa para usuario ${usuarioId} y turno ${turnoId}`);
+        throw new NotFoundException(`No se encontró una asignación activa para el usuario ${usuarioId} y turno ${turnoId}`);
+      }
+
+      console.log(`[USUARIOS_TURNOS] Asignación encontrada: ${asignacion.id}`);
+
+      // Obtener hora actual para registro
+      const now = new Date();
+      const currentTimeString = now.toTimeString().split(' ')[0]; // HH:MM:SS
+
+      // 1. Actualizar la asignación del turno
+      console.log(`[USUARIOS_TURNOS] === PASO 1: Actualizando asignación de turno ===`);
+      asignacion.horaFinReal = currentTimeString;
+      asignacion.activo = false; // Marcar como inactivo
+      asignacion.super = false; // Finalizar operación
+      
+      await this.usuarioTurnoRepository.save(asignacion);
+      console.log(`[USUARIOS_TURNOS] ✅ Asignación finalizada: ${asignacion.id}`);
+      
+      // 2. Desactivar registros en las tablas de operación de agentes del día actual
+      console.log(`[USUARIOS_TURNOS] === PASO 2: Desactivando registros de operación de agentes del día actual ===`);
+      
+      // Obtener fecha actual para filtrar registros del día
+      const today = new Date();
+      const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+      const endOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 23, 59, 59, 999);
+      
+      console.log(`[USUARIOS_TURNOS] Filtrando registros del ${startOfDay.toISOString()} al ${endOfDay.toISOString()}`);
+      
+      // 1. Desactivar transacciones de agentes del usuario del día actual
+      try {
+        const transaccionesResult = await this.usuarioTurnoRepository.manager.query(
+          'UPDATE tbl_transacciones_agentes SET activo = false WHERE usuario_id = $1 AND activo = true AND fecha >= $2 AND fecha <= $3',
+          [usuarioId, startOfDay, endOfDay]
+        );
+        console.log(`[USUARIOS_TURNOS] ✅ Transacciones de agentes desactivadas: ${transaccionesResult[1] || 0} registros`);
+      } catch (error) {
+        console.error(`[USUARIOS_TURNOS] ❌ Error con tbl_transacciones_agentes:`, error.message);
+      }
+      
+      // 2. Desactivar cierres finales de agentes del usuario del día actual
+      try {
+        const cierresResult = await this.usuarioTurnoRepository.manager.query(
+          'UPDATE tbl_cierre_final_agentes SET activo = false WHERE usuario_id = $1 AND activo = true AND fecha_cierre >= $2 AND fecha_cierre <= $3',
+          [usuarioId, startOfDay, endOfDay]
+        );
+        console.log(`[USUARIOS_TURNOS] ✅ Cierres finales de agentes desactivados: ${cierresResult[1] || 0} registros`);
+      } catch (error) {
+        console.error(`[USUARIOS_TURNOS] ❌ Error con tbl_cierre_final_agentes:`, error.message);
+      }
+      
+      // 3. Desactivar conteos de billetes del usuario del día actual
+      try {
+        const conteosResult = await this.usuarioTurnoRepository.manager.query(
+          'UPDATE tbl_conteo_billetes SET activo = false WHERE usuario_id = $1 AND activo = true AND fecha >= $2 AND fecha <= $3',
+          [usuarioId, startOfDay, endOfDay]
+        );
+        console.log(`[USUARIOS_TURNOS] ✅ Conteos de billetes desactivados: ${conteosResult[1] || 0} registros`);
+      } catch (error) {
+        console.error(`[USUARIOS_TURNOS] ❌ Error con tbl_conteo_billetes:`, error.message);
+      }
+      
+      console.log(`[USUARIOS_TURNOS] ========== FINALIZACION DE TURNO AGENTE COMPLETADA ==========`);
+      console.log(`[USUARIOS_TURNOS] ✅ Turno Agente finalizado completamente para usuario ${usuarioId}, turno ${turnoId}`);
+      
+    } catch (error) {
+      console.error(`[USUARIOS_TURNOS] ❌ ERROR CRÍTICO al finalizar turno Agente:`, error);
+      console.error(`[USUARIOS_TURNOS] Stack trace:`, error.stack);
+      throw new BadRequestException(`Error al finalizar turno Agente: ${error.message}`);
+    }
+    
+    // Buscar la asignación actualizada para retornar
+    const asignacionFinalizada = await this.usuarioTurnoRepository.findOne({
+      where: {
+        usuarioId: usuarioId,
+        turnoId: turnoId,
+        activo: false
+      },
+      order: { id: 'DESC' }
+    });
+    
+    return asignacionFinalizada || null;
+  }
+
+  async finalizarTurnoVendedor(usuarioId: number, turnoId: number): Promise<UsuarioTurno> {
+    console.log(`[USUARIOS_TURNOS] ========== INICIANDO FINALIZACION DE TURNO VENDEDOR (SIN OPERACIONES) ==========`);
+    console.log(`[USUARIOS_TURNOS] Finalizando turno ID: ${turnoId} para vendedor ID: ${usuarioId}`);
+    
+    // Validar IDs
+    if (!usuarioId || isNaN(Number(usuarioId))) {
+      console.error(`[USUARIOS_TURNOS] ERROR: ID de usuario inválido: ${usuarioId}`);
+      throw new BadRequestException(`ID de usuario inválido: ${usuarioId}`);
+    }
+    
+    if (!turnoId || isNaN(Number(turnoId))) {
+      console.error(`[USUARIOS_TURNOS] ERROR: ID de turno inválido: ${turnoId}`);
+      throw new BadRequestException(`ID de turno inválido: ${turnoId}`);
+    }
+
+    try {
+      // Buscar la asignación activa
+      const asignacion = await this.usuarioTurnoRepository.findOne({
+        where: {
+          usuarioId: usuarioId,
+          turnoId: turnoId,
+          activo: true
+        }
+      });
+
+      if (!asignacion) {
+        console.error(`[USUARIOS_TURNOS] ERROR: No se encontró asignación activa para usuario ${usuarioId} y turno ${turnoId}`);
+        throw new NotFoundException(`No se encontró una asignación activa para el usuario ${usuarioId} y turno ${turnoId}`);
+      }
+
+      console.log(`[USUARIOS_TURNOS] Asignación encontrada: ${asignacion.id}`);
+
+      // Obtener hora actual para registro
+      const now = new Date();
+      const currentTimeString = now.toTimeString().split(' ')[0]; // HH:MM:SS
+
+      // Solo actualizar la asignación del turno (sin actualizar tablas de operación)
+      console.log(`[USUARIOS_TURNOS] === FINALIZANDO TURNO SIN ACTUALIZAR TABLAS DE OPERACIÓN ===`);
+      asignacion.horaFinReal = currentTimeString;
+      asignacion.activo = false; // Marcar como inactivo
+      asignacion.super = false; // Finalizar operación
+      
+      await this.usuarioTurnoRepository.save(asignacion);
+      console.log(`[USUARIOS_TURNOS] ✅ Asignación finalizada: ${asignacion.id}`);
+      
+      console.log(`[USUARIOS_TURNOS] ========== FINALIZACION DE TURNO VENDEDOR COMPLETADA ==========`);
+      console.log(`[USUARIOS_TURNOS] ✅ Turno Vendedor finalizado (sin operaciones) para usuario ${usuarioId}, turno ${turnoId}`);
+      
+    } catch (error) {
+      console.error(`[USUARIOS_TURNOS] ❌ ERROR CRÍTICO al finalizar turno Vendedor:`, error);
+      console.error(`[USUARIOS_TURNOS] Stack trace:`, error.stack);
+      throw new BadRequestException(`Error al finalizar turno Vendedor: ${error.message}`);
+    }
+    
+    // Buscar la asignación actualizada para retornar
+    const asignacionFinalizada = await this.usuarioTurnoRepository.findOne({
+      where: {
+        usuarioId: usuarioId,
+        turnoId: turnoId,
+        activo: false
+      },
+      order: { id: 'DESC' }
+    });
+    
+    return asignacionFinalizada || null;
   }
 
   async reiniciarTurnoVendedor(usuarioId: number, turnoId: number): Promise<UsuarioTurno> {

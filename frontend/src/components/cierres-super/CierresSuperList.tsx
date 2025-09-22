@@ -33,22 +33,46 @@ import { useNavigate } from 'react-router-dom';
 import { useCierresSuper } from '../../api/cierres-super/cierresSuperApi';
 import { CierreSuper, CierreSuperFilters } from '../../api/cierres-super/types';
 import { useAuth } from '../../contexts/AuthContext';
+import { useTurno } from '../../contexts/TurnoContext';
+import turnosApi from '../../api/turnos/turnosApi';
+import { useSnackbar } from 'notistack';
 import { format } from 'date-fns';
 
 const CierresSuperList: React.FC = () => {
   const navigate = useNavigate();
-  const { loading, error, cierresSuper, fetchCierresSuper, deleteCierreSuper, filterCierresSuper } = useCierresSuper();
+  const { loading, error, cierresSuper, fetchCierresSuper, deleteCierreSuper, filterCierresSuper, getUltimoCierreInactivoDelDia } = useCierresSuper();
   const { state: authState } = useAuth();
+  const { turnoActual, refetchTurno } = useTurno();
+  const { enqueueSnackbar } = useSnackbar();
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [cierreToDelete, setCierreToDelete] = useState<number | null>(null);
-  const [filters, setFilters] = useState<CierreSuperFilters>({});
+  const [filters, setFilters] = useState<CierreSuperFilters>({ activo: true });
+  const [finalizarTurnoDialogOpen, setFinalizarTurnoDialogOpen] = useState(false);
 
   useEffect(() => {
-    fetchCierresSuper();
-  }, [fetchCierresSuper]);
+    // Cargar registros activos por defecto
+    filterCierresSuper(filters);
+  }, [filterCierresSuper]);
 
-  const handleCreateClick = () => {
-    navigate('/cierres-super/new');
+  const handleCreateClick = async () => {
+    try {
+      // Obtener el último cierre inactivo del día para el efectivo inicial
+      const ultimoCierre = await getUltimoCierreInactivoDelDia();
+      
+      if (ultimoCierre) {
+        // Si existe un cierre anterior inactivo del mismo día, navegar con el efectivo inicial
+        navigate('/cierres-super/new', { 
+          state: { efectivoInicial: ultimoCierre.efectivoCierreTurno } 
+        });
+      } else {
+        // Si no existe cierre anterior o es el primer turno del día, navegar sin efectivo inicial
+        navigate('/cierres-super/new');
+      }
+    } catch (error) {
+      console.error('Error al validar cierre anterior:', error);
+      // En caso de error, navegar normalmente
+      navigate('/cierres-super/new');
+    }
   };
 
   const handleEditClick = (id: number) => {
@@ -93,6 +117,63 @@ const CierresSuperList: React.FC = () => {
     fetchCierresSuper();
   };
 
+  // Manejador para finalizar turno
+  const handleFinalizarTurno = async () => {
+    if (!turnoActual) {
+      console.log('[CIERRES_SUPER] No hay turno actual para finalizar');
+      return;
+    }
+    
+    console.log('[CIERRES_SUPER] Iniciando finalización de turno:', turnoActual);
+    
+    try {
+      // Usar el método específico para super que actualiza tablas de operación de super
+      await turnosApi.finalizarTurnoSuper(turnoActual.id);
+      console.log('[CIERRES_SUPER] Turno finalizado exitosamente');
+      
+      setFinalizarTurnoDialogOpen(false);
+      
+      // Limpiar localStorage inmediatamente para evitar inconsistencias
+      localStorage.removeItem('turnoActual');
+      localStorage.removeItem('operacionActiva');
+      
+      // Refrescar datos del servidor inmediatamente
+      await refetchTurno();
+      fetchCierresSuper();
+      
+      enqueueSnackbar('Turno finalizado correctamente', { variant: 'success' });
+      
+      // Redireccionar a Mis turnos después de finalizar
+      navigate('/turnos/vendedor');
+    } catch (error: any) {
+      console.error('[CIERRES_SUPER] Error al finalizar turno:', error);
+      
+      // Extraer mensaje de error detallado
+      let errorMessage = 'Error desconocido al finalizar el turno';
+      
+      if (error.response) {
+        // Error de la API
+        errorMessage = error.response.data?.message || 
+                      error.response.data?.error || 
+                      `Error ${error.response.status}: ${error.response.statusText}`;
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
+      console.error('[CIERRES_SUPER] Mensaje de error:', errorMessage);
+      enqueueSnackbar(errorMessage, { variant: 'error' });
+    }
+  };
+
+  // Manejadores para finalizar turno
+  const handleFinalizarTurnoClick = () => {
+    setFinalizarTurnoDialogOpen(true);
+  };
+
+  const handleFinalizarTurnoCancel = () => {
+    setFinalizarTurnoDialogOpen(false);
+  };
+
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('es-HN', {
       style: 'currency',
@@ -116,16 +197,41 @@ const CierresSuperList: React.FC = () => {
     <Box>
       <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
         <Typography variant="h5">Cierres de Super</Typography>
-        {canCreateEdit && (
-          <Button
-            variant="contained"
-            color="primary"
-            startIcon={<AddIcon />}
-            onClick={handleCreateClick}
-          >
-            Nuevo Cierre
-          </Button>
-        )}
+        <Box display="flex" gap={2}>
+          {turnoActual && (
+            <Button
+              variant="contained"
+              color="secondary"
+              onClick={handleFinalizarTurnoClick}
+              disabled={!turnoActual}
+              sx={{
+                backgroundColor: '#2e86c1',
+                '&:hover': {
+                  backgroundColor: '#1a5276'
+                },
+              }}
+            >
+              Finalizar Turno Super
+            </Button>
+          )}
+          {canCreateEdit && (
+            <Button
+              variant="contained"
+              color="primary"
+              startIcon={<AddIcon />}
+              onClick={handleCreateClick}
+              sx={{
+                backgroundColor: '#dc7633',
+                '&:hover': {
+                  backgroundColor: '#b35c20'
+                },
+                boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+              }}
+            >
+              Nuevo Cierre
+            </Button>
+          )}
+        </Box>
       </Box>
 
       <Paper sx={{ p: 2, mb: 3 }}>
@@ -275,6 +381,38 @@ const CierresSuperList: React.FC = () => {
           </Button>
           <Button onClick={handleDeleteConfirm} color="error" autoFocus>
             Eliminar
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Diálogo de confirmación para finalizar turno */}
+      <Dialog
+        open={finalizarTurnoDialogOpen}
+        onClose={handleFinalizarTurnoCancel}
+      >
+        <DialogTitle>Confirmar finalización de turno</DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            ¿Ya has creado el cierre de Super y desea finalizar el turno actual? Esta acción no se puede deshacer.
+          </DialogContentText>
+          
+          {turnoActual && (
+            <Box mt={2}>
+              <Typography variant="subtitle2">Detalles del turno:</Typography>
+              <Typography variant="body2">ID: {turnoActual.id}</Typography>
+              <Typography variant="body2">Nombre: {turnoActual.nombre}</Typography>
+              <Typography variant="body2">Hora inicio: {turnoActual.horaInicio || 'No registrada'}</Typography>
+              <Typography variant="body2">Hora fin programada: {turnoActual.horaFin || 'No definida'}</Typography>
+            </Box>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleFinalizarTurnoCancel}>Cancelar</Button>
+          <Button 
+            onClick={handleFinalizarTurno}
+            color="primary"
+          >
+            Finalizar Turno
           </Button>
         </DialogActions>
       </Dialog>
