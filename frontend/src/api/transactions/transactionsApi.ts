@@ -25,7 +25,7 @@ export interface Transaction {
   };
   valor: number;
   observacion?: string;
-  estado: number;
+  estado: boolean;
   fechaRegistro: string;
 }
 
@@ -37,7 +37,7 @@ export interface CreateTransactionDto {
   tipoTransaccionId: number;
   valor: number;
   observacion?: string;
-  estado?: number; // Opcional porque se establecerá por defecto en el backend
+  estado?: boolean; // Opcional porque se establecerá por defecto en el backend
 }
 
 export interface UpdateTransactionDto {
@@ -48,7 +48,7 @@ export interface UpdateTransactionDto {
   tipoTransaccionId?: number;
   valor?: number;
   observacion?: string;
-  estado?: number;
+  estado?: boolean;
 }
 
 // El cliente HTTP centralizado ya maneja la autenticación

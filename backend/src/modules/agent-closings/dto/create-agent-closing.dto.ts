@@ -1,4 +1,4 @@
-import { IsNotEmpty, IsNumber, IsOptional, IsString, IsDateString } from 'class-validator';
+import { IsNotEmpty, IsNumber, IsOptional, IsString, IsDateString, IsBoolean } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiProperty } from '@nestjs/swagger';
 
@@ -48,10 +48,10 @@ export class CreateAgentClosingDto {
   @IsString({ message: 'Las observaciones deben ser un texto' })
   observaciones?: string;
 
-  @ApiProperty({ description: 'Estado del cierre', default: 'activo' })
+  @ApiProperty({ description: 'Estado del cierre', default: true })
   @IsOptional()
-  @IsString({ message: 'El estado debe ser texto' })
-  estado?: string = 'activo';
+  @IsBoolean({ message: 'El estado debe ser un valor booleano' })
+  estado?: boolean = true;
 
   @ApiProperty({ description: 'ID del turno asociado al cierre', required: false })
   @IsOptional()

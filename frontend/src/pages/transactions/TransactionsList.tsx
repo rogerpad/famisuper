@@ -89,8 +89,8 @@ const TransactionsList: React.FC<{}> = () => {
       // Crear una copia de la transacción para evitar problemas de referencia
       setEditingTransaction({
         ...transaction,
-        // Asegurar que el estado sea un número
-        estado: typeof transaction.estado === 'number' ? transaction.estado : 1
+        // Asegurar que el estado sea un boolean
+        estado: typeof transaction.estado === 'boolean' ? transaction.estado : true
       });
       setOpenForm(true);
       return;
@@ -215,7 +215,7 @@ const TransactionsList: React.FC<{}> = () => {
         let label = '';
         let color: 'success' | 'error' | 'default' = 'default';
         
-        if (estado === 1) {
+        if (estado === true) {
           label = 'Activa';
           color = 'success';
         } else {
@@ -272,8 +272,8 @@ const TransactionsList: React.FC<{}> = () => {
     if (filterOption === 'all') {
       // No aplicamos filtro por estado
     } else if (filterOption === 'active') {
-      // Filtramos solo las activas (estado = 1)
-      filtered = filtered.filter(transaction => transaction.estado === 1);
+      // Filtramos solo las activas (estado = true)
+      filtered = filtered.filter(transaction => transaction.estado === true);
     }
     // Si el filtro es 'today', ya hemos obtenido solo las del día desde la API
     

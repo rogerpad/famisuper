@@ -542,7 +542,7 @@ export class AgentClosingsService {
       const closing = await this.findOne(id);
       
       // Verificar que el cierre esté inactivo
-      if (closing.estado !== 'inactivo') {
+      if (closing.estado !== false) {
         console.error(`[CS-ADJUST] El cierre ${id} no está inactivo, estado actual: ${closing.estado}`);
         throw new ConflictException('Solo se pueden ajustar cierres inactivos');
       }
@@ -645,9 +645,9 @@ export class AgentClosingsService {
   /**
    * Actualiza el estado de todos los cierres asociados a un turno específico
    * @param turnoId ID del turno
-   * @param estado Nuevo estado para los cierres ('activo', 'inactivo', 'anulado')
+   * @param estado Nuevo estado para los cierres (true para activo, false para inactivo)
    */
-  async updateClosingStatusByTurno(turnoId: number, estado: string): Promise<void> {
+  async updateClosingStatusByTurno(turnoId: number, estado: boolean): Promise<void> {
     console.log(`[CS-UPDATE-STATUS] Actualizando estado a "${estado}" para cierres del turno ${turnoId}`);
     
     try {
@@ -657,18 +657,11 @@ export class AgentClosingsService {
         throw new Error(`ID de turno inválido: ${turnoId}`);
       }
       
-      // Validar que el estado sea válido
-      const estadosValidos = ['activo', 'inactivo', 'anulado'];
-      if (!estadosValidos.includes(estado.toLowerCase())) {
-        console.error(`[CS-UPDATE-STATUS] Estado inválido: ${estado}. Debe ser uno de: ${estadosValidos.join(', ')}`);
-        throw new Error(`Estado inválido: ${estado}. Debe ser uno de: ${estadosValidos.join(', ')}`);
-      }
-      
       // Actualizar todos los cierres asociados al turno especificado
       const result = await this.agentClosingsRepository
         .createQueryBuilder()
         .update(AgentClosing)
-        .set({ estado: estado.toLowerCase() })
+        .set({ estado: estado })
         .where('turno_id = :turnoId', { turnoId })
         .execute();
       

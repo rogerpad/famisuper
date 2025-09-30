@@ -18,7 +18,7 @@ export interface AgentClosing {
   saldoFinal: number;
   diferencia: number;
   observaciones: string | null;
-  estado: string;
+  estado: boolean;
   fechaCreacion: string;
   fechaActualizacion: string;
   turnoId?: number; // ID del turno asociado al cierre
@@ -33,7 +33,7 @@ export interface CreateAgentClosingDto {
   saldoFinal: number;
   diferencia: number;
   observaciones?: string;
-  estado?: string;
+  estado?: boolean;
   turnoId?: number; // ID del turno asociado al cierre
 }
 

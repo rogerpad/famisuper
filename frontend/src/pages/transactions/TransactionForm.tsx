@@ -43,7 +43,7 @@ const validationSchema = yup.object({
     .positive('El valor debe ser positivo')
     .min(0.01, 'El valor mínimo es 0.01'),
   observacion: yup.string(),
-  estado: yup.number().required('El estado es requerido'),
+  estado: yup.boolean().required('El estado es requerido'),
 });
 
 const TransactionForm: React.FC<TransactionFormProps> = ({ open, onClose, transaction }) => {
@@ -114,7 +114,7 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ open, onClose, transa
     usuarioId: number;
     agenteId: string | number; // Puede ser string en el formulario pero number en la API
     tipoTransaccionId: string | number; // Puede ser string en el formulario pero number en la API
-    estado: number;
+    estado: boolean;
     valor: string | number; // Puede ser string en el formulario pero number en la API
     observacion: string;
   }
@@ -132,7 +132,7 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ open, onClose, transa
       tipoTransaccionId: '',
       valor: '',
       observacion: '',
-      estado: 1, // Por defecto activa
+      estado: true, // Por defecto activa
     },
     validationSchema,
     onSubmit: (values) => {
@@ -151,7 +151,7 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ open, onClose, transa
         agenteId: Number(values.agenteId),
         tipoTransaccionId: Number(values.tipoTransaccionId),
         valor: Number(values.valor),
-        estado: Number(values.estado),
+        estado: values.estado,
       };
 
       // Registrar los datos que se van a enviar
@@ -177,8 +177,8 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ open, onClose, transa
     if (transaction) {
       console.log('Estado de la transacción:', transaction.estado);
       
-      // Asegurarse de que el estado sea un número
-      const estadoValue = typeof transaction.estado === 'number' ? transaction.estado : 1;
+      // Asegurarse de que el estado sea un boolean
+      const estadoValue = typeof transaction.estado === 'boolean' ? transaction.estado : true;
       
       // Corregir el problema de zona horaria al procesar la fecha
       // Usar directamente el string de fecha sin convertirlo a Date para evitar el desfase
@@ -402,12 +402,12 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ open, onClose, transa
                     labelId="estado-label"
                     id="estado"
                     name="estado"
-                    value={Number(formik.values.estado)}
-                    onChange={formik.handleChange}
+                    value={formik.values.estado ? "true" : "false"}
+                    onChange={(e) => formik.setFieldValue('estado', e.target.value === "true")}
                     label="Estado"
                   >
-                    <MenuItem value={1}>Activa</MenuItem>
-                    <MenuItem value={0}>Inactiva</MenuItem>
+                    <MenuItem value="true">Activa</MenuItem>
+                    <MenuItem value="false">Inactiva</MenuItem>
                   </Select>
                   {formik.touched.estado && formik.errors.estado && (
                     <FormHelperText>{formik.errors.estado}</FormHelperText>

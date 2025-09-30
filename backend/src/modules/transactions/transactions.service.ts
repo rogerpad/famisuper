@@ -39,8 +39,8 @@ export class TransactionsService {
     const newTransaction = this.transactionsRepository.create({
       ...createTransactionDto,
       fecha: fecha,
-      // Asegurar que el estado sea 1 (activo)
-      estado: 1,
+      // Asegurar que el estado sea true (activo)
+      estado: true,
     });
 
     return this.transactionsRepository.save(newTransaction);
@@ -86,7 +86,7 @@ export class TransactionsService {
       .leftJoinAndSelect('transaction.usuario', 'usuario')
       .leftJoinAndSelect('transaction.agente', 'agente')
       .leftJoinAndSelect('transaction.tipoTransaccion', 'tipoTransaccion')
-      .where('transaction.estado = :estado', { estado: 1 })
+      .where('transaction.estado = :estado', { estado: true })
       .orderBy('transaction.id', 'DESC')
       .getMany();
     
@@ -119,7 +119,7 @@ export class TransactionsService {
       .leftJoinAndSelect('transaction.usuario', 'usuario')
       .leftJoinAndSelect('transaction.agente', 'agente')
       .leftJoinAndSelect('transaction.tipoTransaccion', 'tipoTransaccion')
-      .where('transaction.estado = :estado', { estado: 1 })
+      .where('transaction.estado = :estado', { estado: true })
       .orderBy('transaction.fecha', 'DESC')
       .addOrderBy('transaction.hora', 'DESC')
       .getMany();
@@ -143,7 +143,7 @@ export class TransactionsService {
       .leftJoinAndSelect('transaction.usuario', 'usuario')
       .leftJoinAndSelect('transaction.agente', 'agente')
       .leftJoinAndSelect('transaction.tipoTransaccion', 'tipoTransaccion')
-      .where('transaction.estado = :estado', { estado: 1 })
+      .where('transaction.estado = :estado', { estado: true })
       .andWhere('transaction.fecha >= :startDate', { startDate })
       .andWhere('transaction.fecha <= :endDate', { endDate })
       .orderBy('transaction.fecha', 'DESC')
@@ -254,7 +254,7 @@ export class TransactionsService {
         .select('transaction.id')
         .innerJoin('tbl_usuarios_turnos', 'ut', 'transaction.usuario_id = ut.usuario_id')
         .where('transaction.fecha = :fecha', { fecha: formattedDate })
-        .andWhere('transaction.estado = :estado', { estado: 1 }) // Solo las activas
+        .andWhere('transaction.estado = :estado', { estado: true }) // Solo las activas
         .andWhere('ut.turno_id = :turnoId', { turnoId })
         .getMany();
       
@@ -273,7 +273,7 @@ export class TransactionsService {
       const result = await this.transactionsRepository
         .createQueryBuilder()
         .update(Transaction)
-        .set({ estado: 0 }) // 0 = inactivo
+        .set({ estado: false }) // false = inactivo
         .whereInIds(ids)
         .execute();
       
@@ -298,7 +298,7 @@ export class TransactionsService {
       .leftJoinAndSelect('transaction.usuario', 'usuario')
       .leftJoinAndSelect('transaction.agente', 'agente')
       .leftJoinAndSelect('transaction.tipoTransaccion', 'tipoTransaccion')
-      .where('transaction.estado = :estado', { estado: 1 })
+      .where('transaction.estado = :estado', { estado: true })
       .andWhere('transaction.fecha >= :startDate', { startDate })
       .andWhere('transaction.fecha <= :endDate', { endDate })
       .orderBy('transaction.fecha', 'DESC')
@@ -316,7 +316,7 @@ export class TransactionsService {
       .leftJoinAndSelect('transaction.agente', 'agente')
       .leftJoinAndSelect('transaction.tipoTransaccion', 'tipoTransaccion')
       .where('transaction.agenteId = :agenteId', { agenteId })
-      .andWhere('transaction.estado = :estado', { estado: 1 })
+      .andWhere('transaction.estado = :estado', { estado: true })
       .orderBy('transaction.fecha', 'DESC')
       .addOrderBy('transaction.hora', 'DESC')
       .getMany();
@@ -332,7 +332,7 @@ export class TransactionsService {
       .leftJoinAndSelect('transaction.agente', 'agente')
       .leftJoinAndSelect('transaction.tipoTransaccion', 'tipoTransaccion')
       .where('transaction.tipoTransaccionId = :tipoTransaccionId', { tipoTransaccionId })
-      .andWhere('transaction.estado = :estado', { estado: 1 })
+      .andWhere('transaction.estado = :estado', { estado: true })
       .orderBy('transaction.fecha', 'DESC')
       .addOrderBy('transaction.hora', 'DESC')
       .getMany();
@@ -357,7 +357,7 @@ export class TransactionsService {
       .leftJoinAndSelect('transaction.agente', 'agente')
       .leftJoinAndSelect('transaction.tipoTransaccion', 'tipoTransaccion')
       .where('transaction.agenteId = :agenteId', { agenteId })
-      .andWhere('transaction.estado = :estado', { estado: 1 })
+      .andWhere('transaction.estado = :estado', { estado: true })
       .andWhere('transaction.fecha >= :startDate', { startDate })
       .andWhere('transaction.fecha <= :endDate', { endDate })
       .orderBy('transaction.fecha', 'DESC')
@@ -393,7 +393,7 @@ export class TransactionsService {
       .createQueryBuilder('transaction')
       .where('transaction.agenteId = :agenteId', { agenteId })
       .andWhere('transaction.tipoTransaccionId = :tipoTransaccionId', { tipoTransaccionId })
-      .andWhere('transaction.estado = :estado', { estado: 1 }) // Solo transacciones activas
+      .andWhere('transaction.estado = :estado', { estado: true }) // Solo transacciones activas
       .getCount();
     
     console.log(`[TS] Encontradas ${transactionsCount} transacciones que cumplen los criterios`);
@@ -404,12 +404,12 @@ export class TransactionsService {
       .select('SUM(transaction.valor)', 'total')
       .where('transaction.agenteId = :agenteId', { agenteId })
       .andWhere('transaction.tipoTransaccionId = :tipoTransaccionId', { tipoTransaccionId })
-      .andWhere('transaction.estado = :estado', { estado: 1 }); // Solo transacciones activas
+      .andWhere('transaction.estado = :estado', { estado: true }); // Solo transacciones activas
     
     // Obtener la consulta SQL generada para depuración
     const sqlQuery = queryBuilder.getSql();
     console.log(`[TS] Consulta SQL generada: ${sqlQuery}`);
-    console.log(`[TS] Parámetros: `, { agenteId, tipoTransaccionId, estado: 1 });
+    console.log(`[TS] Parámetros: `, { agenteId, tipoTransaccionId, estado: true });
     
     const result = await queryBuilder.getRawOne();
     console.log(`[TS] Resultado de la consulta:`, result);
@@ -436,7 +436,7 @@ export class TransactionsService {
     const transactionsCount = await this.transactionsRepository
       .createQueryBuilder('transaction')
       .where('transaction.tipoTransaccionId = :tipoTransaccionId', { tipoTransaccionId })
-      .andWhere('transaction.estado = :estado', { estado: 1 }) // Solo transacciones activas
+      .andWhere('transaction.estado = :estado', { estado: true }) // Solo transacciones activas
       .getCount();
     
     console.log(`[TS] Encontradas ${transactionsCount} transacciones que cumplen los criterios`);
@@ -446,12 +446,12 @@ export class TransactionsService {
       .createQueryBuilder('transaction')
       .select('SUM(transaction.valor)', 'total')
       .where('transaction.tipoTransaccionId = :tipoTransaccionId', { tipoTransaccionId })
-      .andWhere('transaction.estado = :estado', { estado: 1 }); // Solo transacciones activas
+      .andWhere('transaction.estado = :estado', { estado: true }); // Solo transacciones activas
     
     // Obtener la consulta SQL generada para depuración
     const sqlQuery = queryBuilder.getSql();
     console.log(`[TS] Consulta SQL generada para suma total: ${sqlQuery}`);
-    console.log(`[TS] Parámetros: `, { tipoTransaccionId, estado: 1 });
+    console.log(`[TS] Parámetros: `, { tipoTransaccionId, estado: true });
     
     const result = await queryBuilder.getRawOne();
     console.log(`[TS] Resultado de la consulta suma total:`, result);

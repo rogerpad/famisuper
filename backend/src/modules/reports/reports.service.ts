@@ -66,7 +66,7 @@ export class ReportsService {
     // Obtener todas las transacciones activas
     const transactions = await this.transactionsRepository.find({
       where: {
-        estado: 1, // Solo transacciones activas
+        estado: true, // Solo transacciones activas
       },
       relations: ['tipoTransaccion', 'agente'],
     });

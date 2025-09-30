@@ -54,7 +54,7 @@ interface AgentClosingFormValues {
   saldoFinal: number;
   diferencia: number;
   observaciones?: string; // Opcional para permitir valores vacíos
-  estado?: string; // Opcional para usar valores por defecto
+  estado?: boolean; // Opcional para usar valores por defecto
   turnoId?: number; // ID del turno activo (opcional)
 }
 
@@ -92,7 +92,7 @@ const AgentClosingForm: React.FC = () => {
     saldoFinal: 0,
     diferencia: 0,
     observaciones: '', // Cambiado de null a cadena vacía
-    estado: 'activo',
+    estado: true,
     turnoId: turnoActual?.id, // Asignar el ID del turno activo si existe
   });
   
@@ -170,7 +170,7 @@ const AgentClosingForm: React.FC = () => {
         saldoFinal: Number(values.saldoFinal) || 0,
         diferencia: Number(values.diferencia) || 0,
         observaciones: values.observaciones || '',
-        estado: values.estado || 'activo',
+        estado: values.estado !== undefined ? values.estado : true,
       };
       
       // Validar turnoId si existe
@@ -254,7 +254,7 @@ const AgentClosingForm: React.FC = () => {
         saldoFinal: Number(data.saldoFinal) || 0,
         diferencia: Number(data.diferencia) || 0,
         observaciones: data.observaciones || undefined,
-        estado: data.estado || 'ACTIVO',
+        estado: data.estado !== undefined ? data.estado : true,
         // Mantener el turnoId si existe y es válido
         turnoId: data.turnoId ? toValidId(data.turnoId) : undefined,
       };
@@ -355,7 +355,7 @@ const AgentClosingForm: React.FC = () => {
           diferencia: Number(agentClosing.diferencia) || 0,
           // Asegurar que observaciones nunca sea null
           observaciones: agentClosing.observaciones || '',
-          estado: agentClosing.estado || 'activo',
+          estado: agentClosing.estado !== undefined ? agentClosing.estado : true,
           // Mantener el turnoId existente o usar el turno activo
           turnoId,
         });
@@ -380,7 +380,7 @@ const AgentClosingForm: React.FC = () => {
     saldoFinal: yup.number().required('El saldo final es requerido'),
     diferencia: yup.number().required('La diferencia es requerida'),
     observaciones: yup.string().default(''),
-    estado: yup.string().required('El estado es requerido'),
+    estado: yup.boolean().required('El estado es requerido'),
   });
 
   // Función para abrir el diálogo de confirmación
@@ -486,7 +486,7 @@ const AgentClosingForm: React.FC = () => {
       dataToSend.adicionalCta = Number(dataToSend.adicionalCta) || 0;
       dataToSend.saldoFinal = Number(dataToSend.saldoFinal) || 0;
       dataToSend.observaciones = dataToSend.observaciones || '';
-      dataToSend.estado = dataToSend.estado || 'activo';
+      dataToSend.estado = dataToSend.estado !== undefined ? dataToSend.estado : true;
       
       // Validar turnoId si existe
       let turnoIdValidado = undefined;
@@ -555,7 +555,7 @@ const AgentClosingForm: React.FC = () => {
             diferencia: Number(dataToSend.diferencia) || 0,
             observaciones: dataToSend.observaciones,
             // Incluir el estado del cierre
-            estado: dataToSend.estado || 'ACTIVO',
+            estado: dataToSend.estado !== undefined ? dataToSend.estado : true,
             // Solo incluir turnoId si es válido
             turnoId: dataToSend.turnoId ? Number(dataToSend.turnoId) : undefined
           };
@@ -747,8 +747,8 @@ const AgentClosingForm: React.FC = () => {
       // Obtener todas las transacciones del agente
       const transactions = await transactionsApi.getByAgent(proveedorId);
       
-      // Filtrar transacciones activas (estado = 1)
-      const activeTrans = transactions.filter(transaction => transaction.estado === 1);
+      // Filtrar transacciones activas (estado = true)
+      const activeTrans = transactions.filter(transaction => transaction.estado === true);
       
       // Buscar la transacción de tipo Saldo Inicial por el nombre del tipo de transacción
       const saldoInicialTransaction = activeTrans.find(transaction => 
@@ -1444,8 +1444,8 @@ const AgentClosingForm: React.FC = () => {
                     <FormControl fullWidth error={touched.estado && Boolean(errors.estado)}>
                       <InputLabel id="estado-label">Estado</InputLabel>
                       <Field as={Select} labelId="estado-label" id="estado" name="estado" label="Estado">
-                        <MenuItem value="activo">Activo</MenuItem>
-                        <MenuItem value="inactivo">Inactivo</MenuItem>
+                        <MenuItem value="true">Activo</MenuItem>
+                        <MenuItem value="false">Inactivo</MenuItem>
                       </Field>
                       <ErrorMessage name="estado" component={FormHelperText} />
                     </FormControl>

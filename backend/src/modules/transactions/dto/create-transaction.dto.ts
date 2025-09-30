@@ -1,4 +1,4 @@
-import { IsNotEmpty, IsNumber, IsString, IsOptional, IsDateString, IsPositive, Min, IsInt } from 'class-validator';
+import { IsNotEmpty, IsNumber, IsString, IsOptional, IsDateString, IsPositive, Min, IsBoolean } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 
 export class CreateTransactionDto {
@@ -39,8 +39,8 @@ export class CreateTransactionDto {
   @IsOptional()
   observacion?: string;
 
-  @ApiProperty({ description: 'Estado de la transacción (1: activa)', example: 1, default: 1 })
-  @IsInt()
+  @ApiProperty({ description: 'Estado de la transacción (true: activa, false: inactiva)', example: true, default: true })
+  @IsBoolean()
   @IsOptional()
-  estado: number = 1;
+  estado: boolean = true;
 }

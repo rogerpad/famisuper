@@ -496,7 +496,7 @@ export class TurnosService {
       // Actualizar el estado de los cierres de agentes asociados a este turno a inactivo
       try {
         console.log(`[TURNOS] Actualizando estado de cierres de agentes para turno ${id} a inactivo`);
-        await this.agentClosingsService.updateClosingStatusByTurno(id, 'inactivo');
+        await this.agentClosingsService.updateClosingStatusByTurno(id, false);
         console.log(`[TURNOS] Estado de cierres de agentes actualizado correctamente`);
       } catch (closingError) {
         console.error(`[TURNOS] Error al actualizar estado de cierres de agentes:`, closingError);

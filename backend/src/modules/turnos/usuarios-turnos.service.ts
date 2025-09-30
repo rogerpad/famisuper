@@ -416,29 +416,46 @@ export class UsuariosTurnosService {
       // 2. Desactivar registros en las tablas de operación de agentes del día actual
       console.log(`[USUARIOS_TURNOS] === PASO 2: Desactivando registros de operación de agentes del día actual ===`);
       
-      // Obtener fecha actual para filtrar registros del día
+      // Obtener fecha actual en formato YYYY-MM-DD usando zona horaria local
       const today = new Date();
-      const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-      const endOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 23, 59, 59, 999);
+      const year = today.getFullYear();
+      const month = String(today.getMonth() + 1).padStart(2, '0');
+      const day = String(today.getDate()).padStart(2, '0');
+      const todayString = `${year}-${month}-${day}`; // Formato YYYY-MM-DD en zona horaria local
       
-      console.log(`[USUARIOS_TURNOS] Filtrando registros del ${startOfDay.toISOString()} al ${endOfDay.toISOString()}`);
+      console.log(`[USUARIOS_TURNOS] Fecha actual calculada: ${todayString} (Año: ${year}, Mes: ${month}, Día: ${day})`);
+      console.log(`[USUARIOS_TURNOS] Filtrando registros del día: ${todayString} para usuario: ${usuarioId}`);
       
       // 1. Desactivar transacciones de agentes del usuario del día actual
       try {
+        // Primero verificar qué registros existen
+        const verificarTransacciones = await this.usuarioTurnoRepository.manager.query(
+          'SELECT id, fecha, estado FROM tbl_transacciones_agentes WHERE usuario_id = $1 AND fecha = $2',
+          [usuarioId, todayString]
+        );
+        console.log(`[USUARIOS_TURNOS] 🔍 Transacciones encontradas para usuario ${usuarioId} en fecha ${todayString}:`, verificarTransacciones);
+        
         const transaccionesResult = await this.usuarioTurnoRepository.manager.query(
-          'UPDATE tbl_transacciones_agentes SET activo = false WHERE usuario_id = $1 AND activo = true AND fecha >= $2 AND fecha <= $3',
-          [usuarioId, startOfDay, endOfDay]
+          'UPDATE tbl_transacciones_agentes SET estado = false WHERE usuario_id = $1 AND estado = true AND fecha = $2',
+          [usuarioId, todayString]
         );
         console.log(`[USUARIOS_TURNOS] ✅ Transacciones de agentes desactivadas: ${transaccionesResult[1] || 0} registros`);
       } catch (error) {
         console.error(`[USUARIOS_TURNOS] ❌ Error con tbl_transacciones_agentes:`, error.message);
       }
       
-      // 2. Desactivar cierres finales de agentes del usuario del día actual
+      // 2. Desactivar cierres finales de agentes del día actual
       try {
+        // Primero verificar qué registros existen
+        const verificarCierres = await this.usuarioTurnoRepository.manager.query(
+          'SELECT id, fecha_cierre, estado FROM tbl_cierre_final_agentes WHERE fecha_cierre = $1',
+          [todayString]
+        );
+        console.log(`[USUARIOS_TURNOS] 🔍 Cierres encontrados en fecha ${todayString}:`, verificarCierres);
+        
         const cierresResult = await this.usuarioTurnoRepository.manager.query(
-          'UPDATE tbl_cierre_final_agentes SET activo = false WHERE usuario_id = $1 AND activo = true AND fecha_cierre >= $2 AND fecha_cierre <= $3',
-          [usuarioId, startOfDay, endOfDay]
+          'UPDATE tbl_cierre_final_agentes SET estado = false WHERE estado = true AND fecha_cierre = $1',
+          [todayString]
         );
         console.log(`[USUARIOS_TURNOS] ✅ Cierres finales de agentes desactivados: ${cierresResult[1] || 0} registros`);
       } catch (error) {
@@ -447,9 +464,16 @@ export class UsuariosTurnosService {
       
       // 3. Desactivar conteos de billetes del usuario del día actual
       try {
+        // Para campos timestamp, necesitamos usar DATE() para extraer solo la fecha
+        const verificarConteos = await this.usuarioTurnoRepository.manager.query(
+          'SELECT id, fecha, estado FROM tbl_conteo_billetes WHERE usuario_id = $1 AND DATE(fecha) = $2',
+          [usuarioId, todayString]
+        );
+        console.log(`[USUARIOS_TURNOS] 🔍 Conteos encontrados para usuario ${usuarioId} en fecha ${todayString}:`, verificarConteos);
+        
         const conteosResult = await this.usuarioTurnoRepository.manager.query(
-          'UPDATE tbl_conteo_billetes SET activo = false WHERE usuario_id = $1 AND activo = true AND fecha >= $2 AND fecha <= $3',
-          [usuarioId, startOfDay, endOfDay]
+          'UPDATE tbl_conteo_billetes SET estado = false WHERE usuario_id = $1 AND estado = true AND DATE(fecha) = $2',
+          [usuarioId, todayString]
         );
         console.log(`[USUARIOS_TURNOS] ✅ Conteos de billetes desactivados: ${conteosResult[1] || 0} registros`);
       } catch (error) {

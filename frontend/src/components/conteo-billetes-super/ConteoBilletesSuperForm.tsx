@@ -15,7 +15,9 @@ import {
   TableCell,
   TableContainer,
   TableHead,
-  TableRow
+  TableRow,
+  Snackbar,
+  Alert
 } from '@mui/material';
 // Importaciones de date-fns para formateo de fechas
 import { useConteoBilletesSuper } from '../../api/conteo-billetes-super/conteoBilletesSuperApi';
@@ -93,6 +95,10 @@ const ConteoBilletesSuperForm: React.FC = () => {
   // Estado para el envío del formulario
   const [submitting, setSubmitting] = useState<boolean>(false);
   const [conteoId, setConteoId] = useState<number | null>(null);
+  
+  // Estado para notificaciones
+  const [showSuccess, setShowSuccess] = useState<boolean>(false);
+  const [successMessage, setSuccessMessage] = useState<string>('');
 
   // Definir las filas de denominaciones
   const denominaciones: DenominacionRow[] = [
@@ -210,6 +216,22 @@ const ConteoBilletesSuperForm: React.FC = () => {
     }));
   };
   
+  // Función para limpiar el formulario
+  const clearForm = () => {
+    setFormData({
+      cant500: 0,
+      cant200: 0,
+      cant100: 0,
+      cant50: 0,
+      cant20: 0,
+      cant10: 0,
+      cant5: 0,
+      cant2: 0,
+      cant1: 0,
+    });
+    setConteoId(null);
+  };
+
   // La fecha ahora se genera automáticamente en el backend
 
   // Manejar envío del formulario
@@ -240,8 +262,20 @@ const ConteoBilletesSuperForm: React.FC = () => {
       }
 
       if (result) {
-        // Navegar a la lista de conteos
-        navigate('/conteo-billetes-super');
+        // Mostrar notificación de éxito
+        const message = isEditMode ? 'Conteo actualizado exitosamente' : 'Conteo guardado exitosamente';
+        setSuccessMessage(message);
+        setShowSuccess(true);
+        
+        // Si no estamos en modo edición, limpiar el formulario
+        if (!isEditMode) {
+          clearForm();
+        } else {
+          // Si estamos editando, navegar a la lista después de un breve delay
+          setTimeout(() => {
+            navigate('/conteo-billetes-super');
+          }, 2000);
+        }
       }
     } catch (error: any) {
       console.error('Error al guardar conteo:', error);
@@ -254,6 +288,14 @@ const ConteoBilletesSuperForm: React.FC = () => {
   // Manejar cancelación
   const handleCancel = () => {
     navigate('/conteo-billetes-super');
+  };
+
+  // Manejar cierre de notificación
+  const handleCloseSuccess = (event?: React.SyntheticEvent | Event, reason?: string) => {
+    if (reason === 'clickaway') {
+      return;
+    }
+    setShowSuccess(false);
   };
 
   // Formatear fecha actual
@@ -367,6 +409,23 @@ const ConteoBilletesSuperForm: React.FC = () => {
           </Button>
         </Box>
       </Box>
+
+      {/* Notificación de éxito */}
+      <Snackbar
+        open={showSuccess}
+        autoHideDuration={4000}
+        onClose={handleCloseSuccess}
+        anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
+      >
+        <Alert
+          onClose={handleCloseSuccess}
+          severity="success"
+          variant="filled"
+          sx={{ width: '100%' }}
+        >
+          {successMessage}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 };

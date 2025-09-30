@@ -278,7 +278,7 @@ const AgentClosingsList = () => {
       const tbody = document.createElement('tbody');
       
       // Filtrar solo cierres activos para el PDF
-      const activeClosings = closings.filter(closing => closing.estado === 'activo');
+      const activeClosings = closings.filter(closing => closing.estado === true);
       
       activeClosings.forEach(closing => {
         const row = document.createElement('tr');
@@ -492,7 +492,7 @@ const AgentClosingsList = () => {
               </TableRow>
             </TableHead>
             <TableBody>
-              {closings?.filter(closing => closing.estado === 'activo')?.map((closing) => (
+              {closings?.filter(closing => closing.estado === true)?.map((closing) => (
                 <TableRow key={closing.id}>
                   <TableCell sx={{ padding: '12px 16px', verticalAlign: 'middle' }}>{closing.id}</TableCell>
                   <TableCell sx={{ padding: '12px 16px', verticalAlign: 'middle' }}>{closing.proveedor?.nombre || 'N/A'}</TableCell>
@@ -511,8 +511,8 @@ const AgentClosingsList = () => {
                   </TableCell>
                   <TableCell sx={{ padding: '12px 16px', verticalAlign: 'middle' }}>
                     <Chip 
-                      label={closing.estado} 
-                      color={closing.estado === 'activo' ? 'success' : 'default'} 
+                      label={closing.estado ? 'Activo' : 'Inactivo'} 
+                      color={closing.estado === true ? 'success' : 'default'} 
                       size="small" 
                     />
                   </TableCell>
@@ -520,18 +520,18 @@ const AgentClosingsList = () => {
                     <IconButton 
                       size="small" 
                       onClick={() => navigate(`/agent-closings/edit/${closing.id}`)}
-                      disabled={closing.estado !== 'activo'}
+                      disabled={closing.estado !== true}
                     >
                       <EditIcon fontSize="small" />
                     </IconButton>
                     <IconButton 
                       size="small" 
                       onClick={() => handleDeleteClick(closing.id)}
-                      disabled={closing.estado !== 'activo'}
+                      disabled={closing.estado !== true}
                     >
                       <DeleteIcon fontSize="small" />
                     </IconButton>
-                    {closing.estado === 'inactivo' && (
+                    {closing.estado === false && (
                       <>
                         <Tooltip title="Realizar ajuste">
                           <IconButton 

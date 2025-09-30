@@ -38,8 +38,8 @@ export class AgentClosing {
   @Column({ name: 'observaciones', type: 'text', nullable: true })
   observaciones: string;
 
-  @Column({ name: 'estado', default: 'activo' })
-  estado: string;
+  @Column({ name: 'estado', type: 'boolean', default: true })
+  estado: boolean;
 
   @CreateDateColumn({ name: 'fecha_creacion' })
   fechaCreacion: Date;
