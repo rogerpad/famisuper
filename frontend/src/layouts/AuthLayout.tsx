@@ -28,7 +28,7 @@ const AuthLayout: React.FC = () => {
             Famisuper
           </Typography>
           <Typography component="h2" variant="h6" color="textSecondary" gutterBottom>
-            Sistema de Cierre de Transacciones
+            Sistema de Cierre
           </Typography>
           <Box sx={{ width: '100%', mt: 2 }}>
             <Outlet />

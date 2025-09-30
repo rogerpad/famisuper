@@ -18,20 +18,33 @@ export class MigrationService implements OnModuleInit {
     try {
       this.logger.log('Ejecutando migración para actualizar campo estado en transacciones...');
       
-      // Verificar si la columna estado existe
-      const columnExists = await this.checkIfColumnExists();
+      // Verificar si la columna estado existe y su tipo
+      const columnInfo = await this.getColumnInfo();
       
-      if (!columnExists) {
-        // Agregar la columna estado
-        await this.dataSource.query(`ALTER TABLE tbl_transacciones_agentes ADD COLUMN estado INTEGER DEFAULT 1`);
-        this.logger.log('Columna estado agregada a la tabla tbl_transacciones_agentes');
+      if (!columnInfo.exists) {
+        // Agregar la columna estado como boolean
+        await this.dataSource.query(`ALTER TABLE tbl_transacciones_agentes ADD COLUMN estado BOOLEAN DEFAULT true`);
+        this.logger.log('Columna estado agregada a la tabla tbl_transacciones_agentes como boolean');
+      } else if (columnInfo.type === 'boolean') {
+        // La columna ya es boolean, solo verificar que no hay valores NULL
+        this.logger.log('Columna estado ya es de tipo boolean, verificando valores NULL...');
+      } else if (columnInfo.type === 'integer') {
+        // Si existe como integer, convertir a boolean (para bases de datos legacy)
+        this.logger.log('Convirtiendo columna estado de integer a boolean...');
+        
+        // Primero, actualizar valores integer a boolean equivalentes
+        await this.dataSource.query(`UPDATE tbl_transacciones_agentes SET estado = CASE WHEN estado = 1 THEN true ELSE false END WHERE estado IS NOT NULL`);
+        
+        // Cambiar el tipo de columna
+        await this.dataSource.query(`ALTER TABLE tbl_transacciones_agentes ALTER COLUMN estado TYPE BOOLEAN USING estado::boolean`);
+        this.logger.log('Columna estado convertida a boolean exitosamente');
       }
       
-      // Actualizar todas las transacciones existentes para que tengan estado = 1
-      await this.dataSource.query(`UPDATE tbl_transacciones_agentes SET estado = 1 WHERE estado IS NULL`);
-      this.logger.log('Todas las transacciones han sido actualizadas con estado = 1');
+      // Actualizar registros NULL a true (activo por defecto)
+      await this.dataSource.query(`UPDATE tbl_transacciones_agentes SET estado = true WHERE estado IS NULL`);
+      this.logger.log('Registros NULL actualizados a true');
       
-      // Agregar restricción NOT NULL a la columna estado
+      // Agregar restricción NOT NULL si no existe
       await this.dataSource.query(`ALTER TABLE tbl_transacciones_agentes ALTER COLUMN estado SET NOT NULL`);
       this.logger.log('Restricción NOT NULL agregada a la columna estado');
       
@@ -49,5 +62,19 @@ export class MigrationService implements OnModuleInit {
     `);
     
     return result.length > 0;
+  }
+
+  private async getColumnInfo(): Promise<{ exists: boolean; type: string | null }> {
+    const result = await this.dataSource.query(`
+      SELECT data_type
+      FROM information_schema.columns
+      WHERE table_name = 'tbl_transacciones_agentes' AND column_name = 'estado'
+    `);
+    
+    if (result.length === 0) {
+      return { exists: false, type: null };
+    }
+    
+    return { exists: true, type: result[0].data_type };
   }
 }

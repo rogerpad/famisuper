@@ -16,6 +16,9 @@ export class MigrationModule implements OnModuleInit {
 
   async onModuleInit() {
     try {
+      // Ejecutar la migración para el campo estado en tbl_transacciones_agentes
+      // (Se ejecuta automáticamente por OnModuleInit en MigrationService)
+      
       // Ejecutar la migración para corregir la tabla tbl_usuarios_turnos
       const fixUsuariosTurnosMigration = this.moduleRef.get(FixUsuariosTurnosMigration);
       await fixUsuariosTurnosMigration.run();
