@@ -1,4 +1,4 @@
-# Famisuper - Sistema de Cierre de Transacciones
+# Famisuper - Sistema de Cierre de Super
 
 Aplicación web para gestión y cierre de transacciones desarrollada con Nest.js (backend), React.js (frontend), TypeScript y PostgreSQL.
 
