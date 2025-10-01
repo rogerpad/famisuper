@@ -7,165 +7,231 @@ import {
   TextField,
   InputAdornment,
   CircularProgress,
-  Chip
+  Chip,
+  IconButton,
+  Tooltip,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogContentText,
+  DialogTitle,
+  FormControl,
+  Select,
+  MenuItem,
+  InputLabel,
+  Grid,
+  SelectChangeEvent,
+  Snackbar,
+  Alert
 } from '@mui/material';
-import { DataGrid, GridColDef, GridValueGetterParams } from '@mui/x-data-grid';
-import { Search as SearchIcon, Add as AddIcon } from '@mui/icons-material';
+import { DataGrid, GridColDef } from '@mui/x-data-grid';
+import { 
+  Search as SearchIcon, 
+  Add as AddIcon, 
+  Description as ReportIcon,
+  Edit as EditIcon,
+  Delete as DeleteIcon 
+} from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
-import api from '../../api/api';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import transactionsApi, { Transaction } from '../../api/transactions/transactionsApi';
+import { format, startOfDay, endOfDay } from 'date-fns';
+import { es } from 'date-fns/locale';
+import TransactionForm from './TransactionForm';
+import { useTurno } from '../../contexts/TurnoContext';
 
-interface Transaction {
-  id: string;
-  date: string;
-  reference: string;
-  amount: number;
-  status: string;
-  customerName: string;
-}
-
-const TransactionsList: React.FC = () => {
-  const [transactions, setTransactions] = useState<Transaction[]>([]);
-  const [loading, setLoading] = useState(true);
+const TransactionsList: React.FC<{}> = () => {
   const [searchTerm, setSearchTerm] = useState('');
+  const [openForm, setOpenForm] = useState(false);
+  const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState<number | null>(null);
+  const [filterOption, setFilterOption] = useState<string>('active');
+  const [filteredData, setFilteredData] = useState<Transaction[]>([]);
+  const [showNoTurnoAlert, setShowNoTurnoAlert] = useState(false);
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  
+  // Obtener el turno actual del contexto
+  const { turnoActual } = useTurno();
 
-  useEffect(() => {
-    // En un escenario real, estos datos vendrían de la API
-    // Aquí simulamos los datos para la demostración
-    setTimeout(() => {
-      const demoData: Transaction[] = [
-        { 
-          id: '1', 
-          date: '2025-05-13', 
-          reference: 'TRX-001', 
-          amount: 1250.00, 
-          status: 'Completada', 
-          customerName: 'Juan Pérez' 
-        },
-        { 
-          id: '2', 
-          date: '2025-05-12', 
-          reference: 'TRX-002', 
-          amount: 890.50, 
-          status: 'Completada', 
-          customerName: 'María González' 
-        },
-        { 
-          id: '3', 
-          date: '2025-05-11', 
-          reference: 'TRX-003', 
-          amount: 2340.75, 
-          status: 'Pendiente', 
-          customerName: 'Carlos Rodríguez' 
-        },
-        { 
-          id: '4', 
-          date: '2025-05-10', 
-          reference: 'TRX-004', 
-          amount: 1100.25, 
-          status: 'Completada', 
-          customerName: 'Ana Martínez' 
-        },
-        { 
-          id: '5', 
-          date: '2025-05-09', 
-          reference: 'TRX-005', 
-          amount: 760.00, 
-          status: 'Pendiente', 
-          customerName: 'Roberto Sánchez' 
-        },
-        { 
-          id: '6', 
-          date: '2025-05-08', 
-          reference: 'TRX-006', 
-          amount: 1500.00, 
-          status: 'Cancelada', 
-          customerName: 'Laura Díaz' 
-        },
-        { 
-          id: '7', 
-          date: '2025-05-07', 
-          reference: 'TRX-007', 
-          amount: 950.30, 
-          status: 'Completada', 
-          customerName: 'Pedro Fernández' 
-        },
-        { 
-          id: '8', 
-          date: '2025-05-06', 
-          reference: 'TRX-008', 
-          amount: 2100.00, 
-          status: 'Pendiente', 
-          customerName: 'Sofía López' 
-        },
-      ];
-      
-      setTransactions(demoData);
-      setLoading(false);
-    }, 1000);
+  // Consulta para obtener todas las transacciones
+  const { data: transactions = [], isLoading } = useQuery({
+    queryKey: ['transactions', filterOption],
+    queryFn: async () => {
+      // Si el filtro es 'today', obtenemos las transacciones del día
+      if (filterOption === 'today') {
+        const today = new Date();
+        const startDate = format(startOfDay(today), 'yyyy-MM-dd');
+        const endDate = format(endOfDay(today), 'yyyy-MM-dd');
+        return transactionsApi.getByDateRange(startDate, endDate);
+      } 
+      // Si el filtro es 'all', obtenemos todas las transacciones incluyendo inactivas
+      else if (filterOption === 'all') {
+        return transactionsApi.getAllWithInactive();
+      }
+      // Por defecto, obtenemos solo las transacciones activas
+      return transactionsApi.getAll();
+    },
+  });
+
+  // Mutación para eliminar una transacción
+  const deleteMutation = useMutation({
+    mutationFn: transactionsApi.delete,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['transactions'] });
+      setConfirmDelete(null);
+    },
+  });
+
+  const handleOpenForm = (transaction?: Transaction) => {
+    // Si es una edición, permitir siempre
+    if (transaction) {
+      // Crear una copia de la transacción para evitar problemas de referencia
+      setEditingTransaction({
+        ...transaction,
+        // Asegurar que el estado sea un boolean
+        estado: typeof transaction.estado === 'boolean' ? transaction.estado : true
+      });
+      setOpenForm(true);
+      return;
+    }
     
-    // En una implementación real, usaríamos:
-    // const fetchTransactions = async () => {
-    //   try {
-    //     const response = await api.get('/transactions');
-    //     setTransactions(response.data);
-    //   } catch (error) {
-    //     console.error('Error fetching transactions:', error);
-    //   } finally {
-    //     setLoading(false);
-    //   }
-    // };
-    // 
-    // fetchTransactions();
-  }, []);
+    // Permitir crear nueva transacción sin restricción de turno
+    setEditingTransaction(null);
+    setOpenForm(true);
+  };
+
+  const handleCloseForm = () => {
+    setOpenForm(false);
+    setEditingTransaction(null);
+  };
+
+  const handleDeleteConfirm = (id: number) => {
+    setConfirmDelete(id);
+  };
+
+  const handleDelete = () => {
+    if (confirmDelete) {
+      deleteMutation.mutate(confirmDelete);
+    }
+  };
+
+  const formatDate = (dateString: string) => {
+    try {
+      // Manejar correctamente las fechas en formato YYYY-MM-DD
+      if (dateString && dateString.match(/^\d{4}-\d{2}-\d{2}$/)) {
+        // Dividir la fecha en partes
+        const [year, month, day] = dateString.split('-').map(Number);
+        // Formatear directamente sin crear un objeto Date
+        return `${day.toString().padStart(2, '0')}/${month.toString().padStart(2, '0')}/${year}`;
+      }
+      // Para otros formatos, usar date-fns
+      return format(new Date(dateString), 'dd/MM/yyyy', { locale: es });
+    } catch (error) {
+      console.error('Error al formatear fecha:', error);
+      return dateString;
+    }
+  };
 
   const columns: GridColDef[] = [
     { 
-      field: 'reference', 
-      headerName: 'Referencia', 
-      flex: 1,
-      minWidth: 120 
+      field: 'id', 
+      headerName: 'ID', 
+      width: 70 
     },
     { 
-      field: 'date', 
+      field: 'fecha', 
       headerName: 'Fecha', 
       flex: 1,
-      minWidth: 120 
+      minWidth: 120,
+      valueFormatter: (params) => formatDate(params.value),
     },
     { 
-      field: 'customerName', 
-      headerName: 'Cliente', 
+      field: 'hora', 
+      headerName: 'Hora', 
+      flex: 1,
+      minWidth: 100 
+    },
+    { 
+      field: 'usuario', 
+      headerName: 'Usuario', 
       flex: 1.5,
-      minWidth: 180 
+      minWidth: 180,
+      valueGetter: (params) => params.row.usuario?.nombre || 'Administrador Sistema',
     },
     { 
-      field: 'amount', 
-      headerName: 'Monto', 
-      flex: 1,
-      minWidth: 120,
-      valueFormatter: (params) => {
-        return `$${params.value.toLocaleString('es-ES', { minimumFractionDigits: 2 })}`;
-      }
+      field: 'agente', 
+      headerName: 'Agente', 
+      flex: 1.5,
+      minWidth: 180,
+      valueGetter: (params) => params.row.agente?.nombre || '',
     },
     { 
-      field: 'status', 
-      headerName: 'Estado', 
+      field: 'tipoTransaccion', 
+      headerName: 'Transacción', 
       flex: 1,
-      minWidth: 120,
+      minWidth: 150,
       renderCell: (params) => {
+        const tipoNombre = params.row.tipoTransaccion?.nombre || '';
         let color = 'default';
-        if (params.value === 'Completada') color = 'success';
-        if (params.value === 'Pendiente') color = 'warning';
-        if (params.value === 'Cancelada') color = 'error';
+        
+        if (tipoNombre.toLowerCase().includes('retiro')) color = 'error';
+        if (tipoNombre.toLowerCase().includes('depósito')) color = 'success';
+        if (tipoNombre.toLowerCase().includes('comisión')) color = 'warning';
+        if (tipoNombre.toLowerCase().includes('adicional')) color = 'info';
         
         return (
           <Chip 
-            label={params.value} 
-            color={color as 'default' | 'success' | 'warning' | 'error'} 
+            label={tipoNombre} 
+            color={color as 'default' | 'success' | 'warning' | 'error' | 'info'} 
             size="small" 
           />
         );
       }
+    },
+    { 
+      field: 'valor', 
+      headerName: 'Valor', 
+      flex: 1,
+      minWidth: 120,
+      valueFormatter: (params) => {
+        return `L${params.value.toLocaleString('es-HN', { minimumFractionDigits: 2 })}`;
+      }
+    },
+    { 
+      field: 'observacion', 
+      headerName: 'Observación', 
+      flex: 2,
+      minWidth: 200,
+      valueGetter: (params) => params.row.observacion || '',
+    },
+    { 
+      field: 'estado', 
+      headerName: 'Estado', 
+      flex: 1,
+      minWidth: 120,
+      renderCell: (params) => {
+        const estado = params.row.estado;
+        let label = '';
+        let color: 'success' | 'error' | 'default' = 'default';
+        
+        if (estado === true) {
+          label = 'Activa';
+          color = 'success';
+        } else {
+          label = 'Inactiva';
+          color = 'error';
+        }
+        
+        return (
+          <Chip 
+            label={label} 
+            color={color} 
+            size="small" 
+            variant="outlined"
+          />
+        );
+      },
     },
     {
       field: 'actions',
@@ -174,43 +240,113 @@ const TransactionsList: React.FC = () => {
       minWidth: 120,
       sortable: false,
       renderCell: (params) => (
-        <Button
-          variant="outlined"
-          size="small"
-          onClick={() => navigate(`/transactions/${params.row.id}`)}
-        >
-          Ver Detalles
-        </Button>
+        <Box>
+          <Tooltip title="Editar">
+            <IconButton 
+              size="small" 
+              color="primary" 
+              onClick={() => handleOpenForm(params.row as Transaction)}
+            >
+              <EditIcon />
+            </IconButton>
+          </Tooltip>
+          <Tooltip title="Eliminar">
+            <IconButton 
+              size="small" 
+              color="error" 
+              onClick={() => handleDeleteConfirm(params.row.id)}
+            >
+              <DeleteIcon />
+            </IconButton>
+          </Tooltip>
+        </Box>
       ),
     },
   ];
 
-  const filteredTransactions = transactions.filter(
-    (transaction) =>
-      transaction.reference.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      transaction.customerName.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  // Filtrar transacciones según la opción seleccionada y el término de búsqueda
+  useEffect(() => {
+    let filtered = [...transactions];
+    
+    // Si el filtro es 'all', mostramos todas las transacciones (incluyendo inactivas)
+    if (filterOption === 'all') {
+      // No aplicamos filtro por estado
+    } else if (filterOption === 'active') {
+      // Filtramos solo las activas (estado = true)
+      filtered = filtered.filter(transaction => transaction.estado === true);
+    }
+    // Si el filtro es 'today', ya hemos obtenido solo las del día desde la API
+    
+    // Aplicar filtro de búsqueda por texto
+    if (searchTerm) {
+      filtered = filtered.filter(
+        (transaction) =>
+          (transaction.agente?.nombre?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
+          (transaction.tipoTransaccion?.nombre?.toLowerCase() || '').includes(searchTerm.toLowerCase())
+      );
+    }
+    
+    setFilteredData(filtered);
+  }, [transactions, searchTerm, filterOption]);
+  
+  // Manejar cambio de opción de filtro
+  const handleFilterChange = (event: SelectChangeEvent) => {
+    setFilterOption(event.target.value);
+  };
 
   return (
     <Box sx={{ flexGrow: 1 }}>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-        <Typography variant="h4" component="h1">
-          Transacciones
-        </Typography>
-        <Button 
-          variant="contained" 
-          startIcon={<AddIcon />}
-          onClick={() => navigate('/transactions/new')}
-        >
-          Nueva Transacción
-        </Button>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+        <Typography variant="h5">Transacciones</Typography>
+        <Box>
+          <Button 
+            variant="contained" 
+            color="primary" 
+            startIcon={<AddIcon />}
+            onClick={() => handleOpenForm()}
+            sx={{ mr: 1 }}
+          >
+            Nueva Transacción
+          </Button>
+          <Button 
+            variant="outlined" 
+            color="primary" 
+            startIcon={<ReportIcon />}
+            onClick={() => navigate('/reports', { state: { tabIndex: 1 } })}
+            sx={{ 
+              mr: 2, 
+              borderColor: 'rgba(220, 118, 51, 0.5)',
+              color: '#dc7633',
+              '&:hover': {
+                borderColor: '#dc7633',
+                backgroundColor: 'rgba(220, 118, 51, 0.04)'
+              }
+            }}
+          >
+            Resumen de Transacciones
+          </Button>
+        </Box>
       </Box>
-      
-      <Paper sx={{ p: 2, mb: 3 }}>
+
+      {/* Filtros y búsqueda */}
+      <Box sx={{ display: 'flex', mb: 2, gap: 2 }}>
+        <FormControl variant="outlined" size="small" sx={{ minWidth: 150 }}>
+          <InputLabel id="filter-label">Filtrar por</InputLabel>
+          <Select
+            labelId="filter-label"
+            value={filterOption}
+            onChange={handleFilterChange}
+            label="Filtrar por"
+          >
+            <MenuItem value="active">Activas</MenuItem>
+            <MenuItem value="today">Hoy</MenuItem>
+            <MenuItem value="all">Todas</MenuItem>
+          </Select>
+        </FormControl>
         <TextField
-          fullWidth
           variant="outlined"
-          placeholder="Buscar por referencia o cliente..."
+          size="small"
+          placeholder="Buscar..."
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
           InputProps={{
@@ -220,29 +356,70 @@ const TransactionsList: React.FC = () => {
               </InputAdornment>
             ),
           }}
-          sx={{ mb: 2 }}
+          sx={{ width: 300 }}
         />
-        
-        {loading ? (
-          <Box sx={{ display: 'flex', justifyContent: 'center', p: 3 }}>
+      </Box>
+
+      {/* Tabla de transacciones */}
+      <Paper sx={{ height: 'calc(100vh - 220px)', width: '100%' }}>
+        {isLoading ? (
+          <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
             <CircularProgress />
           </Box>
         ) : (
           <DataGrid
-            rows={filteredTransactions}
+            rows={filteredData}
             columns={columns}
-            autoHeight
-            pageSizeOptions={[5, 10, 25]}
             initialState={{
-              pagination: {
-                paginationModel: { pageSize: 10, page: 0 },
-              },
+              pagination: { paginationModel: { pageSize: 10 } },
+              sorting: { sortModel: [{ field: 'id', sort: 'desc' }] },
             }}
+            pageSizeOptions={[10, 25, 50]}
             disableRowSelectionOnClick
-            sx={{ minHeight: 400 }}
           />
         )}
       </Paper>
+
+      {/* Formulario de transacción */}
+      {openForm && (
+        <TransactionForm
+          open={openForm}
+          onClose={handleCloseForm}
+          transaction={editingTransaction}
+        />
+      )}
+
+      {/* Diálogo de confirmación de eliminación */}
+      <Dialog open={confirmDelete !== null} onClose={() => setConfirmDelete(null)}>
+        <DialogTitle>Confirmar eliminación</DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            ¿Está seguro que desea eliminar esta transacción? Esta acción no se puede deshacer.
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setConfirmDelete(null)}>Cancelar</Button>
+          <Button onClick={handleDelete} color="error" variant="contained">
+            Eliminar
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Alerta de turno no activo */}
+      <Snackbar 
+        open={showNoTurnoAlert} 
+        autoHideDuration={6000} 
+        onClose={() => setShowNoTurnoAlert(false)}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Alert 
+          onClose={() => setShowNoTurnoAlert(false)} 
+          severity="warning" 
+          variant="filled"
+        >
+          No hay un turno activo. Debe activar un turno antes de crear transacciones.
+        </Alert>
+      </Snackbar>
     </Box>
   );
 };

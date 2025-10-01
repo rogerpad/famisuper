@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Prueba API Contador de Efectivo</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .container {
+            background-color: #f5f5f5;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #2c3e50;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        input {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        button {
+            background-color: #3498db;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        button:hover {
+            background-color: #2980b9;
+        }
+        .result {
+            margin-top: 20px;
+            padding: 15px;
+            background-color: #e8f4f8;
+            border-radius: 4px;
+            white-space: pre-wrap;
+        }
+        .error {
+            background-color: #f8d7da;
+            color: #721c24;
+        }
+        .success {
+            background-color: #d4edda;
+            color: #155724;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 15px;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+        }
+        th {
+            background-color: #f2f2f2;
+        }
+        .denomination-row {
+            display: flex;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        .denomination-row label {
+            width: 120px;
+            margin-bottom: 0;
+        }
+        .denomination-row input {
+            width: 80px;
+            margin-right: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Prueba API Contador de Efectivo</h1>
+        
+        <div class="form-group">
+            <label for="token">Token JWT:</label>
+            <input type="text" id="token" placeholder="Pega aquí tu token JWT">
+        </div>
+        
+        <h2>Denominaciones de Billetes</h2>
+        <div id="denominations-container">
+            <div class="denomination-row">
+                <label>L. 500:</label>
+                <input type="number" class="denomination-input" data-value="500" min="0" value="0">
+                <span class="total-display">Total: L. 0</span>
+            </div>
+            <div class="denomination-row">
+                <label>L. 200:</label>
+                <input type="number" class="denomination-input" data-value="200" min="0" value="0">
+                <span class="total-display">Total: L. 0</span>
+            </div>
+            <div class="denomination-row">
+                <label>L. 100:</label>
+                <input type="number" class="denomination-input" data-value="100" min="0" value="0">
+                <span class="total-display">Total: L. 0</span>
+            </div>
+            <div class="denomination-row">
+                <label>L. 50:</label>
+                <input type="number" class="denomination-input" data-value="50" min="0" value="0">
+                <span class="total-display">Total: L. 0</span>
+            </div>
+            <div class="denomination-row">
+                <label>L. 20:</label>
+                <input type="number" class="denomination-input" data-value="20" min="0" value="0">
+                <span class="total-display">Total: L. 0</span>
+            </div>
+            <div class="denomination-row">
+                <label>L. 10:</label>
+                <input type="number" class="denomination-input" data-value="10" min="0" value="0">
+                <span class="total-display">Total: L. 0</span>
+            </div>
+            <div class="denomination-row">
+                <label>L. 5:</label>
+                <input type="number" class="denomination-input" data-value="5" min="0" value="0">
+                <span class="total-display">Total: L. 0</span>
+            </div>
+            <div class="denomination-row">
+                <label>L. 2:</label>
+                <input type="number" class="denomination-input" data-value="2" min="0" value="0">
+                <span class="total-display">Total: L. 0</span>
+            </div>
+            <div class="denomination-row">
+                <label>L. 1:</label>
+                <input type="number" class="denomination-input" data-value="1" min="0" value="0">
+                <span class="total-display">Total: L. 0</span>
+            </div>
+        </div>
+        
+        <div class="form-group">
+            <label for="turno-id">ID del Turno (opcional):</label>
+            <input type="number" id="turno-id" placeholder="Deja en blanco si no aplica">
+        </div>
+        
+        <h3>Total: <span id="grand-total">L. 0</span></h3>
+        
+        <button id="save-button">Guardar en Base de Datos</button>
+        <button id="load-button">Cargar Último Conteo</button>
+        
+        <div id="result" class="result" style="display: none;"></div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const API_BASE_URL = 'http://localhost:4001'; // Ajusta según tu configuración
+            const denominationInputs = document.querySelectorAll('.denomination-input');
+            const saveButton = document.getElementById('save-button');
+            const loadButton = document.getElementById('load-button');
+            const resultDiv = document.getElementById('result');
+            const grandTotalSpan = document.getElementById('grand-total');
+            
+            // Actualizar totales cuando cambian las cantidades
+            denominationInputs.forEach(input => {
+                input.addEventListener('input', updateTotals);
+            });
+            
+            function updateTotals() {
+                let grandTotal = 0;
+                
+                denominationInputs.forEach(input => {
+                    const value = parseInt(input.dataset.value);
+                    const quantity = parseInt(input.value) || 0;
+                    const total = value * quantity;
+                    
+                    // Actualizar el total para esta denominación
+                    const totalDisplay = input.nextElementSibling;
+                    totalDisplay.textContent = `Total: L. ${total.toLocaleString()}`;
+                    
+                    grandTotal += total;
+                });
+                
+                // Actualizar el gran total
+                grandTotalSpan.textContent = `L. ${grandTotal.toLocaleString()}`;
+            }
+            
+            // Guardar en la base de datos
+            saveButton.addEventListener('click', async function() {
+                const token = document.getElementById('token').value.trim();
+                if (!token) {
+                    showResult('Por favor, ingresa un token JWT válido', 'error');
+                    return;
+                }
+                
+                try {
+                    // Preparar los datos para enviar
+                    const denominations = [];
+                    let totalCash = 0;
+                    
+                    denominationInputs.forEach(input => {
+                        const value = parseInt(input.dataset.value);
+                        const count = parseInt(input.value) || 0;
+                        
+                        if (count > 0) {
+                            const total = value * count;
+                            denominations.push({
+                                value,
+                                count,
+                                total
+                            });
+                            totalCash += total;
+                        }
+                    });
+                    
+                    if (denominations.length === 0) {
+                        showResult('No hay datos para guardar', 'error');
+                        return;
+                    }
+                    
+                    // Obtener el ID del turno si se proporcionó
+                    const turnoIdInput = document.getElementById('turno-id');
+                    const turnoId = turnoIdInput.value ? parseInt(turnoIdInput.value) : undefined;
+                    
+                    // Crear el objeto para enviar
+                    const cashCountData = {
+                        denominations,
+                        totalCash,
+                        turnoId
+                    };
+                    
+                    // Enviar la solicitud
+                    const response = await fetch(`${API_BASE_URL}/billetes/cash-count`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${token}`
+                        },
+                        body: JSON.stringify(cashCountData)
+                    });
+                    
+                    if (!response.ok) {
+                        throw new Error(`Error ${response.status}: ${response.statusText}`);
+                    }
+                    
+                    const data = await response.json();
+                    showResult('Conteo guardado correctamente en la base de datos', 'success');
+                    console.log('Respuesta del servidor:', data);
+                } catch (error) {
+                    showResult(`Error al guardar: ${error.message}`, 'error');
+                    console.error('Error completo:', error);
+                }
+            });
+            
+            // Cargar el último conteo
+            loadButton.addEventListener('click', async function() {
+                const token = document.getElementById('token').value.trim();
+                if (!token) {
+                    showResult('Por favor, ingresa un token JWT válido', 'error');
+                    return;
+                }
+                
+                try {
+                    // Enviar la solicitud para obtener el último conteo
+                    const response = await fetch(`${API_BASE_URL}/billetes/latest`, {
+                        method: 'GET',
+                        headers: {
+                            'Authorization': `Bearer ${token}`
+                        }
+                    });
+                    
+                    if (!response.ok) {
+                        throw new Error(`Error ${response.status}: ${response.statusText}`);
+                    }
+                    
+                    const billetes = await response.json();
+                    
+                    if (billetes && billetes.length > 0) {
+                        // Limpiar los valores actuales
+                        denominationInputs.forEach(input => {
+                            input.value = 0;
+                        });
+                        
+                        // Establecer los nuevos valores
+                        billetes.forEach(billete => {
+                            const input = document.querySelector(`.denomination-input[data-value="${billete.billete}"]`);
+                            if (input) {
+                                input.value = billete.cantidad;
+                            }
+                        });
+                        
+                        // Actualizar todos los totales
+                        updateTotals();
+                        
+                        showResult('Último conteo cargado correctamente', 'success');
+                    } else {
+                        showResult('No se encontraron datos de conteo previos', 'error');
+                    }
+                } catch (error) {
+                    showResult(`Error al cargar: ${error.message}`, 'error');
+                    console.error('Error completo:', error);
+                }
+            });
+            
+            function showResult(message, type) {
+                resultDiv.textContent = message;
+                resultDiv.className = `result ${type}`;
+                resultDiv.style.display = 'block';
+                
+                // Desplazarse hasta el resultado
+                resultDiv.scrollIntoView({ behavior: 'smooth' });
+            }
+        });
+    </script>
+</body>
+</html>
