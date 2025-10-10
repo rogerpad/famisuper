@@ -18,14 +18,14 @@ import { CashModule } from './modules/cash/cash.module';
 import { SuperExpenseTypesModule } from './modules/super-expense-types/super-expense-types.module';
 import { PaymentDocumentsModule } from './modules/payment-documents/payment-documents.module';
 import { PaymentMethodsModule } from './modules/payment-methods/payment-methods.module';
-import { SuperExpensesModule } from './super-expenses/super-expenses.module';
+import { SuperExpensesModule } from './modules/super-expenses/super-expenses.module';
 import { PhoneLinesModule } from './modules/phone-lines/phone-lines.module';
 import { BalanceFlowsModule } from './modules/balance-flows/balance-flows.module';
 import { BalanceSalesModule } from './modules/balance-sales/balance-sales.module';
 import { PackagesModule } from './modules/packages/packages.module';
 import { LoggerModule } from './common/modules/logger.module';
-import { ConteoBilletesSuperModule } from './conteo-billetes-super/conteo-billetes-super.module';
-import { AdicionalesPrestamosModule } from './adicionales-prestamos/adicionales-prestamos.module';
+import { ConteoBilletesSuperModule } from './modules/conteo-billetes-super/conteo-billetes-super.module';
+import { AdicionalesPrestamosModule } from './modules/adicionales-prestamos/adicionales-prestamos.module';
 import { CierresSuperModule } from './modules/cierres-super/cierres-super.module';
 
 @Module({

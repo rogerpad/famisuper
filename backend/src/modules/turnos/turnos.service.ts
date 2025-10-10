@@ -12,11 +12,11 @@ import { AgentClosingsService } from '../agent-closings/agent-closings.service';
 import { TransactionsService } from '../transactions/transactions.service';
 import { BilletesService } from '../cash/services/billetes.service';
 import { CierreSuper } from '../cierres-super/entities/cierre-super.entity';
-import { SuperExpense } from '../../super-expenses/entities/super-expense.entity';
+import { SuperExpense } from '../super-expenses/entities/super-expense.entity';
 import { BalanceFlow } from '../balance-flows/entities/balance-flow.entity';
 import { BalanceSale } from '../balance-sales/entities/balance-sale.entity';
-import { ConteoBilletesSuper } from '../../database/entities/conteo-billetes-super.entity';
-import { AdicionalesPrestamos } from '../../adicionales-prestamos/entities/adicionales-prestamos.entity';
+import { ConteoBilletesSuper } from '../conteo-billetes-super/entities/conteo-billetes-super.entity';
+import { AdicionalesPrestamos } from '../adicionales-prestamos/entities/adicionales-prestamos.entity';
 
 @Injectable()
 export class TurnosService {

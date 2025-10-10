@@ -49,14 +49,12 @@ const AdicionalesPrestamosForm: React.FC = () => {
 
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState<boolean>(false);
-  const [snackbar, setSnackbar] = useState<{
+  const [errorSnackbar, setErrorSnackbar] = useState<{
     open: boolean;
     message: string;
-    severity: 'success' | 'error';
   }>({
     open: false,
-    message: '',
-    severity: 'success'
+    message: ''
   });
 
   // Cargar datos si estamos en modo edición
@@ -76,10 +74,9 @@ const AdicionalesPrestamosForm: React.FC = () => {
           });
         } catch (error) {
           console.error('[ADICIONALES_PRESTAMOS_FORM] Error al cargar datos:', error);
-          setSnackbar({
+          setErrorSnackbar({
             open: true,
-            message: 'Error al cargar los datos del adicional/préstamo',
-            severity: 'error'
+            message: 'Error al cargar los datos del adicional/préstamo'
           });
         } finally {
           setLoading(false);
@@ -165,38 +162,25 @@ const AdicionalesPrestamosForm: React.FC = () => {
       setLoading(true);
       if (isEditMode && id) {
         await updateAdicionalesPrestamos(parseInt(id, 10), formData);
-        setSnackbar({
-          open: true,
-          message: 'Adicional/Préstamo actualizado correctamente',
-          severity: 'success'
-        });
       } else {
         await createAdicionalesPrestamos(formData);
-        setSnackbar({
-          open: true,
-          message: 'Adicional/Préstamo creado correctamente',
-          severity: 'success'
-        });
       }
       
-      // Redirigir después de un breve retraso
-      setTimeout(() => {
-        navigate('/adicionales-prestamos');
-      }, 1500);
+      // Redirigir inmediatamente sin notificación
+      navigate('/adicionales-prestamos');
     } catch (error) {
       console.error('[ADICIONALES_PRESTAMOS_FORM] Error al guardar:', error);
-      setSnackbar({
+      setErrorSnackbar({
         open: true,
-        message: `Error al ${isEditMode ? 'actualizar' : 'crear'} el adicional/préstamo`,
-        severity: 'error'
+        message: `Error al ${isEditMode ? 'actualizar' : 'crear'} el adicional/préstamo`
       });
     } finally {
       setLoading(false);
     }
   };
 
-  // Verificar permisos
-  const canCreateEdit = hasPermission('crear_editar_adic_prest');
+  // Verificar permisos (memoizado para evitar re-renders innecesarios)
+  const canCreateEdit = React.useMemo(() => hasPermission('crear_editar_adic_prest'), [hasPermission]);
 
   if (!canCreateEdit) {
     return (
@@ -227,7 +211,7 @@ const AdicionalesPrestamosForm: React.FC = () => {
                 value={formData.usuarioId || ''}
                 label="Usuario"
                 onChange={handleChange}
-                disabled={loading || loadingUsers || !isEditMode}
+                disabled={loading || loadingUsers}
               >
                 <MenuItem value="">
                   <em>Seleccione un usuario</em>
@@ -365,18 +349,18 @@ const AdicionalesPrestamosForm: React.FC = () => {
         </Grid>
       </Box>
 
-      {/* Snackbar para mensajes */}
+      {/* Snackbar solo para errores */}
       <Snackbar
-        open={snackbar.open}
-        autoHideDuration={6000}
-        onClose={() => setSnackbar(prev => ({ ...prev, open: false }))}
+        open={errorSnackbar.open}
+        autoHideDuration={4000}
+        onClose={() => setErrorSnackbar(prev => ({ ...prev, open: false }))}
       >
         <Alert
-          onClose={() => setSnackbar(prev => ({ ...prev, open: false }))}
-          severity={snackbar.severity}
+          onClose={() => setErrorSnackbar(prev => ({ ...prev, open: false }))}
+          severity="error"
           sx={{ width: '100%' }}
         >
-          {snackbar.message}
+          {errorSnackbar.message}
         </Alert>
       </Snackbar>
     </Paper>

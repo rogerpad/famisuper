@@ -1,6 +1,6 @@
 import React from 'react';
 import { Container, Paper, Box, Typography } from '@mui/material';
-import CashCountList from '../components/CashCountList';
+import CashCountList from '../components/cash-count/CashCountList';
 import { useAuth } from '../contexts/AuthContext';
 import { Navigate } from 'react-router-dom';
 

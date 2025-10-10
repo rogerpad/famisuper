@@ -8,8 +8,8 @@ import {
   Tab,
   Divider
 } from '@mui/material';
-import CashCounter from '../../components/CashCounter';
-import CashCountList from '../../components/CashCountList';
+import CashCounter from '../../components/cash-count/CashCounter';
+import CashCountList from '../../components/cash-count/CashCountList';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTurno } from '../../contexts/TurnoContext';
 

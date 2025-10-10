@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Container, Typography, Paper, Box, Alert, Button } from '@mui/material';
 import RefreshIcon from '@mui/icons-material/Refresh';
-import CashCounter from '../components/CashCounter';
+import CashCounter from '../components/cash-count/CashCounter';
 import { useNavigate } from 'react-router-dom';
 
 const CashCounterPage: React.FC = () => {
