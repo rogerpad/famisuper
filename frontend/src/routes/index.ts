@@ -12,8 +12,8 @@ import reportsRoutes from './reports.routes';
 import superAdminRoutes from './super-admin.routes';
 import balanceRoutes from './balance.routes';
 import conteoBilletesSuperRoutes from './conteo-billetes-super.routes';
-import adicionalesPrestamosRoutes from './adicionales-prestamos.routes';
-import cierresSuperRoutes from './cierres-super.routes';
+import additionalLoanRoutes from './additional-loan.routes';
+import superClosingsRoutes from './super-closings.routes';
 import debugRoutes from './debug.routes';
 
 // Exportar todas las rutas públicas (fuera de MainLayout)
@@ -37,8 +37,8 @@ export const protectedRoutes: RouteObject[] = [
   ...superAdminRoutes,
   ...balanceRoutes,
   ...conteoBilletesSuperRoutes,
-  ...adicionalesPrestamosRoutes,
-  ...cierresSuperRoutes,
+  ...additionalLoanRoutes,
+  ...superClosingsRoutes,
 ];
 
 // Exportar todas las rutas individualmente por si se necesitan
@@ -56,7 +56,7 @@ export {
   superAdminRoutes,
   balanceRoutes,
   conteoBilletesSuperRoutes,
-  adicionalesPrestamosRoutes,
-  cierresSuperRoutes,
+  additionalLoanRoutes,
+  superClosingsRoutes,
   debugRoutes,
 };

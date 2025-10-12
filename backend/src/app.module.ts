@@ -25,8 +25,8 @@ import { BalanceSalesModule } from './modules/balance-sales/balance-sales.module
 import { PackagesModule } from './modules/packages/packages.module';
 import { LoggerModule } from './common/modules/logger.module';
 import { ConteoBilletesSuperModule } from './modules/conteo-billetes-super/conteo-billetes-super.module';
-import { AdicionalesPrestamosModule } from './modules/adicionales-prestamos/adicionales-prestamos.module';
-import { CierresSuperModule } from './modules/cierres-super/cierres-super.module';
+import { AdditionalLoanModule } from './modules/additional-loan/additional-loan.module';
+import { SuperClosingsModule } from './modules/super-closings/super-closings.module';
 
 @Module({
   imports: [
@@ -68,8 +68,8 @@ import { CierresSuperModule } from './modules/cierres-super/cierres-super.module
     BalanceSalesModule,
     PackagesModule,
     ConteoBilletesSuperModule,
-    AdicionalesPrestamosModule,
-    CierresSuperModule,
+    AdditionalLoanModule,
+    SuperClosingsModule,
   ],
 })
 export class AppModule {}

@@ -11,12 +11,12 @@ import { RegistroActividad } from './entities/registro-actividad.entity';
 import { AgentClosingsService } from '../agent-closings/agent-closings.service';
 import { TransactionsService } from '../transactions/transactions.service';
 import { BilletesService } from '../cash/services/billetes.service';
-import { CierreSuper } from '../cierres-super/entities/cierre-super.entity';
+import { SuperClosing } from '../super-closings/entities/super-closing.entity';
 import { SuperExpense } from '../super-expenses/entities/super-expense.entity';
 import { BalanceFlow } from '../balance-flows/entities/balance-flow.entity';
 import { BalanceSale } from '../balance-sales/entities/balance-sale.entity';
 import { ConteoBilletesSuper } from '../conteo-billetes-super/entities/conteo-billetes-super.entity';
-import { AdicionalesPrestamos } from '../adicionales-prestamos/entities/adicionales-prestamos.entity';
+import { AdditionalLoan } from '../additional-loan/entities/additional-loan.entity';
 
 @Injectable()
 export class TurnosService {
@@ -27,8 +27,8 @@ export class TurnosService {
     private usersRepository: Repository<User>,
     @InjectRepository(RegistroActividad)
     private registroActividadRepository: Repository<RegistroActividad>,
-    @InjectRepository(CierreSuper)
-    private cierresSuperRepository: Repository<CierreSuper>,
+    @InjectRepository(SuperClosing)
+    private superClosingsRepository: Repository<SuperClosing>,
     @InjectRepository(SuperExpense)
     private superExpensesRepository: Repository<SuperExpense>,
     @InjectRepository(BalanceFlow)
@@ -37,8 +37,8 @@ export class TurnosService {
     private balanceSalesRepository: Repository<BalanceSale>,
     @InjectRepository(ConteoBilletesSuper)
     private conteoBilletesSuperRepository: Repository<ConteoBilletesSuper>,
-    @InjectRepository(AdicionalesPrestamos)
-    private adicionalesPrestamosRepository: Repository<AdicionalesPrestamos>,
+    @InjectRepository(AdditionalLoan)
+    private additionalLoanRepository: Repository<AdditionalLoan>,
     private agentClosingsService: AgentClosingsService,
     private transactionsService: TransactionsService,
     private billetesService: BilletesService,
@@ -907,7 +907,7 @@ private async desactivarRegistrosDelTurno(turnoId: number, usuarioId: number): P
     console.log(`[TURNOS] Filtrando registros del ${startOfDay.toISOString()} al ${endOfDay.toISOString()}`);
 
     // 1. Desactivar cierres super del usuario del día actual
-    const cierresResult = await this.cierresSuperRepository.update(
+    const cierresResult = await this.superClosingsRepository.update(
       {
         usuarioId: usuarioId,
         activo: true,
@@ -961,7 +961,7 @@ private async desactivarRegistrosDelTurno(turnoId: number, usuarioId: number): P
     console.log(`[TURNOS] Desactivados ${conteosResult.affected} conteos de billetes super del usuario ${usuarioId}`);
 
     // 6. Desactivar adicionales y préstamos del usuario del día actual
-    const adicionalesResult = await this.adicionalesPrestamosRepository.update(
+    const adicionalesResult = await this.additionalLoanRepository.update(
       {
         usuarioId: usuarioId,
         activo: true,
