@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Box, Typography, Paper, List, ListItem, ListItemText, Divider, Button, CircularProgress } from '@mui/material';
-import { useAuth } from '../contexts/AuthContext';
+import { useAuth } from '../../contexts/AuthContext';
 
 const PermissionsDebug: React.FC = () => {
   const { state, hasPermission, hasRole } = useAuth();

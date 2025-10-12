@@ -33,7 +33,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useTurno } from '../../contexts/TurnoContext';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
-import PermissionsDebug from '../../components/PermissionsDebug';
+import PermissionsDebug from '../../components/auth/PermissionsDebug';
 import ConfirmationDialog from '../../components/ConfirmationDialog';
 import OperationTypeDialog from '../../components/turnos/OperationTypeDialog';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';

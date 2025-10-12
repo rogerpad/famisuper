@@ -1,13 +1,10 @@
-import React from 'react';
 import { RouteObject } from 'react-router-dom';
 import ProtectedRoute from '../components/ProtectedRoute';
-import CierresSuperList from '../components/cierres-super/CierresSuperList';
-import CierreSuperForm from '../components/cierres-super/CierreSuperForm';
-import CierreSuperDetail from '../components/cierres-super/CierreSuperDetail';
+import { CierresSuperList, CierreSuperForm, CierreSuperDetail } from '../components/cierres-super';
 
 const cierresSuperRoutes: RouteObject[] = [
   {
-    path: 'cierres-super',
+    path: '/cierres-super',
     element: (
       <ProtectedRoute requiredPermission="ver_cierre_super">
         <CierresSuperList />
@@ -15,7 +12,7 @@ const cierresSuperRoutes: RouteObject[] = [
     ),
   },
   {
-    path: 'cierres-super/new',
+    path: '/cierres-super/new',
     element: (
       <ProtectedRoute requiredPermission="crear_editar_cierre_super">
         <CierreSuperForm />
@@ -23,7 +20,7 @@ const cierresSuperRoutes: RouteObject[] = [
     ),
   },
   {
-    path: 'cierres-super/:id',
+    path: '/cierres-super/:id',
     element: (
       <ProtectedRoute requiredPermission="ver_cierre_super">
         <CierreSuperDetail />
@@ -31,7 +28,7 @@ const cierresSuperRoutes: RouteObject[] = [
     ),
   },
   {
-    path: 'cierres-super/:id/edit',
+    path: '/cierres-super/:id/edit',
     element: (
       <ProtectedRoute requiredPermission="crear_editar_cierre_super">
         <CierreSuperForm />
