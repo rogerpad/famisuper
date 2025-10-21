@@ -20,8 +20,8 @@ import {
   Alert
 } from '@mui/material';
 // Importaciones de date-fns para formateo de fechas
-import { useConteoBilletesSuper } from '../../api/conteo-billetes-super/conteoBilletesSuperApi';
-import { ConteoBilletesSuperFormData } from '../../api/conteo-billetes-super/types';
+import { useSuperBillCount } from '../../api/super-bill-count/superBillCountApi';
+import { SuperBillCountFormData } from '../../api/super-bill-count/types';
 import { useAuth } from '../../contexts/AuthContext';
 import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -48,24 +48,24 @@ interface DenominacionRow {
   denominacion: number;
   cantidad: number;
   total: number;
-  field: keyof ConteoBilletesSuperFormData;
+  field: keyof SuperBillCountFormData;
 }
 
-const ConteoBilletesSuperForm: React.FC = () => {
+const SuperBillCountForm: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const isEditMode = !!id;
   const navigate = useNavigate();
   const { state } = useAuth();
   const {
-    fetchConteoBilletesSuperById,
-    createConteoBilletesSuper,
-    updateConteoBilletesSuper,
+    fetchSuperBillCountById,
+    createSuperBillCount,
+    updateSuperBillCount,
     loading,
     error,
-  } = useConteoBilletesSuper();
+  } = useSuperBillCount();
 
   // Estado para el formulario
-  const [formData, setFormData] = useState<ConteoBilletesSuperFormData>({
+  const [formData, setFormData] = useState<SuperBillCountFormData>({
     cant500: 0,
     cant200: 0,
     cant100: 0,
@@ -94,7 +94,7 @@ const ConteoBilletesSuperForm: React.FC = () => {
 
   // Estado para el envío del formulario
   const [submitting, setSubmitting] = useState<boolean>(false);
-  const [conteoId, setConteoId] = useState<number | null>(null);
+  const [countId, setcountId] = useState<number | null>(null);
   
   // Estado para notificaciones
   const [showSuccess, setShowSuccess] = useState<boolean>(false);
@@ -114,7 +114,7 @@ const ConteoBilletesSuperForm: React.FC = () => {
   ];
 
   // Función para calcular los totales con conversión segura de tipos
-  const calculateTotals = useCallback((data: ConteoBilletesSuperFormData) => {
+  const calculateTotals = useCallback((data: SuperBillCountFormData) => {
     // Asegurar que todos los valores sean números
     const cant500 = safeParseInt(data.cant500, 0);
     const cant200 = safeParseInt(data.cant200, 0);
@@ -157,9 +157,9 @@ const ConteoBilletesSuperForm: React.FC = () => {
     if (isEditMode && id) {
       const loadConteo = async () => {
         try {
-          const conteo = await fetchConteoBilletesSuperById(parseInt(id));
+          const conteo = await fetchSuperBillCountById(parseInt(id));
           if (conteo) {
-            setConteoId(conteo.id);
+            setcountId(conteo.id);
             // Aplicar conversión segura de tipos para cada campo
             setFormData({
               cant500: safeParseInt(conteo.cant500, 0),
@@ -195,7 +195,7 @@ const ConteoBilletesSuperForm: React.FC = () => {
 
       loadConteo();
     }
-  }, [id, isEditMode, fetchConteoBilletesSuperById]);
+  }, [id, isEditMode, fetchSuperBillCountById]);
 
   // Actualizar totales cuando cambian las cantidades
   useEffect(() => {
@@ -229,7 +229,7 @@ const ConteoBilletesSuperForm: React.FC = () => {
       cant2: 0,
       cant1: 0,
     });
-    setConteoId(null);
+    setcountId(null);
   };
 
   // La fecha ahora se genera automáticamente en el backend
@@ -246,19 +246,19 @@ const ConteoBilletesSuperForm: React.FC = () => {
       }
 
       // Preparar datos para enviar
-      const dataToSubmit: ConteoBilletesSuperFormData = {
+      const dataToSubmit: SuperBillCountFormData = {
         ...formData,
         usuarioId: state.user.id,
         // La fecha se genera automáticamente en el backend
       };
 
       let result;
-      if (isEditMode && conteoId) {
+      if (isEditMode && countId) {
         // Actualizar conteo existente
-        result = await updateConteoBilletesSuper(conteoId, dataToSubmit);
+        result = await updateSuperBillCount(countId, dataToSubmit);
       } else {
         // Crear nuevo conteo
-        result = await createConteoBilletesSuper(dataToSubmit);
+        result = await createSuperBillCount(dataToSubmit);
       }
 
       if (result) {
@@ -310,13 +310,13 @@ const ConteoBilletesSuperForm: React.FC = () => {
       )}
 
       <Box sx={{ mb: 2 }}>
-        {isEditMode && conteoId && (
+        {isEditMode && countId && (
           <>
             <Typography variant="body1" gutterBottom>
               <strong>Fecha:</strong> {currentDate}
             </Typography>
             <Typography variant="body1" gutterBottom>
-              <strong>ID:</strong> {conteoId}
+              <strong>ID:</strong> {countId}
             </Typography>
             <Typography variant="body1" gutterBottom>
               <strong>Usuario:</strong> {state.user ? `${state.user.nombre} ${state.user.apellido || ''}` : 'Usuario actual'}
@@ -430,4 +430,5 @@ const ConteoBilletesSuperForm: React.FC = () => {
   );
 };
 
-export default ConteoBilletesSuperForm;
+export default SuperBillCountForm;
+

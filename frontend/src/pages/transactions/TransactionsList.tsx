@@ -58,18 +58,16 @@ const TransactionsList: React.FC<{}> = () => {
   const { data: transactions = [], isLoading } = useQuery({
     queryKey: ['transactions', filterOption],
     queryFn: async () => {
-      // Si el filtro es 'today', obtenemos las transacciones del día
+      // Si el filtro es 'today', obtenemos solo las transacciones inactivas del día
       if (filterOption === 'today') {
         const today = new Date();
         const startDate = format(startOfDay(today), 'yyyy-MM-dd');
         const endDate = format(endOfDay(today), 'yyyy-MM-dd');
-        return transactionsApi.getByDateRange(startDate, endDate);
-      } 
-      // Si el filtro es 'all', obtenemos todas las transacciones incluyendo inactivas
-      else if (filterOption === 'all') {
-        return transactionsApi.getAllWithInactive();
+        const allToday = await transactionsApi.getByDateRange(startDate, endDate);
+        // Filtrar solo las inactivas
+        return allToday.filter(t => t.estado === false);
       }
-      // Por defecto, obtenemos solo las transacciones activas
+      // Por defecto (active), obtenemos solo las transacciones activas
       return transactionsApi.getAll();
     },
   });
@@ -239,43 +237,46 @@ const TransactionsList: React.FC<{}> = () => {
       flex: 1,
       minWidth: 120,
       sortable: false,
-      renderCell: (params) => (
-        <Box>
-          <Tooltip title="Editar">
-            <IconButton 
-              size="small" 
-              color="primary" 
-              onClick={() => handleOpenForm(params.row as Transaction)}
-            >
-              <EditIcon />
-            </IconButton>
-          </Tooltip>
-          <Tooltip title="Eliminar">
-            <IconButton 
-              size="small" 
-              color="error" 
-              onClick={() => handleDeleteConfirm(params.row.id)}
-            >
-              <DeleteIcon />
-            </IconButton>
-          </Tooltip>
-        </Box>
-      ),
+      renderCell: (params) => {
+        const isInactive = params.row.estado === false;
+        return (
+          <Box>
+            <Tooltip title={isInactive ? "No disponible para inactivas" : "Editar"}>
+              <span>
+                <IconButton 
+                  size="small" 
+                  color="primary" 
+                  onClick={() => handleOpenForm(params.row as Transaction)}
+                  disabled={isInactive}
+                >
+                  <EditIcon />
+                </IconButton>
+              </span>
+            </Tooltip>
+            <Tooltip title={isInactive ? "No disponible para inactivas" : "Eliminar"}>
+              <span>
+                <IconButton 
+                  size="small" 
+                  color="error" 
+                  onClick={() => handleDeleteConfirm(params.row.id)}
+                  disabled={isInactive}
+                >
+                  <DeleteIcon />
+                </IconButton>
+              </span>
+            </Tooltip>
+          </Box>
+        );
+      },
     },
   ];
 
-  // Filtrar transacciones según la opción seleccionada y el término de búsqueda
+  // Filtrar transacciones según el término de búsqueda
   useEffect(() => {
     let filtered = [...transactions];
     
-    // Si el filtro es 'all', mostramos todas las transacciones (incluyendo inactivas)
-    if (filterOption === 'all') {
-      // No aplicamos filtro por estado
-    } else if (filterOption === 'active') {
-      // Filtramos solo las activas (estado = true)
-      filtered = filtered.filter(transaction => transaction.estado === true);
-    }
-    // Si el filtro es 'today', ya hemos obtenido solo las del día desde la API
+    // El filtrado por estado ya se hace en la consulta (queryFn)
+    // 'active' trae solo activas, 'today' trae solo inactivas del día
     
     // Aplicar filtro de búsqueda por texto
     if (searchTerm) {
@@ -340,7 +341,6 @@ const TransactionsList: React.FC<{}> = () => {
           >
             <MenuItem value="active">Activas</MenuItem>
             <MenuItem value="today">Hoy</MenuItem>
-            <MenuItem value="all">Todas</MenuItem>
           </Select>
         </FormControl>
         <TextField

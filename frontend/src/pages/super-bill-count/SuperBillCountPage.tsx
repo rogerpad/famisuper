@@ -8,7 +8,7 @@ import {
   Tab,
   Divider
 } from '@mui/material';
-import { ConteoBilletesSuperForm, ConteoBilletesSuperList } from '../../components/conteo-billetes-super';
+import { SuperBillCountForm, SuperBillCountList } from '../../components/super-bill-count';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTurno } from '../../contexts/TurnoContext';
 import { format } from 'date-fns';
@@ -40,7 +40,7 @@ function TabPanel(props: TabPanelProps) {
   );
 }
 
-const ConteoBilletesSuperPage: React.FC = () => {
+const SuperBillCountPage: React.FC = () => {
   const [tabValue, setTabValue] = useState(0);
   const { state } = useAuth();
   const { turnoActual } = useTurno();
@@ -83,12 +83,12 @@ const ConteoBilletesSuperPage: React.FC = () => {
         </Box>
 
         <TabPanel value={tabValue} index={0}>
-          <ConteoBilletesSuperForm />
+          <SuperBillCountForm />
         </TabPanel>
         
         <TabPanel value={tabValue} index={1}>
           <Box sx={{ mt: 2 }}>
-            <ConteoBilletesSuperList />
+            <SuperBillCountList />
           </Box>
         </TabPanel>
       </Paper>
@@ -96,4 +96,5 @@ const ConteoBilletesSuperPage: React.FC = () => {
   );
 };
 
-export default ConteoBilletesSuperPage;
+export default SuperBillCountPage;
+

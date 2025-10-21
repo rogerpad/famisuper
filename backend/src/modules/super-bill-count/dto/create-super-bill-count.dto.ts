@@ -1,7 +1,7 @@
 import { IsNumber, IsOptional, IsBoolean } from 'class-validator';
 import { Type } from 'class-transformer';
 
-export class CreateConteoBilletesSuperDto {
+export class CreateSuperBillCountDto {
   @IsNumber()
   usuarioId: number;
 

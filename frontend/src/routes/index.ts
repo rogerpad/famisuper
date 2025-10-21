@@ -11,7 +11,7 @@ import vendedorRoutes from './vendedor.routes';
 import reportsRoutes from './reports.routes';
 import superAdminRoutes from './super-admin.routes';
 import balanceRoutes from './balance.routes';
-import conteoBilletesSuperRoutes from './conteo-billetes-super.routes';
+import superBillCountRoutes from './super-bill-count.routes';
 import additionalLoanRoutes from './additional-loan.routes';
 import superClosingsRoutes from './super-closings.routes';
 import debugRoutes from './debug.routes';
@@ -36,7 +36,7 @@ export const protectedRoutes: RouteObject[] = [
   ...reportsRoutes,
   ...superAdminRoutes,
   ...balanceRoutes,
-  ...conteoBilletesSuperRoutes,
+  ...superBillCountRoutes,
   ...additionalLoanRoutes,
   ...superClosingsRoutes,
 ];
@@ -55,7 +55,7 @@ export {
   reportsRoutes,
   superAdminRoutes,
   balanceRoutes,
-  conteoBilletesSuperRoutes,
+  superBillCountRoutes,
   additionalLoanRoutes,
   superClosingsRoutes,
   debugRoutes,

@@ -2,7 +2,7 @@ import { Entity, Column, PrimaryGeneratedColumn, ManyToOne, JoinColumn, CreateDa
 import { User } from '../../users/entities/user.entity';
 
 @Entity({ name: 'tbl_conteo_billetes_super' })
-export class ConteoBilletesSuper {
+export class SuperBillCount {
   @PrimaryGeneratedColumn()
   id: number;
 

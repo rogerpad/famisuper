@@ -24,7 +24,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { getTotalAmountByAcuerdoOrigen } from '../../api/additional-loan/additionalLoanApi';
 import { useBalanceFlows } from '../../api/balance-flows/balanceFlowsApi';
 import { useSuperExpenses } from '../../api/super-expenses/superExpensesApi';
-import { useConteoBilletesSuper } from '../../api/conteo-billetes-super/conteoBilletesSuperApi';
+import { useSuperBillCount } from '../../api/super-bill-count/superBillCountApi';
 
 const SuperClosingForm: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -35,10 +35,10 @@ const SuperClosingForm: React.FC = () => {
   
   // Obtener el efectivo inicial del state de navegación si existe
   const efectivoInicialFromNavigation = location.state?.efectivoInicial || 0;
-  const { loading, error, fetchSuperClosingById, createSuperClosing, updateSuperClosing } = useSuperClosings();
+  const { loading, error, fetchSuperClosingById, createSuperClosing, updateSuperClosing, getLastInactiveClosingOfDay } = useSuperClosings();
   const { getSumSaldoVendido } = useBalanceFlows();
   const { getSumPagoProductosEfectivo, getSumGastosEfectivo } = useSuperExpenses();
-  const { getLastActiveConteoBilletes } = useConteoBilletesSuper();
+  const { getLastActiveBillCount } = useSuperBillCount();
 
   const [formData, setFormData] = useState<SuperClosingFormData>({
     usuarioId: authState.user?.id || 0,
@@ -94,7 +94,8 @@ const SuperClosingForm: React.FC = () => {
       };
       fetchCierre();
     } else {
-      // Si es un nuevo cierre, cargar automáticamente los valores de adicionales y préstamos
+      // Si es un nuevo cierre, cargar automáticamente el efectivo inicial y los valores de adicionales/préstamos
+      cargarEfectivoInicial();
       cargarValoresAdicionalesPrestamos();
     }
   }, [isEditing, id, fetchSuperClosingById]);
@@ -102,7 +103,7 @@ const SuperClosingForm: React.FC = () => {
   // Función para cargar el último conteo de billetes activo
   const cargarUltimoConteoBilletes = async () => {
     try {
-      const ultimoConteo = await getLastActiveConteoBilletes();
+      const ultimoConteo = await getLastActiveBillCount();
       
       if (ultimoConteo) {
         console.log('Conteo de billetes activo encontrado:', ultimoConteo);
@@ -152,6 +153,42 @@ const SuperClosingForm: React.FC = () => {
         
         setShowConteoWarning(true);
       }
+    }
+  };
+
+  // Función para cargar automáticamente el efectivo inicial
+  const cargarEfectivoInicial = async () => {
+    try {
+      console.log('[SUPER_CLOSING_FORM] Cargando efectivo inicial...');
+      
+      // Consultar el último cierre inactivo del día
+      const ultimoCierreInactivo = await getLastInactiveClosingOfDay();
+      
+      if (ultimoCierreInactivo && ultimoCierreInactivo.efectivoCierreTurno !== undefined) {
+        // Si existe un cierre inactivo, usar su efectivoCierreTurno
+        const efectivoInicial = Number(ultimoCierreInactivo.efectivoCierreTurno) || 0;
+        console.log(`[SUPER_CLOSING_FORM] Se encontró cierre inactivo. Efectivo Inicial: ${efectivoInicial}`);
+        
+        setFormData(prevData => ({
+          ...prevData,
+          efectivoInicial: efectivoInicial
+        }));
+      } else {
+        // Si no existe ningún cierre en el día, usar 2000 por defecto
+        console.log('[SUPER_CLOSING_FORM] No se encontró cierre inactivo. Efectivo Inicial: 2000');
+        
+        setFormData(prevData => ({
+          ...prevData,
+          efectivoInicial: 2000
+        }));
+      }
+    } catch (error) {
+      console.error('[SUPER_CLOSING_FORM] Error al cargar efectivo inicial:', error);
+      // En caso de error, usar 2000 por defecto
+      setFormData(prevData => ({
+        ...prevData,
+        efectivoInicial: 2000
+      }));
     }
   };
 

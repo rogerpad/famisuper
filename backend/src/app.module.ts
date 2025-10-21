@@ -24,7 +24,7 @@ import { BalanceFlowsModule } from './modules/balance-flows/balance-flows.module
 import { BalanceSalesModule } from './modules/balance-sales/balance-sales.module';
 import { PackagesModule } from './modules/packages/packages.module';
 import { LoggerModule } from './common/modules/logger.module';
-import { ConteoBilletesSuperModule } from './modules/conteo-billetes-super/conteo-billetes-super.module';
+import { SuperBillCountModule } from './modules/super-bill-count/super-bill-count.module';
 import { AdditionalLoanModule } from './modules/additional-loan/additional-loan.module';
 import { SuperClosingsModule } from './modules/super-closings/super-closings.module';
 
@@ -67,7 +67,7 @@ import { SuperClosingsModule } from './modules/super-closings/super-closings.mod
     BalanceFlowsModule,
     BalanceSalesModule,
     PackagesModule,
-    ConteoBilletesSuperModule,
+    SuperBillCountModule,
     AdditionalLoanModule,
     SuperClosingsModule,
   ],

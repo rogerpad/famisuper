@@ -1,4 +1,4 @@
-export interface ConteoBilletesSuper {
+export interface SuperBillCount {
   id: number;
   usuarioId: number;
   deno500: number;
@@ -38,7 +38,7 @@ export interface ConteoBilletesSuper {
   };
 }
 
-export interface ConteoBilletesSuperFormData {
+export interface SuperBillCountFormData {
   usuarioId?: number;
   cant500: number;
   cant200: number;
@@ -49,5 +49,5 @@ export interface ConteoBilletesSuperFormData {
   cant5: number;
   cant2: number;
   cant1: number;
-  // La fecha se genera automáticamente en el backend
+  // Date is generated automatically in backend
 }

@@ -14,7 +14,7 @@ import { SuperClosing } from '../super-closings/entities/super-closing.entity';
 import { SuperExpense } from '../super-expenses/entities/super-expense.entity';
 import { BalanceFlow } from '../balance-flows/entities/balance-flow.entity';
 import { BalanceSale } from '../balance-sales/entities/balance-sale.entity';
-import { ConteoBilletesSuper } from '../conteo-billetes-super/entities/conteo-billetes-super.entity';
+import { SuperBillCount } from '../super-bill-count/entities/super-bill-count.entity';
 import { AdditionalLoan } from '../additional-loan/entities/additional-loan.entity';
 
 @Module({
@@ -28,7 +28,7 @@ import { AdditionalLoan } from '../additional-loan/entities/additional-loan.enti
       SuperExpense,
       BalanceFlow,
       BalanceSale,
-      ConteoBilletesSuper,
+      SuperBillCount,
       AdditionalLoan
     ]),
     AgentClosingsModule,

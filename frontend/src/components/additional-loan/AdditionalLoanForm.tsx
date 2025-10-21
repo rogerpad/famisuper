@@ -197,30 +197,19 @@ const AdditionalLoanForm: React.FC = () => {
       
       <Box component="form" onSubmit={handleSubmit} noValidate>
         <Grid container spacing={3}>
-          {/* Usuario */}
+          {/* Usuario - Solo lectura, muestra el usuario actual */}
           <Grid item xs={12} md={6}>
-            <FormControl fullWidth error={!!errors.usuarioId}>
-              <InputLabel id="usuario-label">Usuario</InputLabel>
-              <Select
-                labelId="usuario-label"
-                id="usuarioId"
-                name="usuarioId"
-                value={formData.usuarioId || ''}
-                label="Usuario"
-                onChange={handleChange}
-                disabled={loading || loadingUsers}
-              >
-                <MenuItem value="">
-                  <em>Seleccione un usuario</em>
-                </MenuItem>
-                {users.map(user => (
-                  <MenuItem key={user.id} value={user.id}>
-                    {user.nombre} {user.apellido} ({user.username})
-                  </MenuItem>
-                ))}
-              </Select>
-              {errors.usuarioId && <FormHelperText>{errors.usuarioId}</FormHelperText>}
-            </FormControl>
+            <TextField
+              fullWidth
+              id="usuario"
+              label="Usuario"
+              value={authState.user ? `${authState.user.nombre} ${authState.user.apellido} (${authState.user.username})` : ''}
+              InputProps={{
+                readOnly: true,
+              }}
+              disabled
+              helperText="Usuario de la sesión actual"
+            />
           </Grid>
 
           {/* Acuerdo */}

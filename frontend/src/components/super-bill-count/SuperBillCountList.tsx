@@ -23,25 +23,25 @@ import AddIcon from '@mui/icons-material/Add';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import VisibilityIcon from '@mui/icons-material/Visibility';
-import { useConteoBilletesSuper } from '../../api/conteo-billetes-super/conteoBilletesSuperApi';
-import { ConteoBilletesSuper } from '../../api/conteo-billetes-super/types';
+import { useSuperBillCount } from '../../api/super-bill-count/superBillCountApi';
+import { SuperBillCount } from '../../api/super-bill-count/types';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { useAuth } from '../../contexts/AuthContext';
 
-const ConteoBilletesSuperList: React.FC = () => {
+const SuperBillCountList: React.FC = () => {
   const navigate = useNavigate();
   const { state } = useAuth();
   const {
-    conteoBilletesSuper,
+    superBillCounts,
     loading,
     error,
-    fetchConteoBilletesSuper,
-    deleteConteoBilletesSuper,
-  } = useConteoBilletesSuper();
+    fetchSuperBillCounts,
+    deleteSuperBillCount,
+  } = useSuperBillCount();
 
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [conteoToDelete, setConteoToDelete] = useState<number | null>(null);
+  const [countToDelete, setCountToDelete] = useState<number | null>(null);
 
   // Verificar permisos
   const canCreate = !!state.permissions['crear_editar_conteo_super'];
@@ -50,8 +50,8 @@ const ConteoBilletesSuperList: React.FC = () => {
 
   // Cargar datos al montar el componente (solo registros activos)
   useEffect(() => {
-    fetchConteoBilletesSuper(true);
-  }, [fetchConteoBilletesSuper]);
+    fetchSuperBillCounts(true);
+  }, [fetchSuperBillCounts]);
 
   // Manejar creación de nuevo conteo
   const handleCreate = () => {
@@ -70,23 +70,23 @@ const ConteoBilletesSuperList: React.FC = () => {
 
   // Manejar eliminación de conteo
   const handleDelete = (id: number) => {
-    setConteoToDelete(id);
+    setCountToDelete(id);
     setDeleteDialogOpen(true);
   };
 
   // Confirmar eliminación
   const confirmDelete = async () => {
-    if (conteoToDelete) {
-      await deleteConteoBilletesSuper(conteoToDelete);
+    if (countToDelete) {
+      await deleteSuperBillCount(countToDelete);
       setDeleteDialogOpen(false);
-      setConteoToDelete(null);
+      setCountToDelete(null);
     }
   };
 
   // Cancelar eliminación
   const cancelDelete = () => {
     setDeleteDialogOpen(false);
-    setConteoToDelete(null);
+    setCountToDelete(null);
   };
 
   // Formatear fecha
@@ -119,28 +119,28 @@ const ConteoBilletesSuperList: React.FC = () => {
               </TableRow>
             </TableHead>
             <TableBody>
-              {conteoBilletesSuper.length === 0 ? (
+              {superBillCounts.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={5} align="center">
                     No hay conteos registrados
                   </TableCell>
                 </TableRow>
               ) : (
-                conteoBilletesSuper.map((conteo: ConteoBilletesSuper) => (
-                  <TableRow key={conteo.id}>
-                    <TableCell>{conteo.id}</TableCell>
+                superBillCounts.map((count: SuperBillCount) => (
+                  <TableRow key={count.id}>
+                    <TableCell>{count.id}</TableCell>
                     <TableCell>
-                      {conteo.usuario
-                        ? `${conteo.usuario.nombre} ${conteo.usuario.apellido || ''}`
-                        : `Usuario ID: ${conteo.usuarioId}`}
+                      {count.usuario
+                        ? `${count.usuario.nombre} ${count.usuario.apellido || ''}`
+                        : `Usuario ID: ${count.usuarioId}`}
                     </TableCell>
-                    <TableCell>{formatDate(conteo.fecha)}</TableCell>
-                    <TableCell align="right">L {(typeof conteo.totalGeneral === 'number' ? conteo.totalGeneral : parseFloat(String(conteo.totalGeneral || 0))).toFixed(2)}</TableCell>
+                    <TableCell>{formatDate(count.fecha)}</TableCell>
+                    <TableCell align="right">L {(typeof count.totalGeneral === 'number' ? count.totalGeneral : parseFloat(String(count.totalGeneral || 0))).toFixed(2)}</TableCell>
                     <TableCell align="center">
                       <Tooltip title="Ver detalles">
                         <IconButton
                           color="primary"
-                          onClick={() => handleView(conteo.id)}
+                          onClick={() => handleView(count.id)}
                         >
                           <VisibilityIcon />
                         </IconButton>
@@ -150,7 +150,7 @@ const ConteoBilletesSuperList: React.FC = () => {
                         <Tooltip title="Editar">
                           <IconButton
                             color="secondary"
-                            onClick={() => handleEdit(conteo.id)}
+                            onClick={() => handleEdit(count.id)}
                           >
                             <EditIcon />
                           </IconButton>
@@ -161,7 +161,7 @@ const ConteoBilletesSuperList: React.FC = () => {
                         <Tooltip title="Eliminar">
                           <IconButton
                             color="error"
-                            onClick={() => handleDelete(conteo.id)}
+                            onClick={() => handleDelete(count.id)}
                           >
                             <DeleteIcon />
                           </IconButton>
@@ -198,4 +198,5 @@ const ConteoBilletesSuperList: React.FC = () => {
   );
 };
 
-export default ConteoBilletesSuperList;
+export default SuperBillCountList;
+

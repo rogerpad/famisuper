@@ -1,7 +1,7 @@
 import { IsNumber, IsOptional, IsBoolean, IsDate } from 'class-validator';
 import { Type } from 'class-transformer';
 
-export class ConteoBilletesSuperDto {
+export class SuperBillCountDto {
   @IsNumber()
   id: number;
 
@@ -99,7 +99,7 @@ export class ConteoBilletesSuperDto {
   @Type(() => Date)
   fecha: Date;
 
-  // Información adicional para mostrar en el frontend
+  // Additional information to display in frontend
   usuario?: {
     id: number;
     nombre: string;

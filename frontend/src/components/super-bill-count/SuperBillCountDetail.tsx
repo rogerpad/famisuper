@@ -14,8 +14,8 @@ import {
   TableHead,
   TableRow,
 } from '@mui/material';
-import { useConteoBilletesSuper } from '../../api/conteo-billetes-super/conteoBilletesSuperApi';
-import { ConteoBilletesSuper } from '../../api/conteo-billetes-super/types';
+import { useSuperBillCount } from '../../api/super-bill-count/superBillCountApi';
+import { SuperBillCount } from '../../api/super-bill-count/types';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
@@ -46,31 +46,31 @@ interface DenominacionRow {
   total: number;
 }
 
-const ConteoBilletesSuperDetail: React.FC = () => {
+const SuperBillCountDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { state } = useAuth();
-  const { fetchConteoBilletesSuperById, loading, error } = useConteoBilletesSuper();
-  const [conteo, setConteo] = useState<ConteoBilletesSuper | null>(null);
+  const { fetchSuperBillCountById, loading, error } = useSuperBillCount();
+  const [count, setConteo] = useState<SuperBillCount | null>(null);
 
   // Verificar permisos
   const canEdit = !!state.permissions['crear_editar_conteo_super'];
 
-  // Cargar datos del conteo
+  // Cargar datos del count
   useEffect(() => {
     if (id) {
       const loadConteo = async () => {
         try {
-          const data = await fetchConteoBilletesSuperById(parseInt(id));
+          const data = await fetchSuperBillCountById(parseInt(id));
           setConteo(data);
         } catch (error) {
-          console.error('Error al cargar conteo:', error);
+          console.error('Error al cargar count:', error);
         }
       };
 
       loadConteo();
     }
-  }, [id, fetchConteoBilletesSuperById]);
+  }, [id, fetchSuperBillCountById]);
 
   // Formatear fecha
   const formatDate = (dateString: string) => {
@@ -83,29 +83,29 @@ const ConteoBilletesSuperDetail: React.FC = () => {
 
   // Crear filas de denominaciones con conversión segura de tipos
   const getDenominaciones = (): DenominacionRow[] => {
-    if (!conteo) return [];
+    if (!count) return [];
 
     return [
-      { denominacion: 500, cantidad: safeParseInt(conteo.cant500, 0), total: ensureNumber(conteo.total500, 0) },
-      { denominacion: 200, cantidad: safeParseInt(conteo.cant200, 0), total: ensureNumber(conteo.total200, 0) },
-      { denominacion: 100, cantidad: safeParseInt(conteo.cant100, 0), total: ensureNumber(conteo.total100, 0) },
-      { denominacion: 50, cantidad: safeParseInt(conteo.cant50, 0), total: ensureNumber(conteo.total50, 0) },
-      { denominacion: 20, cantidad: safeParseInt(conteo.cant20, 0), total: ensureNumber(conteo.total20, 0) },
-      { denominacion: 10, cantidad: safeParseInt(conteo.cant10, 0), total: ensureNumber(conteo.total10, 0) },
-      { denominacion: 5, cantidad: safeParseInt(conteo.cant5, 0), total: ensureNumber(conteo.total5, 0) },
-      { denominacion: 2, cantidad: safeParseInt(conteo.cant2, 0), total: ensureNumber(conteo.total2, 0) },
-      { denominacion: 1, cantidad: safeParseInt(conteo.cant1, 0), total: ensureNumber(conteo.total1, 0) },
+      { denominacion: 500, cantidad: safeParseInt(count.cant500, 0), total: ensureNumber(count.total500, 0) },
+      { denominacion: 200, cantidad: safeParseInt(count.cant200, 0), total: ensureNumber(count.total200, 0) },
+      { denominacion: 100, cantidad: safeParseInt(count.cant100, 0), total: ensureNumber(count.total100, 0) },
+      { denominacion: 50, cantidad: safeParseInt(count.cant50, 0), total: ensureNumber(count.total50, 0) },
+      { denominacion: 20, cantidad: safeParseInt(count.cant20, 0), total: ensureNumber(count.total20, 0) },
+      { denominacion: 10, cantidad: safeParseInt(count.cant10, 0), total: ensureNumber(count.total10, 0) },
+      { denominacion: 5, cantidad: safeParseInt(count.cant5, 0), total: ensureNumber(count.total5, 0) },
+      { denominacion: 2, cantidad: safeParseInt(count.cant2, 0), total: ensureNumber(count.total2, 0) },
+      { denominacion: 1, cantidad: safeParseInt(count.cant1, 0), total: ensureNumber(count.total1, 0) },
     ];
   };
 
   // Manejar navegación
   const handleBack = () => {
-    navigate('/conteo-billetes-super');
+    navigate('/count-billetes-super');
   };
 
   const handleEdit = () => {
     if (id) {
-      navigate(`/conteo-billetes-super/edit/${id}`);
+      navigate(`/count-billetes-super/edit/${id}`);
     }
   };
 
@@ -117,27 +117,27 @@ const ConteoBilletesSuperDetail: React.FC = () => {
     return <Typography color="error">Error: {error}</Typography>;
   }
 
-  if (!conteo) {
-    return <Typography>No se encontró el conteo solicitado</Typography>;
+  if (!count) {
+    return <Typography>No se encontró el count solicitado</Typography>;
   }
 
   return (
     <Paper sx={{ p: 3 }}>
       <Typography variant="h6" gutterBottom>
-        Efectivo Super #{conteo.id}
+        Efectivo Super #{count.id}
       </Typography>
 
       <Box sx={{ mb: 2 }}>
         <Typography variant="body1" gutterBottom>
-          <strong>Fecha:</strong> {formatDate(conteo.fecha)}
+          <strong>Fecha:</strong> {formatDate(count.fecha)}
         </Typography>
         <Typography variant="body1" gutterBottom>
-          <strong>Usuario:</strong> {conteo.usuario
-            ? `${conteo.usuario.nombre} ${conteo.usuario.apellido || ''}`
-            : `ID: ${conteo.usuarioId}`}
+          <strong>Usuario:</strong> {count.usuario
+            ? `${count.usuario.nombre} ${count.usuario.apellido || ''}`
+            : `ID: ${count.usuarioId}`}
         </Typography>
         <Typography variant="body1" gutterBottom>
-          <strong>Total:</strong> L {ensureNumber(conteo.totalGeneral, 0).toFixed(2)}
+          <strong>Total:</strong> L {ensureNumber(count.totalGeneral, 0).toFixed(2)}
         </Typography>
       </Box>
 
@@ -164,7 +164,7 @@ const ConteoBilletesSuperDetail: React.FC = () => {
               </TableCell>
               <TableCell align="right">
                 <Typography variant="subtitle2" fontWeight="bold">
-                  L{ensureNumber(conteo.totalGeneral, 0).toFixed(2)}
+                  L{ensureNumber(count.totalGeneral, 0).toFixed(2)}
                 </Typography>
               </TableCell>
             </TableRow>
@@ -193,4 +193,5 @@ const ConteoBilletesSuperDetail: React.FC = () => {
   );
 };
 
-export default ConteoBilletesSuperDetail;
+export default SuperBillCountDetail;
+

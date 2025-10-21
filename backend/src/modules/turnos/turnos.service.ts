@@ -15,7 +15,7 @@ import { SuperClosing } from '../super-closings/entities/super-closing.entity';
 import { SuperExpense } from '../super-expenses/entities/super-expense.entity';
 import { BalanceFlow } from '../balance-flows/entities/balance-flow.entity';
 import { BalanceSale } from '../balance-sales/entities/balance-sale.entity';
-import { ConteoBilletesSuper } from '../conteo-billetes-super/entities/conteo-billetes-super.entity';
+import { SuperBillCount } from '../super-bill-count/entities/super-bill-count.entity';
 import { AdditionalLoan } from '../additional-loan/entities/additional-loan.entity';
 
 @Injectable()
@@ -35,8 +35,8 @@ export class TurnosService {
     private balanceFlowsRepository: Repository<BalanceFlow>,
     @InjectRepository(BalanceSale)
     private balanceSalesRepository: Repository<BalanceSale>,
-    @InjectRepository(ConteoBilletesSuper)
-    private conteoBilletesSuperRepository: Repository<ConteoBilletesSuper>,
+    @InjectRepository(SuperBillCount)
+    private superBillCountRepository: Repository<SuperBillCount>,
     @InjectRepository(AdditionalLoan)
     private additionalLoanRepository: Repository<AdditionalLoan>,
     private agentClosingsService: AgentClosingsService,
@@ -950,7 +950,7 @@ private async desactivarRegistrosDelTurno(turnoId: number, usuarioId: number): P
     console.log(`[TURNOS] Desactivadas ${ventasResult.affected} ventas de saldo del usuario ${usuarioId}`);
 
     // 5. Desactivar conteos de billetes super del usuario del día actual
-    const conteosResult = await this.conteoBilletesSuperRepository.update(
+    const conteosResult = await this.superBillCountRepository.update(
       {
         usuarioId: usuarioId,
         activo: true,

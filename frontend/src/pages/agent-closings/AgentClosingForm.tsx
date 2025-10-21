@@ -1318,6 +1318,7 @@ const AgentClosingForm: React.FC = () => {
                       name="saldoInicial"
                       type="number"
                       InputProps={{
+                        readOnly: true,
                         inputProps: { step: 0.01 },
                         // Añadir un indicador visual para mostrar que el valor se obtiene automáticamente
                         startAdornment: values.proveedorId > 0 ? (
@@ -1326,15 +1327,9 @@ const AgentClosingForm: React.FC = () => {
                           </InputAdornment>
                         ) : null,
                       }}
+                      disabled
                       error={touched.saldoInicial && Boolean(errors.saldoInicial)}
-                      helperText={touched.saldoInicial && errors.saldoInicial}
-                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
-                        setFieldValue('saldoInicial', parseFloat(e.target.value) || 0);
-                        calculateDifference(
-                          { ...values, saldoInicial: parseFloat(e.target.value) || 0 },
-                          setFieldValue
-                        );
-                      }}
+                      helperText="Calculado automáticamente"
                     />
                   </Grid>
 
@@ -1373,15 +1368,9 @@ const AgentClosingForm: React.FC = () => {
                         readOnly: true,
                         inputProps: { min: 0, step: 0.01 },
                       }}
+                      disabled
                       error={touched.resultadoFinal && Boolean(errors.resultadoFinal)}
-                      helperText={touched.resultadoFinal && errors.resultadoFinal}
-                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
-                        setFieldValue('resultadoFinal', parseFloat(e.target.value) || 0);
-                        calculateDifference(
-                          { ...values, resultadoFinal: parseFloat(e.target.value) || 0 },
-                          setFieldValue
-                        );
-                      }}
+                      helperText="Calculado automáticamente"
                     />
                   </Grid>
 
@@ -1420,8 +1409,9 @@ const AgentClosingForm: React.FC = () => {
                         readOnly: true,
                         inputProps: { step: 0.01 },
                       }}
+                      disabled
                       error={touched.diferencia && Boolean(errors.diferencia)}
-                      helperText={touched.diferencia && errors.diferencia}
+                      helperText="Calculado automáticamente"
                     />
                   </Grid>
 

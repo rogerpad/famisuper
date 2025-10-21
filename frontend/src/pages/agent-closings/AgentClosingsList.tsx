@@ -277,10 +277,8 @@ const AgentClosingsList = () => {
       // Crear cuerpo de la tabla
       const tbody = document.createElement('tbody');
       
-      // Filtrar solo cierres activos para el PDF
-      const activeClosings = closings.filter(closing => closing.estado === true);
-      
-      activeClosings.forEach(closing => {
+      // Mostrar todos los cierres en el PDF (activos e inactivos)
+      closings.forEach(closing => {
         const row = document.createElement('tr');
         
         // Crear celdas con los datos
@@ -492,7 +490,7 @@ const AgentClosingsList = () => {
               </TableRow>
             </TableHead>
             <TableBody>
-              {closings?.filter(closing => closing.estado === true)?.map((closing) => (
+              {closings?.map((closing) => (
                 <TableRow key={closing.id}>
                   <TableCell sx={{ padding: '12px 16px', verticalAlign: 'middle' }}>{closing.id}</TableCell>
                   <TableCell sx={{ padding: '12px 16px', verticalAlign: 'middle' }}>{closing.proveedor?.nombre || 'N/A'}</TableCell>
