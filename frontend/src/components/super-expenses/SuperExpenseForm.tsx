@@ -29,6 +29,14 @@ import { SuperExpenseType } from '../../api/super-expense-types/types';
 import { PaymentDocument } from '../../api/payment-documents/types';
 import { PaymentMethod } from '../../api/payment-methods/types';
 
+// Función helper para formatear fecha en zona horaria local (evita problemas de UTC)
+const formatDateToLocal = (date: Date): string => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
 interface SuperExpenseFormProps {
   open: boolean;
   onClose: () => void;
@@ -52,7 +60,7 @@ const SuperExpenseForm: React.FC<SuperExpenseFormProps> = ({
     impuesto: 0,
     total: 0,
     formaPagoId: 0,
-    fechaEgreso: new Date().toISOString().split('T')[0],
+    fechaEgreso: formatDateToLocal(new Date()),
     hora: new Date().toTimeString().slice(0, 5), // Formato HH:MM
     activo: true,
   };
@@ -107,8 +115,8 @@ const SuperExpenseForm: React.FC<SuperExpenseFormProps> = ({
         impuesto: ensureNumber(superExpense.impuesto),
         formaPagoId: ensureNumber(superExpense.formaPagoId),
         fechaEgreso: superExpense.fechaEgreso instanceof Date
-          ? superExpense.fechaEgreso.toISOString().split('T')[0]
-          : new Date(superExpense.fechaEgreso).toISOString().split('T')[0],
+          ? formatDateToLocal(superExpense.fechaEgreso)
+          : formatDateToLocal(new Date(superExpense.fechaEgreso)),
         hora: superExpense.hora || new Date().toTimeString().slice(0, 5),
         activo: superExpense.activo,
       };

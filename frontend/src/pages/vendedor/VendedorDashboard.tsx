@@ -1,7 +1,7 @@
 import React from 'react';
 import { Container, Typography, Grid, Card, CardContent, CardActions, Button, Box, Divider } from '@mui/material';
 import { PermissionGuard, useHasPermission } from '../../components/auth/PermissionGuard';
-import TurnoStats from '../../components/TurnoStats';
+import TurnoStats from '../../components/turnos/TurnoStats';
 import { useTurno } from '../../contexts/TurnoContext';
 
 // Definimos los códigos de permisos para el rol de Vendedor

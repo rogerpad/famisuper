@@ -10,12 +10,12 @@ import { User } from '../users/entities/user.entity';
 import { AgentClosingsModule } from '../agent-closings/agent-closings.module';
 import { TransactionsModule } from '../transactions/transactions.module';
 import { CashModule } from '../cash/cash.module';
-import { CierreSuper } from '../cierres-super/entities/cierre-super.entity';
-import { SuperExpense } from '../../super-expenses/entities/super-expense.entity';
+import { SuperClosing } from '../super-closings/entities/super-closing.entity';
+import { SuperExpense } from '../super-expenses/entities/super-expense.entity';
 import { BalanceFlow } from '../balance-flows/entities/balance-flow.entity';
 import { BalanceSale } from '../balance-sales/entities/balance-sale.entity';
-import { ConteoBilletesSuper } from '../../database/entities/conteo-billetes-super.entity';
-import { AdicionalesPrestamos } from '../../adicionales-prestamos/entities/adicionales-prestamos.entity';
+import { SuperBillCount } from '../super-bill-count/entities/super-bill-count.entity';
+import { AdditionalLoan } from '../additional-loan/entities/additional-loan.entity';
 
 @Module({
   imports: [
@@ -24,12 +24,12 @@ import { AdicionalesPrestamos } from '../../adicionales-prestamos/entities/adici
       User, 
       RegistroActividad, 
       UsuarioTurno,
-      CierreSuper,
+      SuperClosing,
       SuperExpense,
       BalanceFlow,
       BalanceSale,
-      ConteoBilletesSuper,
-      AdicionalesPrestamos
+      SuperBillCount,
+      AdditionalLoan
     ]),
     AgentClosingsModule,
     TransactionsModule,

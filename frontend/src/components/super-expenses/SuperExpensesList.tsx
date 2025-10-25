@@ -18,7 +18,12 @@ import {
   DialogTitle,
   TextField,
   Grid,
-  CircularProgress
+  CircularProgress,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
+  SelectChangeEvent
 } from '@mui/material';
 import {
   Add as AddIcon,
@@ -34,9 +39,17 @@ import SuperExpenseForm from './SuperExpenseForm';
 import SuperExpenseDetail from './SuperExpenseDetail';
 
 const SuperExpensesList: React.FC = () => {
-  const { superExpenses, loading: isLoading, error, fetchSuperExpenses: refetch, deleteSuperExpense } = useSuperExpenses();
+  const { superExpenses, loading: isLoading, error, fetchSuperExpenses, deleteSuperExpense } = useSuperExpenses();
   const isError = !!error;
   const { hasPermission } = useAuth();
+  
+  // Función para recargar datos incluyendo inactivos
+  const refetch = () => fetchSuperExpenses(true);
+  
+  // Cargar datos con inactivos al montar el componente
+  React.useEffect(() => {
+    fetchSuperExpenses(true);
+  }, [fetchSuperExpenses]);
   
   const [openForm, setOpenForm] = useState(false);
   const [openDetail, setOpenDetail] = useState(false);
@@ -46,6 +59,7 @@ const SuperExpensesList: React.FC = () => {
   // Mantenemos filterType pero eliminamos setFilterType de la desestructuración para evitar la advertencia
   const [filterType] = useState<number | ''>('');
   const [filterDate, setFilterDate] = useState('');
+  const [filterStatus, setFilterStatus] = useState<'active' | 'inactive'>('active');
 
   const canCreate = hasPermission('crear_egreso_super');
   const canEdit = hasPermission('editar_egreso_super');
@@ -108,7 +122,37 @@ const SuperExpensesList: React.FC = () => {
     const matchesDate = filterDate === '' || 
       (expense.fechaEgreso && String(expense.fechaEgreso).includes(filterDate));
     
-    return matchesSearch && matchesType && matchesDate;
+    // Filtrar por estado
+    let matchesStatus = true;
+    
+    if (filterStatus === 'active') {
+      // Mostrar todos los registros activos sin importar la fecha
+      matchesStatus = expense.activo === true;
+    } else if (filterStatus === 'inactive') {
+      // Mostrar solo registros inactivos del día actual
+      const today = new Date();
+      // Formatear fecha actual en zona horaria local
+      const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+      
+      let expenseDateStr = '';
+      if (expense.fechaEgreso) {
+        if (typeof expense.fechaEgreso === 'string') {
+          // Si es string, extraer solo la parte de fecha
+          expenseDateStr = expense.fechaEgreso.split('T')[0];
+        } else {
+          // Si es Date, formatear en zona horaria local
+          const date = new Date(expense.fechaEgreso);
+          expenseDateStr = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+        }
+      }
+      
+      console.log('[SuperExpensesList] Comparando fechas - Hoy:', todayStr, 'Egreso:', expenseDateStr, 'Activo:', expense.activo);
+      
+      const isToday = expenseDateStr === todayStr;
+      matchesStatus = expense.activo === false && isToday;
+    }
+    
+    return matchesSearch && matchesType && matchesDate && matchesStatus;
   }) || [];
 
   if (isLoading) {
@@ -147,6 +191,20 @@ const SuperExpensesList: React.FC = () => {
 
       <Box mb={3}>
         <Grid container spacing={2}>
+          <Grid item xs={12} md={3}>
+            <FormControl fullWidth variant="outlined">
+              <InputLabel id="filter-status-label">Filtrar por</InputLabel>
+              <Select
+                labelId="filter-status-label"
+                value={filterStatus}
+                onChange={(e: SelectChangeEvent<'active' | 'inactive'>) => setFilterStatus(e.target.value as 'active' | 'inactive')}
+                label="Filtrar por"
+              >
+                <MenuItem value="active">Activas</MenuItem>
+                <MenuItem value="inactive">Hoy inactivas</MenuItem>
+              </Select>
+            </FormControl>
+          </Grid>
           <Grid item xs={12} md={4}>
             <TextField
               fullWidth
@@ -179,6 +237,8 @@ const SuperExpensesList: React.FC = () => {
               <TableCell>Descripción</TableCell>
               <TableCell>Documento</TableCell>
               <TableCell>No. Factura</TableCell>
+              <TableCell>Exento</TableCell>
+              <TableCell>Gravado</TableCell>
               <TableCell>Impuesto</TableCell>
               <TableCell>Total</TableCell>
               <TableCell>Forma de Pago</TableCell>
@@ -194,6 +254,8 @@ const SuperExpensesList: React.FC = () => {
                   <TableCell>{expense.descripcionEgreso || '-'}</TableCell>
                   <TableCell>{expense.documentoPago?.nombre || 'N/A'}</TableCell>
                   <TableCell>{expense.nroFactura || '-'}</TableCell>
+                  <TableCell>{formatCurrency(expense.excento)}</TableCell>
+                  <TableCell>{formatCurrency(expense.gravado)}</TableCell>
                   <TableCell>{formatCurrency(expense.impuesto)}</TableCell>
                   <TableCell>{formatCurrency(expense.total)}</TableCell>
                   <TableCell>{expense.formaPago?.nombre || 'N/A'}</TableCell>
@@ -211,6 +273,7 @@ const SuperExpensesList: React.FC = () => {
                         size="small"
                         color="primary"
                         onClick={() => handleOpenForm(expense)}
+                        disabled={expense.activo === false}
                       >
                         <EditIcon />
                       </IconButton>
@@ -220,6 +283,7 @@ const SuperExpensesList: React.FC = () => {
                         size="small"
                         color="error"
                         onClick={() => handleOpenDeleteDialog(expense)}
+                        disabled={expense.activo === false}
                       >
                         <DeleteIcon />
                       </IconButton>
@@ -229,7 +293,7 @@ const SuperExpensesList: React.FC = () => {
               ))
             ) : (
               <TableRow>
-                <TableCell colSpan={6} align="center">
+                <TableCell colSpan={11} align="center">
                   No hay egresos para mostrar
                 </TableCell>
               </TableRow>

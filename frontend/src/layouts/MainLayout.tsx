@@ -5,7 +5,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useTurno } from '../contexts/TurnoContext';
 import turnosApi from '../api/turnos/turnosApi';
 import Copyright from '../components/Copyright';
-import TurnoIndicator from '../components/TurnoIndicator';
+import TurnoIndicator from '../components/turnos/TurnoIndicator';
 import logoImage from '../assets/images/LogoFS.png';
 import { 
   AppBar, 
