@@ -3,18 +3,29 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { SuperExpense } from './entities/super-expense.entity';
 import { CreateSuperExpenseDto, UpdateSuperExpenseDto } from './dto';
+import { UsuarioTurno } from '../turnos/entities/usuario-turno.entity';
 
 @Injectable()
 export class SuperExpensesService {
   constructor(
     @InjectRepository(SuperExpense)
     private superExpenseRepository: Repository<SuperExpense>,
+    @InjectRepository(UsuarioTurno)
+    private usuarioTurnoRepository: Repository<UsuarioTurno>,
   ) {}
 
   async create(createSuperExpenseDto: CreateSuperExpenseDto, userId: number): Promise<SuperExpense> {
     try {
       console.log('Servicio - Datos recibidos:', JSON.stringify(createSuperExpenseDto));
       console.log('Servicio - Usuario ID:', userId);
+      
+      // Obtener el turno activo del usuario para obtener cajaNumero
+      const turnoActivo = await this.usuarioTurnoRepository.findOne({
+        where: { usuarioId: userId, activo: true }
+      });
+      
+      const cajaNumero = turnoActivo?.cajaNumero || null;
+      console.log('Caja numero del turno activo:', cajaNumero);
       
       // Verificar que el usuario exista
       const userExists = await this.superExpenseRepository.query(
@@ -125,8 +136,8 @@ export class SuperExpensesService {
           INSERT INTO tbl_egresos_super (
             usuario_id, tipo_egreso_id, descripcion_egreso, documento_pago_id, 
             nro_factura, excento, gravado, impuesto, total, forma_pago_id, 
-            fecha_egreso, hora, activo
-          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) RETURNING *`;
+            fecha_egreso, hora, activo, caja_numero
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14) RETURNING *`;
         
         // Normalizar los valores para evitar errores de tipo en la base de datos
         // Si nroFactura es una cadena vacía, establecerlo como null
@@ -145,7 +156,8 @@ export class SuperExpensesService {
           cleanData.formaPagoId,
           cleanData.fechaEgreso,
           cleanData.hora,
-          cleanData.activo
+          cleanData.activo,
+          cajaNumero // Agregar caja_numero del turno activo
         ];
         
         console.log('query:', query);

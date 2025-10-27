@@ -99,6 +99,10 @@ export class SuperBillCountDto {
   @Type(() => Date)
   fecha: Date;
 
+  @IsOptional()
+  @IsNumber()
+  cajaNumero?: number | null;
+
   // Additional information to display in frontend
   usuario?: {
     id: number;

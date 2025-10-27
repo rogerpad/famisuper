@@ -4,6 +4,7 @@ import { Repository } from 'typeorm';
 import { CreateBalanceSaleDto } from './dto/create-balance-sale.dto';
 import { UpdateBalanceSaleDto } from './dto/update-balance-sale.dto';
 import { BalanceSale } from './entities/balance-sale.entity';
+import { UsuarioTurno } from '../turnos/entities/usuario-turno.entity';
 
 @Injectable()
 export class BalanceSalesService {
@@ -12,9 +13,11 @@ export class BalanceSalesService {
   constructor(
     @InjectRepository(BalanceSale)
     private balanceSaleRepository: Repository<BalanceSale>,
+    @InjectRepository(UsuarioTurno)
+    private usuarioTurnoRepository: Repository<UsuarioTurno>,
   ) {}
 
-  async create(createBalanceSaleDto: CreateBalanceSaleDto): Promise<BalanceSale> {
+  async create(createBalanceSaleDto: CreateBalanceSaleDto, userId?: number): Promise<BalanceSale> {
     try {
       this.logger.log(
         `Creando nueva venta de saldo: ${JSON.stringify(createBalanceSaleDto)}`,
@@ -26,7 +29,20 @@ export class BalanceSalesService {
         createBalanceSaleDto.fecha = new Date(createBalanceSaleDto.fecha);
       }
       
-      const balanceSale = this.balanceSaleRepository.create(createBalanceSaleDto);
+      // Obtener cajaNumero del turno activo si se proporciona userId
+      let cajaNumero: number | null = null;
+      if (userId || createBalanceSaleDto.usuarioId) {
+        const turnoActivo = await this.usuarioTurnoRepository.findOne({
+          where: { usuarioId: userId || createBalanceSaleDto.usuarioId, activo: true }
+        });
+        cajaNumero = turnoActivo?.cajaNumero || null;
+        this.logger.log(`Caja del turno activo: ${cajaNumero}`);
+      }
+      
+      const balanceSale = this.balanceSaleRepository.create({
+        ...createBalanceSaleDto,
+        cajaNumero  // Asignar caja del turno activo
+      });
       return await this.balanceSaleRepository.save(balanceSale);
     } catch (error) {
       this.handleBalanceSaleError(error, createBalanceSaleDto, 'create');

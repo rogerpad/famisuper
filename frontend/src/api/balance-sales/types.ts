@@ -16,6 +16,7 @@ export interface BalanceSale {
   fecha: Date;
   observacion?: string;
   activo: boolean;
+  cajaNumero?: number | null;
 }
 
 export interface BalanceSaleFormData {

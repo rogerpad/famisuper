@@ -140,11 +140,11 @@ export class UsuariosTurnosService {
   async iniciarTurnoVendedor(
     usuarioId: number, 
     turnoId: number, 
-    operationType?: { agente: boolean; super: boolean }
+    operationType?: { agente: boolean; super: boolean; cajaNumero?: number }
   ): Promise<UsuarioTurno> {
     console.log(`[USUARIOS_TURNOS] Iniciando turno ID: ${turnoId} para vendedor ID: ${usuarioId}`);
     if (operationType) {
-      console.log(`[USUARIOS_TURNOS] Tipo de operación: Agente=${operationType.agente}, Super=${operationType.super}`);
+      console.log(`[USUARIOS_TURNOS] Tipo de operación: Agente=${operationType.agente}, Super=${operationType.super}, Caja=${operationType.cajaNumero || 'N/A'}`);
     }
     
     // Validar IDs
@@ -177,13 +177,29 @@ export class UsuariosTurnosService {
       }
       
       if (operationType.super) {
-        const resultadoSuper = await this.operacionEstaEnUso('super', usuarioId);
-        if (resultadoSuper.enUso) {
-          const nombreUsuario = resultadoSuper.usuario ? 
-            `${resultadoSuper.usuario.nombre} ${resultadoSuper.usuario.apellido}` : 
+        // Validar que se haya seleccionado una caja para operación de Super
+        if (!operationType.cajaNumero) {
+          throw new BadRequestException(
+            `Debe seleccionar una caja para la operación de Super.`
+          );
+        }
+        
+        // Validar que la caja específica no esté en uso
+        const cajaEnUso = await this.usuarioTurnoRepository.findOne({
+          where: {
+            activo: true,
+            super: true,
+            cajaNumero: operationType.cajaNumero
+          },
+          relations: ['usuario']
+        });
+        
+        if (cajaEnUso && cajaEnUso.usuarioId !== usuarioId) {
+          const nombreUsuario = cajaEnUso.usuario ? 
+            `${cajaEnUso.usuario.nombre} ${cajaEnUso.usuario.apellido}` : 
             'Usuario desconocido';
           throw new BadRequestException(
-            `La operación de Super ya está siendo utilizada por ${nombreUsuario}. Solo un usuario puede acceder a esta operación a la vez.`
+            `La Caja ${operationType.cajaNumero} ya está siendo utilizada por ${nombreUsuario}. Solo un usuario puede acceder a cada caja a la vez.`
           );
         }
       }
@@ -208,6 +224,8 @@ export class UsuariosTurnosService {
       if (operationType) {
         asignacion.agente = operationType.agente;
         asignacion.super = operationType.super;
+        // Asignar número de caja para operación de Super, null para Agentes
+        asignacion.cajaNumero = operationType.super ? operationType.cajaNumero : null;
       }
       
       await this.usuarioTurnoRepository.save(asignacion);
@@ -223,6 +241,8 @@ export class UsuariosTurnosService {
         // Establecer tipo de operación si se proporciona
         agente: operationType ? operationType.agente : false,
         super: operationType ? operationType.super : false,
+        // Asignar número de caja para operación de Super, null para Agentes
+        cajaNumero: operationType && operationType.super ? operationType.cajaNumero : null,
       });
       
       await this.usuarioTurnoRepository.save(asignacion);
@@ -274,6 +294,7 @@ export class UsuariosTurnosService {
       asignacion.horaFinReal = currentTimeString;
       asignacion.activo = false; // Marcar como inactivo
       asignacion.super = false; // Finalizar operación super
+      asignacion.cajaNumero = null; // Liberar la caja
       
       await this.usuarioTurnoRepository.save(asignacion);
       console.log(`[USUARIOS_TURNOS] ✅ Asignación finalizada: ${asignacion.id}`);
@@ -627,15 +648,41 @@ export class UsuariosTurnosService {
   async getOperacionesEnUso(): Promise<{
     operacionAgente: { enUso: boolean; usuario?: User };
     operacionSuper: { enUso: boolean; usuario?: User };
+    cajas: Array<{ id: number; nombre: string; enUso: boolean; usuario?: User }>;
   }> {
     console.log(`[USUARIOS_TURNOS] Obteniendo estado de operaciones en uso`);
     
     const operacionAgente = await this.operacionEstaEnUso('agente');
     const operacionSuper = await this.operacionEstaEnUso('super');
     
+    // Importar configuración de cajas dinámicamente
+    const { CAJAS_SUPER_NUMEROS } = await import('../../config/cajas.config');
+    
+    // Obtener estado de cada caja
+    const cajas = await Promise.all(
+      CAJAS_SUPER_NUMEROS.map(async (cajaId) => {
+        const turnoActivo = await this.usuarioTurnoRepository.findOne({
+          where: {
+            activo: true,
+            super: true,
+            cajaNumero: cajaId
+          },
+          relations: ['usuario']
+        });
+        
+        return {
+          id: cajaId,
+          nombre: `Caja Super ${cajaId}`,
+          enUso: !!turnoActivo,
+          usuario: turnoActivo?.usuario
+        };
+      })
+    );
+    
     return {
       operacionAgente,
-      operacionSuper
+      operacionSuper,
+      cajas
     };
   }
 }

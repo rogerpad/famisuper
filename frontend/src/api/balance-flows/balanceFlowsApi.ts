@@ -396,6 +396,35 @@ export const useBalanceFlows = () => {
     }
   }, [fetchBalanceFlows]);
 
+  // Obtener el saldo final del último flujo inactivo
+  const getLastInactiveSaldoFinal = useCallback(async (telefonicaId: number, cajaNumero: number): Promise<number | null> => {
+    try {
+      const response = await fetch(
+        `${API_BASE_URL}/balance-flows/last-inactive-saldo/${telefonicaId}/${cajaNumero}`,
+        {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem('token')}`,
+          },
+        }
+      );
+
+      if (!response.ok) {
+        if (response.status === 404) {
+          console.log('[BalanceFlowsAPI] No se encontró flujo inactivo previo');
+          return null;
+        }
+        throw new Error(`Error: ${response.status}`);
+      }
+
+      const data = await response.json();
+      console.log('[BalanceFlowsAPI] Último saldo final obtenido:', data);
+      return data?.saldoFinal ?? null;
+    } catch (err) {
+      console.error('Error al obtener último saldo final:', err);
+      return null; // Retornar null en caso de error en lugar de lanzar excepción
+    }
+  }, []);
+
   return {
     balanceFlows,
     loading,
@@ -407,6 +436,7 @@ export const useBalanceFlows = () => {
     createBalanceFlow,
     updateBalanceFlow,
     deleteBalanceFlow,
+    getLastInactiveSaldoFinal,
     getSumSaldoVendido,
     recalcularSaldosVendidos,
   };

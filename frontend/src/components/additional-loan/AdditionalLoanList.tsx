@@ -35,10 +35,12 @@ import {
   AdditionalLoanData
 } from '../../api/additional-loan/additionalLoanApi';
 import { usePermissions } from '../../hooks/usePermissions';
+import { useTurno } from '../../contexts/TurnoContext';
 
 const AdditionalLoanList: React.FC = () => {
   const navigate = useNavigate();
   const { hasPermission } = usePermissions();
+  const { turnosActivos } = useTurno();
   
   const [loans, setLoans] = useState<AdditionalLoanData[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
@@ -156,6 +158,33 @@ const AdditionalLoanList: React.FC = () => {
     );
   }
 
+  // Obtener el cajaNumero del turno activo del usuario
+  const cajaNumeroActual = turnosActivos.length > 0 ? turnosActivos[0].cajaNumero : null;
+  console.log('[AdditionalLoanList] Caja número del turno activo:', cajaNumeroActual);
+  console.log('[AdditionalLoanList] Total registros antes de filtrar:', loans.length);
+
+  // Filtrar por caja y estado activo ESTRICTAMENTE
+  const filteredLoans = loans.filter(loan => {
+    console.log('[AdditionalLoanList] Registro:', { id: loan.id, cajaNumero: loan.cajaNumero, activo: loan.activo, cajaNumeroActual });
+    
+    // 1. Debe estar activo
+    if (loan.activo !== true) {
+      console.log('[AdditionalLoanList] ❌ Rechazado: no está activo');
+      return false;
+    }
+    
+    // 2. Si hay turno activo, debe coincidir con la caja
+    if (cajaNumeroActual && loan.cajaNumero !== cajaNumeroActual) {
+      console.log('[AdditionalLoanList] ❌ Rechazado: caja no coincide');
+      return false;
+    }
+    
+    console.log('[AdditionalLoanList] ✅ Aceptado');
+    return true;
+  });
+  
+  console.log('[AdditionalLoanList] Total registros después de filtrar:', filteredLoans.length);
+
   return (
     <Paper sx={{ p: 3, mt: 3 }}>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
@@ -180,7 +209,7 @@ const AdditionalLoanList: React.FC = () => {
         <Alert severity="error" sx={{ my: 2 }}>
           {error}
         </Alert>
-      ) : loans.length === 0 ? (
+      ) : filteredLoans.length === 0 ? (
         <Alert severity="info" sx={{ my: 2 }}>
           No hay adicionales/préstamos registrados
         </Alert>
@@ -199,7 +228,7 @@ const AdditionalLoanList: React.FC = () => {
               </TableRow>
             </TableHead>
             <TableBody>
-              {loans.map((item) => (
+              {filteredLoans.map((item) => (
                 <TableRow key={item.id}>
                   <TableCell>
                     {item.usuario ? `${item.usuario.nombre} ${item.usuario.apellido}` : 'N/A'}

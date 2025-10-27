@@ -509,7 +509,9 @@ const SuperClosingForm: React.FC = () => {
                 helperText={formErrors.efectivoInicial}
                 InputProps={{
                   startAdornment: <InputAdornment position="start">L.</InputAdornment>,
+                  readOnly: true,
                 }}
+                disabled
               />
             </Grid>
             
@@ -523,7 +525,9 @@ const SuperClosingForm: React.FC = () => {
                 onChange={handleInputChange}
                 InputProps={{
                   startAdornment: <InputAdornment position="start">L.</InputAdornment>,
+                  readOnly: true,
                 }}
+                disabled
               />
             </Grid>
             
@@ -537,7 +541,9 @@ const SuperClosingForm: React.FC = () => {
                 onChange={handleInputChange}
                 InputProps={{
                   startAdornment: <InputAdornment position="start">L.</InputAdornment>,
+                  readOnly: true,
                 }}
+                disabled
               />
             </Grid>
             
@@ -691,7 +697,9 @@ const SuperClosingForm: React.FC = () => {
                 onChange={handleInputChange}
                 InputProps={{
                   startAdornment: <InputAdornment position="start">L.</InputAdornment>,
+                  readOnly: true,
                 }}
+                disabled
               />
             </Grid>
             
@@ -711,7 +719,9 @@ const SuperClosingForm: React.FC = () => {
                 onChange={handleInputChange}
                 InputProps={{
                   startAdornment: <InputAdornment position="start">L.</InputAdornment>,
+                  readOnly: true,
                 }}
+                disabled
               />
             </Grid>
             
@@ -725,7 +735,9 @@ const SuperClosingForm: React.FC = () => {
                 onChange={handleInputChange}
                 InputProps={{
                   startAdornment: <InputAdornment position="start">L.</InputAdornment>,
+                  readOnly: true,
                 }}
+                disabled
               />
             </Grid>
             
@@ -739,7 +751,9 @@ const SuperClosingForm: React.FC = () => {
                 onChange={handleInputChange}
                 InputProps={{
                   startAdornment: <InputAdornment position="start">L.</InputAdornment>,
+                  readOnly: true,
                 }}
+                disabled
               />
             </Grid>
             
@@ -788,7 +802,9 @@ const SuperClosingForm: React.FC = () => {
                 onChange={handleInputChange}
                 InputProps={{
                   startAdornment: <InputAdornment position="start">L.</InputAdornment>,
+                  readOnly: true,
                 }}
+                disabled
               />
               {showConteoWarning && (
                 <Typography

@@ -3,6 +3,7 @@ import { User } from '../../users/entities/user.entity';
 import { SuperExpenseType } from '../../super-expense-types/entities/super-expense-type.entity';
 import { PaymentDocument } from '../../payment-documents/entities/payment-document.entity';
 import { PaymentMethod } from '../../payment-methods/entities/payment-method.entity';
+import { SuperClosing } from '../../super-closings/entities/super-closing.entity';
 
 @Entity('tbl_egresos_super')
 export class SuperExpense {
@@ -63,4 +64,14 @@ export class SuperExpense {
 
   @Column({ default: true })
   activo: boolean;
+
+  @Column({ name: 'caja_numero', nullable: true })
+  cajaNumero: number;
+
+  @Column({ name: 'cierre_id', nullable: true })
+  cierreId: number;
+
+  @ManyToOne(() => SuperClosing, { nullable: true })
+  @JoinColumn({ name: 'cierre_id' })
+  cierre: SuperClosing;
 }

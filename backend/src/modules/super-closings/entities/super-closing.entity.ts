@@ -1,5 +1,6 @@
 import { Entity, Column, PrimaryGeneratedColumn, ManyToOne, JoinColumn } from 'typeorm';
 import { User } from '../../users/entities/user.entity';
+import { UsuarioTurno } from '../../turnos/entities/usuario-turno.entity';
 
 @Entity('tbl_cierres_super')
 export class SuperClosing {
@@ -78,4 +79,14 @@ export class SuperClosing {
 
   @Column({ name: 'activo', default: true })
   activo: boolean;
+
+  @Column({ name: 'caja_numero', type: 'integer', nullable: true })
+  cajaNumero: number;
+
+  @Column({ name: 'usuario_turno_id', type: 'integer', nullable: true })
+  usuarioTurnoId: number;
+
+  @ManyToOne(() => UsuarioTurno, { nullable: true })
+  @JoinColumn({ name: 'usuario_turno_id' })
+  usuarioTurno: UsuarioTurno;
 }

@@ -22,6 +22,7 @@ export interface SuperExpense {
   fechaEgreso: string | Date;
   hora: string;
   activo: boolean;
+  cajaNumero?: number | null;
 }
 
 export interface CreateSuperExpenseDto {

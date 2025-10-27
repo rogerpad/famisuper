@@ -1,4 +1,5 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, Query, HttpStatus } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, Query, HttpStatus, Req } from '@nestjs/common';
+import { Request } from 'express';
 import { BalanceSalesService } from './balance-sales.service';
 import { CreateBalanceSaleDto } from './dto/create-balance-sale.dto';
 import { UpdateBalanceSaleDto } from './dto/update-balance-sale.dto';
@@ -17,14 +18,17 @@ export class BalanceSalesController {
 
   @Post()
   @RequierePermiso('crear_editar_venta')
-  async create(@Body() createBalanceSaleDto: CreateBalanceSaleDto) {
+  async create(@Body() createBalanceSaleDto: CreateBalanceSaleDto, @Req() req: Request) {
     try {
+      const userId = req.user ? req.user['id'] : undefined;
+      console.log('[BalanceSalesController] userId del request:', userId);
+      
       this.logger.log(
         `Solicitud recibida para crear venta de saldo: ${JSON.stringify(createBalanceSaleDto)}`,
         'BalanceSalesController'
       );
       
-      const result = await this.balanceSalesService.create(createBalanceSaleDto);
+      const result = await this.balanceSalesService.create(createBalanceSaleDto, userId);
       
       this.logger.log(
         `Venta de saldo creada exitosamente con ID: ${result.id}`,

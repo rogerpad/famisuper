@@ -1,5 +1,6 @@
 import { Entity, Column, PrimaryGeneratedColumn, ManyToOne, JoinColumn, CreateDateColumn } from 'typeorm';
 import { User } from '../../users/entities/user.entity';
+import { SuperClosing } from '../../super-closings/entities/super-closing.entity';
 
 @Entity({ name: 'tbl_adic_prest' })
 export class AdditionalLoan {
@@ -30,4 +31,14 @@ export class AdditionalLoan {
 
   @Column({ default: true })
   activo: boolean;
+
+  @Column({ name: 'caja_numero', nullable: true })
+  cajaNumero: number;
+
+  @Column({ name: 'cierre_id', nullable: true })
+  cierreId: number;
+
+  @ManyToOne(() => SuperClosing, { nullable: true })
+  @JoinColumn({ name: 'cierre_id' })
+  cierre: SuperClosing;
 }

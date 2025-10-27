@@ -16,6 +16,7 @@ export interface AdditionalLoanData {
   descripcion: string;
   fecha?: Date | string;
   activo: boolean;
+  cajaNumero?: number | null;
 }
 
 export interface AdditionalLoanFormData {
@@ -51,7 +52,8 @@ const normalizeAdditionalLoanData = (data: any): AdditionalLoanData => {
     monto: ensureNumber(data.monto),
     descripcion: data.descripcion || '',
     fecha: data.fecha,
-    activo: data.activo !== undefined ? data.activo : true
+    activo: data.activo !== undefined ? data.activo : true,
+    cajaNumero: data.cajaNumero
   };
 };
 

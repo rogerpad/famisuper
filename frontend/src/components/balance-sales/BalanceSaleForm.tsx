@@ -20,6 +20,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { useBalanceSales } from '../../api/balance-sales/balanceSalesApi';
 import { BalanceSale, BalanceSaleFormData } from '../../api/balance-sales/types';
 import { useAuth } from '../../contexts/AuthContext';
+import { useTurno } from '../../contexts/TurnoContext';
 
 // Importar hooks para obtener líneas telefónicas, flujos de saldo y paquetes
 import { usePhoneLines } from '../../api/phoneLines/phoneLinesApi';
@@ -34,6 +35,7 @@ const BalanceSaleForm: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const isEditMode = id !== 'new' && id !== undefined;
   const { state: authState } = useAuth();
+  const { turnosActivos } = useTurno();
   
   const { loading: loadingBalanceSale, error: balanceSaleError, fetchBalanceSaleById, createBalanceSale, updateBalanceSale } = useBalanceSales();
   const { loading: loadingPhoneLines, phoneLines, fetchPhoneLines } = usePhoneLines();
@@ -62,7 +64,8 @@ const BalanceSaleForm: React.FC = () => {
   // Cargar líneas telefónicas, flujos de saldo y paquetes al montar el componente
   useEffect(() => {
     fetchPhoneLines();
-    fetchBalanceFlows();
+    // Cargar solo flujos activos
+    fetchBalanceFlows(true);
     loadPackages();
   }, [fetchPhoneLines, fetchBalanceFlows]); // Agregar dependencias para evitar loops
   
@@ -501,14 +504,31 @@ const BalanceSaleForm: React.FC = () => {
                 value={formData.flujoSaldoId || ''}
                 onChange={handleSelectChange}
                 label="Flujo de Saldo"
-                disabled={submitting}
+                disabled={true}
+                readOnly
               >
                 <MenuItem value="">Seleccione un flujo</MenuItem>
-                {balanceFlows?.map((flow: BalanceFlow) => (
-                  <MenuItem key={flow.id} value={flow.id}>
-                    {flow.nombre}
-                  </MenuItem>
-                ))}
+                {balanceFlows
+                  ?.filter((flow: BalanceFlow) => {
+                    // Obtener el cajaNumero del turno activo
+                    const cajaNumeroActual = turnosActivos.length > 0 ? turnosActivos[0].cajaNumero : null;
+                    
+                    // Filtrar por flujos activos
+                    if (!flow.activo) return false;
+                    
+                    // Si hay turno activo con caja y el flujo tiene caja asignada, filtrar por caja
+                    if (cajaNumeroActual && flow.cajaNumero) {
+                      return flow.cajaNumero === cajaNumeroActual;
+                    }
+                    
+                    // Si el flujo no tiene caja asignada, mostrarlo
+                    return true;
+                  })
+                  .map((flow: BalanceFlow) => (
+                    <MenuItem key={flow.id} value={flow.id}>
+                      {flow.nombre}
+                    </MenuItem>
+                  ))}
               </Select>
               {errors.flujoSaldoId && <FormHelperText>{errors.flujoSaldoId}</FormHelperText>}
             </FormControl>

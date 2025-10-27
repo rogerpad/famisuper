@@ -33,6 +33,9 @@ export interface UsuarioTurno {
   horaInicioReal: string | null;
   horaFinReal: string | null;
   activo: boolean;
+  agente?: boolean;
+  super?: boolean;
+  cajaNumero?: number | null;
   usuario?: Usuario;
   turno?: Turno;
 }
@@ -152,6 +155,7 @@ const turnosApi = {
   getOperacionesEnUso: async (): Promise<{
     operacionAgente: { enUso: boolean; usuario?: any };
     operacionSuper: { enUso: boolean; usuario?: any };
+    cajas: Array<{ id: number; nombre: string; enUso: boolean; usuario?: any }>;
   }> => {
     console.log(`[TURNOS_API] Obteniendo estado de operaciones en uso`);
     const response = await api.get('/turnos/operaciones-en-uso');
@@ -436,7 +440,7 @@ const turnosApi = {
   // Iniciar un turno como vendedor (actualizar la hora de inicio con la hora actual)
   iniciarTurnoVendedor: async (
     id: number | string,
-    operationType?: { agente: boolean; super: boolean }
+    operationType?: { agente: boolean; super: boolean; cajaNumero?: number }
   ): Promise<UsuarioTurno | Turno> => {
     // Validar el ID del turno
     const validId = toValidId(id);
@@ -453,7 +457,7 @@ const turnosApi = {
     try {
       console.log(`[TURNOS API] Iniciando turno como vendedor con ID validado: ${validId}`);
       if (operationType) {
-        console.log(`[TURNOS API] Tipo de operación: Agente=${operationType.agente}, Super=${operationType.super}`);
+        console.log(`[TURNOS API] Tipo de operación: Agente=${operationType.agente}, Super=${operationType.super}, Caja=${operationType.cajaNumero || 'N/A'}`);
       }
       
       // Enviar los parámetros de tipo de operación si se proporcionan
@@ -468,6 +472,11 @@ const turnosApi = {
       // Verificar si el error es porque el usuario ya tiene un turno activo
       if (error.response?.data?.message?.includes('ya tiene un turno activo')) {
         throw new Error(`Ya tienes un turno activo. Debes finalizar el turno actual antes de iniciar uno nuevo.`);
+      }
+      
+      // Verificar si el error es porque la caja está en uso
+      if (error.response?.data?.message?.includes('ya está siendo utilizada')) {
+        throw new Error(error.response.data.message);
       }
       
       throw new Error(`Error al iniciar turno como vendedor: ${error.message || 'Error desconocido'}`);

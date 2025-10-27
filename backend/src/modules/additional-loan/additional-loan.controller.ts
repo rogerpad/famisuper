@@ -1,10 +1,11 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, Query } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, Query, Req } from '@nestjs/common';
+import { Request } from 'express';
 import { AdditionalLoanService } from './additional-loan.service';
 import { 
   CreateAdditionalLoanDto, 
-  UpdateAdditionalLoanDto, 
-  AdditionalLoanDto 
+  UpdateAdditionalLoanDto
 } from './dto';
+import { AdditionalLoan } from './entities/additional-loan.entity';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../auth/guards/permissions.guard';
 import { RequirePermissions } from '../auth/decorators/require-permissions.decorator';
@@ -16,30 +17,39 @@ export class AdditionalLoanController {
 
   @Post()
   @RequirePermissions('crear_editar_adic_prest')
-  create(@Body() createAdditionalLoanDto: CreateAdditionalLoanDto): Promise<AdditionalLoanDto> {
-    return this.additionalLoanService.create(createAdditionalLoanDto);
+  create(@Body() createAdditionalLoanDto: CreateAdditionalLoanDto, @Req() req: Request): Promise<AdditionalLoan> {
+    const userId = req.user ? req.user['id'] : undefined;
+    console.log('[AdditionalLoanController] userId del request:', userId);
+    return this.additionalLoanService.create(createAdditionalLoanDto, userId);
   }
 
   @Get()
   @RequirePermissions('ver_adic_presta')
-  findAll(
+  async findAll(
     @Query('acuerdo') acuerdo?: string,
     @Query('origen') origen?: string,
     @Query('activo') activo?: string,
-  ): Promise<AdditionalLoanDto[]> {
+  ): Promise<AdditionalLoan[]> {
     // Convertir el string 'true'/'false' a boolean si existe
     const activoBoolean = activo ? activo === 'true' : undefined;
     
-    return this.additionalLoanService.findAll({
+    const result = await this.additionalLoanService.findAll({
       acuerdo,
       origen,
       activo: activoBoolean,
     });
+    
+    console.log('[AdditionalLoanController] findAll - Total registros:', result.length);
+    if (result.length > 0) {
+      console.log('[AdditionalLoanController] findAll - Primer registro:', JSON.stringify(result[0]));
+    }
+    
+    return result;
   }
 
   @Get(':id')
   @RequirePermissions('ver_adic_presta')
-  findOne(@Param('id') id: string): Promise<AdditionalLoanDto> {
+  findOne(@Param('id') id: string): Promise<AdditionalLoan> {
     return this.additionalLoanService.findOne(+id);
   }
 
@@ -48,7 +58,7 @@ export class AdditionalLoanController {
   update(
     @Param('id') id: string, 
     @Body() updateAdditionalLoanDto: UpdateAdditionalLoanDto
-  ): Promise<AdditionalLoanDto> {
+  ): Promise<AdditionalLoan> {
     return this.additionalLoanService.update(+id, updateAdditionalLoanDto);
   }
 

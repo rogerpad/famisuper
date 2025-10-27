@@ -485,7 +485,11 @@ const menuItemsConfig: MenuItemType[] = [
         if (item.text === 'Operación de Agentes' || item.text === 'Operación de Super') {
           console.log(`[MENU_FILTER] Procesando grupo de operación: ${item.text}`);
           
-          // Verificar si la operación está en uso por otro usuario (solo para usuarios no admin)
+          // NOTA: Con múltiples cajas, NO verificamos el estado global operacionSuper.enUso
+          // porque siempre estará en true mientras haya alguna caja en uso.
+          // En su lugar, confiamos en operacionActiva del usuario específico.
+          
+          // Solo verificamos Agentes porque sigue siendo operación única
           if (!isAdmin) {
             if (item.text === 'Operación de Agentes' && operacionesEnUso?.operacionAgente.enUso) {
               const usuarioEnUso = operacionesEnUso.operacionAgente.usuario;
@@ -496,14 +500,8 @@ const menuItemsConfig: MenuItemType[] = [
               }
             }
             
-            if (item.text === 'Operación de Super' && operacionesEnUso?.operacionSuper.enUso) {
-              const usuarioEnUso = operacionesEnUso.operacionSuper.usuario;
-              const esUsuarioActual = usuarioEnUso && authState.user && usuarioEnUso.id === authState.user.id;
-              if (!esUsuarioActual) {
-                console.log('Operación de Super en uso por otro usuario - ocultando menú para Vendedor');
-                return false;
-              }
-            }
+            // Operación de Super: NO verificar estado global, confiar en operacionActiva
+            // (Varios usuarios pueden usar Super simultáneamente con diferentes cajas)
           }
           
           if (item.children) {
@@ -623,8 +621,8 @@ const menuItemsConfig: MenuItemType[] = [
         
         // Para grupos, aplicar lógica específica de VendedorB
         if (item.text === 'Operación de Agentes') {
-          // Solo mostrar si tiene el permiso específico Y tiene turno activo Y la operación no está en uso por otro usuario
-          if (tienePermisoOperacionAgentes && tieneTurnoActivo && item.children) {
+          // Solo mostrar si tiene el permiso específico Y tiene turno activo Y operacionActiva es 'agente'
+          if (tienePermisoOperacionAgentes && tieneTurnoActivo && operacionActiva === 'agente' && item.children) {
             // Verificar si la operación está en uso por otro usuario (no por el usuario actual)
             if (operacionesEnUso?.operacionAgente.enUso) {
               const usuarioEnUso = operacionesEnUso.operacionAgente.usuario;
@@ -643,17 +641,9 @@ const menuItemsConfig: MenuItemType[] = [
         }
         
         if (item.text === 'Operación de Super') {
-          // Solo mostrar si tiene el permiso específico Y tiene turno activo Y la operación no está en uso por otro usuario
-          if (tienePermisoOperacionSuper && tieneTurnoActivo && item.children) {
-            // Verificar si la operación está en uso por otro usuario (no por el usuario actual)
-            if (operacionesEnUso?.operacionSuper.enUso) {
-              const usuarioEnUso = operacionesEnUso.operacionSuper.usuario;
-              const esUsuarioActual = usuarioEnUso && authState.user && usuarioEnUso.id === authState.user.id;
-              if (!esUsuarioActual) {
-                console.log('Operación de Super en uso por otro usuario - ocultando menú para VendedorB');
-                return false;
-              }
-            }
+          // Solo mostrar si tiene el permiso específico Y tiene turno activo Y operacionActiva es 'super'
+          // NOTA: NO verificamos operacionSuper.enUso porque con múltiples cajas ese estado es global
+          if (tienePermisoOperacionSuper && tieneTurnoActivo && operacionActiva === 'super' && item.children) {
             item.children = item.children.filter(child => 
               !child.permissionCode || hasPermission(child.permissionCode)
             );

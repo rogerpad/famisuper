@@ -28,12 +28,14 @@ import { usePackages } from '../../api/packages/packagesApi';
 import { useBalanceFlows } from '../../api/balance-flows/balanceFlowsApi';
 import { BalanceSale } from '../../api/balance-sales/types';
 import { Package } from '../../api/packages/types';
+import { useTurno } from '../../contexts/TurnoContext';
 
 const BalanceSalesList: React.FC = () => {
   const navigate = useNavigate();
   const { loading, error, fetchBalanceSales, deleteBalanceSale } = useBalanceSales();
   const { loading: packagesLoading, fetchPackages } = usePackages();
   const { loading: balanceFlowsLoading, error: balanceFlowsError, recalcularSaldosVendidos } = useBalanceFlows();
+  const { turnosActivos } = useTurno();
   const [balanceSales, setBalanceSales] = useState<BalanceSale[]>([]);
   const [packages, setPackages] = useState<Package[]>([]);
   const [packageMap, setPackageMap] = useState<Record<number, string>>({});
@@ -134,6 +136,21 @@ const BalanceSalesList: React.FC = () => {
     return <Typography color="error">Error: {error || balanceFlowsError}</Typography>;
   }
 
+  // Obtener el cajaNumero del turno activo del usuario
+  const cajaNumeroActual = turnosActivos.length > 0 ? turnosActivos[0].cajaNumero : null;
+  console.log('[BalanceSalesList] Caja número del turno activo:', cajaNumeroActual);
+
+  // Filtrar por caja y estado activo
+  const filteredBalanceSales = balanceSales.filter(sale => {
+    // Filtrar por estado activo
+    const matchesActivo = sale.activo === true;
+    
+    // Filtrar por caja ESTRICTAMENTE: debe coincidir con el turno activo
+    const matchesCaja = !cajaNumeroActual || sale.cajaNumero === cajaNumeroActual;
+    
+    return matchesActivo && matchesCaja;
+  });
+
   return (
     <Box>
       <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
@@ -175,14 +192,14 @@ const BalanceSalesList: React.FC = () => {
             </TableRow>
           </TableHead>
           <TableBody>
-            {balanceSales.length === 0 ? (
+            {filteredBalanceSales.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={8} align="center">
                   No hay ventas de saldo registradas
                 </TableCell>
               </TableRow>
             ) : (
-              balanceSales.map((balanceSale) => (
+              filteredBalanceSales.map((balanceSale) => (
                 <TableRow key={balanceSale.id}>
                   <TableCell>{balanceSale.id}</TableCell>
                   <TableCell>{balanceSale.paqueteId && packageMap[balanceSale.paqueteId] ? packageMap[balanceSale.paqueteId] : 'N/A'}</TableCell>

@@ -5,16 +5,19 @@ import { BalanceFlow } from './entities/balance-flow.entity';
 import { CreateBalanceFlowDto } from './dto/create-balance-flow.dto';
 import { UpdateBalanceFlowDto } from './dto/update-balance-flow.dto';
 import { LoggerService } from '../../common/services/logger.service';
+import { UsuarioTurno } from '../turnos/entities/usuario-turno.entity';
 
 @Injectable()
 export class BalanceFlowsService {
   constructor(
     @InjectRepository(BalanceFlow)
     private balanceFlowsRepository: Repository<BalanceFlow>,
+    @InjectRepository(UsuarioTurno)
+    private usuarioTurnoRepository: Repository<UsuarioTurno>,
     private readonly logger: LoggerService
   ) {}
 
-  async create(createBalanceFlowDto: CreateBalanceFlowDto): Promise<BalanceFlow> {
+  async create(createBalanceFlowDto: CreateBalanceFlowDto, userId?: number): Promise<BalanceFlow> {
     // Asegurar que la fecha se procese correctamente
     if (createBalanceFlowDto.fecha) {
       console.log('Fecha original en create:', createBalanceFlowDto.fecha);
@@ -22,7 +25,20 @@ export class BalanceFlowsService {
       console.log('Fecha convertida en create:', createBalanceFlowDto.fecha);
     }
     
-    const balanceFlow = this.balanceFlowsRepository.create(createBalanceFlowDto);
+    // Obtener cajaNumero del turno activo si se proporciona userId
+    let cajaNumero: number | null = null;
+    if (userId) {
+      const turnoActivo = await this.usuarioTurnoRepository.findOne({
+        where: { usuarioId: userId, activo: true }
+      });
+      cajaNumero = turnoActivo?.cajaNumero || null;
+      console.log('[BalanceFlowsService] Caja del turno activo:', cajaNumero);
+    }
+    
+    const balanceFlow = this.balanceFlowsRepository.create({
+      ...createBalanceFlowDto,
+      cajaNumero  // Asignar caja del turno activo
+    });
     return this.balanceFlowsRepository.save(balanceFlow);
   }
 
@@ -284,5 +300,33 @@ export class BalanceFlowsService {
       );
       throw error;
     }
+  }
+
+  /**
+   * Obtener el saldo final del último flujo inactivo
+   * Filtrado por: telefonica_id, caja_numero, activo = false
+   * Para pre-cargar el saldo inicial en el nuevo flujo
+   */
+  async getLastInactiveSaldoFinal(telefonicaId: number, cajaNumero: number): Promise<{ saldoFinal: number } | null> {
+    console.log('[BalanceFlowsService] Buscando último saldo final - telefonicaId:', telefonicaId, 'cajaNumero:', cajaNumero);
+    
+    const lastFlow = await this.balanceFlowsRepository.findOne({
+      where: {
+        telefonicaId,
+        cajaNumero,
+        activo: false
+      },
+      order: {
+        fecha: 'DESC'
+      }
+    });
+
+    if (!lastFlow) {
+      console.log('[BalanceFlowsService] No se encontró flujo inactivo previo');
+      return null;
+    }
+
+    console.log('[BalanceFlowsService] Flujo inactivo encontrado - ID:', lastFlow.id, 'Saldo Final:', lastFlow.saldoFinal);
+    return { saldoFinal: lastFlow.saldoFinal };
   }
 }

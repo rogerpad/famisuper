@@ -11,6 +11,7 @@ export interface BalanceFlow {
   saldoFinal: number;
   fecha: string;
   activo: boolean;
+  cajaNumero?: number | null;
 }
 
 export interface CreateBalanceFlowDto {

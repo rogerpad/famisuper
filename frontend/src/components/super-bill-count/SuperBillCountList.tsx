@@ -28,10 +28,12 @@ import { SuperBillCount } from '../../api/super-bill-count/types';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { useAuth } from '../../contexts/AuthContext';
+import { useTurno } from '../../contexts/TurnoContext';
 
 const SuperBillCountList: React.FC = () => {
   const navigate = useNavigate();
   const { state } = useAuth();
+  const { turnosActivos } = useTurno();
   const {
     superBillCounts,
     loading,
@@ -98,6 +100,27 @@ const SuperBillCountList: React.FC = () => {
     }
   };
 
+  // Obtener el cajaNumero del turno activo del usuario
+  const cajaNumeroActual = turnosActivos.length > 0 ? turnosActivos[0].cajaNumero : null;
+  console.log('[SuperBillCountList] Caja número del turno activo:', cajaNumeroActual);
+  console.log('[SuperBillCountList] Total registros antes de filtrar:', superBillCounts.length);
+
+  // Filtrar por caja y estado activo
+  const filteredCounts = superBillCounts.filter(count => {
+    console.log('[SuperBillCountList] Registro:', { id: count.id, cajaNumero: count.cajaNumero, activo: count.activo, cajaNumeroActual });
+    
+    // Filtrar por estado activo
+    const matchesActivo = count.activo === true;
+    
+    // Filtrar por caja ESTRICTAMENTE: debe tener cajaNumero y coincidir con el turno activo
+    const matchesCaja = !cajaNumeroActual || count.cajaNumero === cajaNumeroActual;
+    
+    console.log('[SuperBillCountList] Filtro:', { matchesActivo, matchesCaja, pasa: matchesActivo && matchesCaja });
+    return matchesActivo && matchesCaja;
+  });
+  
+  console.log('[SuperBillCountList] Total registros después de filtrar:', filteredCounts.length);
+
   return (
     <Box>
       {/* Se ha eliminado el botón 'Nuevo Conteo' de esta vista */}
@@ -119,14 +142,14 @@ const SuperBillCountList: React.FC = () => {
               </TableRow>
             </TableHead>
             <TableBody>
-              {superBillCounts.length === 0 ? (
+              {filteredCounts.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={5} align="center">
                     No hay conteos registrados
                   </TableCell>
                 </TableRow>
               ) : (
-                superBillCounts.map((count: SuperBillCount) => (
+                filteredCounts.map((count: SuperBillCount) => (
                   <TableRow key={count.id}>
                     <TableCell>{count.id}</TableCell>
                     <TableCell>

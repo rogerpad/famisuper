@@ -54,6 +54,7 @@ const normalizeCountData = (count: any): SuperBillCount => {
     totalGeneral: ensureNumber(count.totalGeneral, 0),
     activo: Boolean(count.activo),
     fecha: count.fecha || new Date().toISOString(),
+    cajaNumero: count.cajaNumero,
     usuario: count.usuario ? {
       id: safeParseInt(count.usuario.id),
       nombre: count.usuario.nombre || '',

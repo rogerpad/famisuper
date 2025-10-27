@@ -11,6 +11,7 @@ export interface UsuarioTurno {
   activo: boolean;
   agente: boolean;
   super: boolean;
+  cajaNumero?: number | null;
   usuario?: {
     id: number;
     nombre: string;

@@ -22,7 +22,7 @@ export const dbConfig: TypeOrmModuleOptions & PostgresConnectionOptions = {
   synchronize: false, // Desactivado temporalmente para evitar problemas con la estructura de la tabla
   logging: process.env.DB_LOGGING === 'true',
   autoLoadEntities: true,
-  migrations: [__dirname + '/migrations/**/*{.ts,.js}'],
+  migrations: [__dirname + '/migrations/[0-9]*{.ts,.js}'],
   migrationsTableName: 'migrations',
   ssl: false,
   // Configuración adicional para mejorar la estabilidad de la conexión
