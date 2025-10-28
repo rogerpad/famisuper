@@ -354,7 +354,7 @@ export const useSuperExpenses = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const getSumPagoProductosEfectivo = useCallback(async (): Promise<number> => {
+  const getSumPagoProductosEfectivo = useCallback(async (cajaNumero?: number): Promise<number> => {
     const token = localStorage.getItem('token');
     if (!token) return 0;
     
@@ -363,10 +363,18 @@ export const useSuperExpenses = () => {
         // Valor de prueba para desarrollo
         return 15000;
       } else {
-        const response = await axios.get(`${API_BASE_URL}/super-expenses/sum/pago-productos-efectivo`, {
+        const url = cajaNumero
+          ? `${API_BASE_URL}/super-expenses/sum/pago-productos-efectivo?cajaNumero=${cajaNumero}`
+          : `${API_BASE_URL}/super-expenses/sum/pago-productos-efectivo`;
+        
+        console.log(`[SUPER_EXPENSES_API] Obteniendo suma de pago productos en efectivo - Caja: ${cajaNumero || 'Todas'}`);
+        
+        const response = await axios.get(url, {
           headers: { Authorization: `Bearer ${token}` }
         });
-        return response.data.suma || 0;
+        const result = response.data.suma || 0;
+        console.log(`[SUPER_EXPENSES_API] Suma de pago productos obtenida: ${result}`);
+        return result;
       }
     } catch (err) {
       console.error('Error al obtener la suma de pagos de productos en efectivo:', err);
@@ -374,7 +382,7 @@ export const useSuperExpenses = () => {
     }
   }, []);
 
-  const getSumGastosEfectivo = useCallback(async (): Promise<number> => {
+  const getSumGastosEfectivo = useCallback(async (cajaNumero?: number): Promise<number> => {
     const token = localStorage.getItem('token');
     if (!token) return 0;
     
@@ -383,10 +391,18 @@ export const useSuperExpenses = () => {
         // Valor de prueba para desarrollo
         return 5000;
       } else {
-        const response = await axios.get(`${API_BASE_URL}/super-expenses/sum/gastos-efectivo`, {
+        const url = cajaNumero
+          ? `${API_BASE_URL}/super-expenses/sum/gastos-efectivo?cajaNumero=${cajaNumero}`
+          : `${API_BASE_URL}/super-expenses/sum/gastos-efectivo`;
+        
+        console.log(`[SUPER_EXPENSES_API] Obteniendo suma de gastos en efectivo - Caja: ${cajaNumero || 'Todas'}`);
+        
+        const response = await axios.get(url, {
           headers: { Authorization: `Bearer ${token}` }
         });
-        return response.data.suma || 0;
+        const result = response.data.suma || 0;
+        console.log(`[SUPER_EXPENSES_API] Suma de gastos obtenida: ${result}`);
+        return result;
       }
     } catch (err) {
       console.error('Error al obtener la suma de gastos en efectivo:', err);

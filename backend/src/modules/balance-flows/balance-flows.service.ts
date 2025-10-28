@@ -160,16 +160,25 @@ export class BalanceFlowsService {
     await this.balanceFlowsRepository.remove(balanceFlow);
   }
 
-  async getSumSaldoVendidoActivos(): Promise<number> {
-    // Obtener la suma de saldo_vendido de todos los registros activos
-    const result = await this.balanceFlowsRepository
+  async getSumSaldoVendidoActivos(cajaNumero?: number): Promise<number> {
+    console.log(`[BalanceFlowsService] Calculando suma de saldo vendido - Caja: ${cajaNumero || 'Todas'}`);
+    
+    // Obtener la suma de saldo_vendido de todos los registros activos (filtrado por caja)
+    const queryBuilder = this.balanceFlowsRepository
       .createQueryBuilder('balanceFlow')
       .select('SUM(balanceFlow.saldoVendido)', 'total')
-      .where('balanceFlow.activo = :activo', { activo: true })
-      .getRawOne();
+      .where('balanceFlow.activo = :activo', { activo: true });
+    
+    // Si se proporciona cajaNumero, filtrar por esa caja específica
+    if (cajaNumero) {
+      queryBuilder.andWhere('balanceFlow.cajaNumero = :cajaNumero', { cajaNumero });
+    }
+    
+    const result = await queryBuilder.getRawOne();
     
     // Convertir el resultado a número y manejar el caso de null/undefined
     const total = result?.total ? parseFloat(result.total) : 0;
+    console.log(`[BalanceFlowsService] Suma de saldo vendido obtenida: ${total}`);
     return total;
   }
   

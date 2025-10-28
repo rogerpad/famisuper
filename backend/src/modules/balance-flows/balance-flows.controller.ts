@@ -39,8 +39,10 @@ export class BalanceFlowsController {
 
   @Get('sum-saldo-vendido')
   @RequierePermiso('ver_flujos_saldo')
-  getSumSaldoVendido() {
-    return this.balanceFlowsService.getSumSaldoVendidoActivos();
+  getSumSaldoVendido(@Query('cajaNumero') cajaNumero?: string) {
+    const cajaNum = cajaNumero ? parseInt(cajaNumero) : undefined;
+    console.log('[BalanceFlowsController] getSumSaldoVendido - Caja:', cajaNum);
+    return this.balanceFlowsService.getSumSaldoVendidoActivos(cajaNum);
   }
 
   @Get('last-inactive-saldo/:telefonicaId/:cajaNumero')

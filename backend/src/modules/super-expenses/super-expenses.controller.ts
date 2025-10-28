@@ -140,16 +140,20 @@ export class SuperExpensesController {
   @Get('sum/pago-productos-efectivo')
   @UseGuards(PermisosGuard)
   @RequierePermiso('ver_egresos_super')
-  async getSumPagoProductosEfectivo() {
-    const suma = await this.superExpensesService.getSumPagoProductosEfectivo();
+  async getSumPagoProductosEfectivo(@Query('cajaNumero') cajaNumero?: string) {
+    const cajaNum = cajaNumero ? parseInt(cajaNumero) : undefined;
+    console.log('[SuperExpensesController] getSumPagoProductosEfectivo - Caja:', cajaNum);
+    const suma = await this.superExpensesService.getSumPagoProductosEfectivo(cajaNum);
     return { suma };
   }
 
   @Get('sum/gastos-efectivo')
   @UseGuards(PermisosGuard)
   @RequierePermiso('ver_egresos_super')
-  async getSumGastosEfectivo() {
-    const suma = await this.superExpensesService.getSumGastosEfectivo();
+  async getSumGastosEfectivo(@Query('cajaNumero') cajaNumero?: string) {
+    const cajaNum = cajaNumero ? parseInt(cajaNumero) : undefined;
+    console.log('[SuperExpensesController] getSumGastosEfectivo - Caja:', cajaNum);
+    const suma = await this.superExpensesService.getSumGastosEfectivo(cajaNum);
     return { suma };
   }
 }

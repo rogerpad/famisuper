@@ -113,8 +113,8 @@ export const useBalanceFlows = () => {
     }
   }, []);
   
-  // Obtener la suma de saldo vendido de registros activos
-  const getSumSaldoVendido = useCallback(async (): Promise<number> => {
+  // Obtener la suma de saldo vendido de registros activos (filtrado por caja)
+  const getSumSaldoVendido = useCallback(async (cajaNumero?: number): Promise<number> => {
     setLoading(true);
     setError(null);
     
@@ -122,12 +122,18 @@ export const useBalanceFlows = () => {
       if (USE_MOCK) {
         // Calcular suma en datos mock
         const sum = mockBalanceFlows
-          .filter(flow => flow.activo)
+          .filter(flow => flow.activo && (!cajaNumero || flow.cajaNumero === cajaNumero))
           .reduce((total, flow) => total + flow.saldoVendido, 0);
         return sum;
       } else {
         // Usar API real
-        const response = await fetch(`${API_BASE_URL}/balance-flows/sum-saldo-vendido`, {
+        const url = cajaNumero 
+          ? `${API_BASE_URL}/balance-flows/sum-saldo-vendido?cajaNumero=${cajaNumero}`
+          : `${API_BASE_URL}/balance-flows/sum-saldo-vendido`;
+        
+        console.log(`[BALANCE_FLOWS_API] Obteniendo suma de saldo vendido - Caja: ${cajaNumero || 'Todas'}`);
+        
+        const response = await fetch(url, {
           headers: {
             Authorization: `Bearer ${localStorage.getItem('token')}`,
           },
@@ -138,7 +144,9 @@ export const useBalanceFlows = () => {
         }
 
         const total = await response.json();
-        return parseFloat(total) || 0;
+        const result = parseFloat(total) || 0;
+        console.log(`[BALANCE_FLOWS_API] Suma de saldo vendido obtenida: ${result}`);
+        return result;
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error desconocido');

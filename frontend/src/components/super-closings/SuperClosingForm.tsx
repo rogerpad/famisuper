@@ -21,10 +21,12 @@ import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { useSuperClosings } from '../../api/super-closings/superClosingsApi';
 import { SuperClosingFormData } from '../../api/super-closings/types';
 import { useAuth } from '../../contexts/AuthContext';
+import { useTurno } from '../../contexts/TurnoContext';
 import { getTotalAmountByAcuerdoOrigen } from '../../api/additional-loan/additionalLoanApi';
 import { useBalanceFlows } from '../../api/balance-flows/balanceFlowsApi';
 import { useSuperExpenses } from '../../api/super-expenses/superExpensesApi';
 import { useSuperBillCount } from '../../api/super-bill-count/superBillCountApi';
+import { useSnackbar } from 'notistack';
 
 const SuperClosingForm: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -32,6 +34,7 @@ const SuperClosingForm: React.FC = () => {
   const location = useLocation();
   const isEditing = !!id;
   const { state: authState } = useAuth();
+  const { turnosActivos } = useTurno();
   
   // Obtener el efectivo inicial del state de navegación si existe
   const efectivoInicialFromNavigation = location.state?.efectivoInicial || 0;
@@ -39,6 +42,7 @@ const SuperClosingForm: React.FC = () => {
   const { getSumSaldoVendido } = useBalanceFlows();
   const { getSumPagoProductosEfectivo, getSumGastosEfectivo } = useSuperExpenses();
   const { getLastActiveBillCount } = useSuperBillCount();
+  const { enqueueSnackbar } = useSnackbar();
 
   const [formData, setFormData] = useState<SuperClosingFormData>({
     usuarioId: authState.user?.id || 0,
@@ -100,13 +104,28 @@ const SuperClosingForm: React.FC = () => {
     }
   }, [isEditing, id, fetchSuperClosingById]);
   
-  // Función para cargar el último conteo de billetes activo
+  // Función para cargar el último conteo de billetes activo (por caja)
   const cargarUltimoConteoBilletes = async () => {
     try {
-      const ultimoConteo = await getLastActiveBillCount();
+      // Obtener el cajaNumero del turno activo
+      const cajaNumero = turnosActivos.length > 0 ? turnosActivos[0].cajaNumero : null;
+      
+      console.log('[SUPER_CLOSING_FORM] Cargando último conteo de billetes - Caja:', cajaNumero);
+      
+      if (!cajaNumero) {
+        console.warn('[SUPER_CLOSING_FORM] No hay turno activo con caja asignada. No se puede cargar conteo.');
+        setFormData(prevData => ({
+          ...prevData,
+          efectivoCierreTurno: 0
+        }));
+        setShowConteoWarning(true);
+        return;
+      }
+      
+      const ultimoConteo = await getLastActiveBillCount(cajaNumero);
       
       if (ultimoConteo) {
-        console.log('Conteo de billetes activo encontrado:', ultimoConteo);
+        console.log('[SUPER_CLOSING_FORM] Conteo de billetes activo encontrado - Caja:', cajaNumero, 'Total:', ultimoConteo.totalGeneral);
         
         // Actualizar el campo efectivoCierreTurno con el totalGeneral del conteo
         setFormData(prevData => ({
@@ -117,9 +136,9 @@ const SuperClosingForm: React.FC = () => {
         // Ocultar la advertencia si se carga exitosamente
         setShowConteoWarning(false);
         
-        console.log(`Efectivo Cierre Turno cargado automáticamente: ${ultimoConteo.totalGeneral}`);
+        console.log(`[SUPER_CLOSING_FORM] Efectivo Cierre Turno cargado automáticamente: ${ultimoConteo.totalGeneral}`);
       } else {
-        console.log('No se encontró ningún conteo de billetes activo - establecer en 0');
+        console.log(`[SUPER_CLOSING_FORM] No se encontró conteo de billetes activo para Caja ${cajaNumero} - establecer en 0`);
         
         // Establecer efectivoCierreTurno en 0 cuando no hay conteo activo
         setFormData(prevData => ({
@@ -156,26 +175,38 @@ const SuperClosingForm: React.FC = () => {
     }
   };
 
-  // Función para cargar automáticamente el efectivo inicial
+  // Función para cargar automáticamente el efectivo inicial (por caja)
   const cargarEfectivoInicial = async () => {
     try {
-      console.log('[SUPER_CLOSING_FORM] Cargando efectivo inicial...');
+      // Obtener el cajaNumero del turno activo
+      const cajaNumero = turnosActivos.length > 0 ? turnosActivos[0].cajaNumero : null;
       
-      // Consultar el último cierre inactivo del día
-      const ultimoCierreInactivo = await getLastInactiveClosingOfDay();
+      console.log('[SUPER_CLOSING_FORM] Cargando efectivo inicial - Caja:', cajaNumero);
+      
+      if (!cajaNumero) {
+        console.log('[SUPER_CLOSING_FORM] No hay turno activo con caja asignada. Usando 2000 por defecto');
+        setFormData(prevData => ({
+          ...prevData,
+          efectivoInicial: 2000
+        }));
+        return;
+      }
+      
+      // Consultar el último cierre inactivo de esta caja específica
+      const ultimoCierreInactivo = await getLastInactiveClosingOfDay(cajaNumero);
       
       if (ultimoCierreInactivo && ultimoCierreInactivo.efectivoCierreTurno !== undefined) {
-        // Si existe un cierre inactivo, usar su efectivoCierreTurno
+        // Si existe un cierre inactivo de esta caja, usar su efectivoCierreTurno
         const efectivoInicial = Number(ultimoCierreInactivo.efectivoCierreTurno) || 0;
-        console.log(`[SUPER_CLOSING_FORM] Se encontró cierre inactivo. Efectivo Inicial: ${efectivoInicial}`);
+        console.log(`[SUPER_CLOSING_FORM] Se encontró cierre inactivo de Caja ${cajaNumero}. Efectivo Inicial: ${efectivoInicial}`);
         
         setFormData(prevData => ({
           ...prevData,
           efectivoInicial: efectivoInicial
         }));
       } else {
-        // Si no existe ningún cierre en el día, usar 2000 por defecto
-        console.log('[SUPER_CLOSING_FORM] No se encontró cierre inactivo. Efectivo Inicial: 2000');
+        // Si no existe ningún cierre inactivo de esta caja, usar 2000 por defecto (primer cierre de la caja)
+        console.log(`[SUPER_CLOSING_FORM] No se encontró cierre inactivo de Caja ${cajaNumero}. Efectivo Inicial: 2000 (primer cierre)`);
         
         setFormData(prevData => ({
           ...prevData,
@@ -192,32 +223,42 @@ const SuperClosingForm: React.FC = () => {
     }
   };
 
-  // Función para cargar automáticamente los valores de adicionales, préstamos, venta saldo, pago productos y gastos
+  // Función para cargar automáticamente los valores de adicionales, préstamos, venta saldo, pago productos y gastos (por caja)
   const cargarValoresAdicionalesPrestamos = async () => {
     try {
-      // 1. Cargar Adicional Casa (Acuerdo: Adicional, Origen: Casa)
-      const montoAdicionalCasa = await getTotalAmountByAcuerdoOrigen('Adicional', 'Casa');
+      // Obtener el cajaNumero del turno activo
+      const cajaNumero = turnosActivos.length > 0 ? turnosActivos[0].cajaNumero : null;
       
-      // 2. Cargar Adicional Agente (Acuerdo: Adicional, Origen: Agente)
-      const montoAdicionalAgente = await getTotalAmountByAcuerdoOrigen('Adicional', 'Agente');
+      console.log('[SUPER_CLOSING_FORM] Cargando valores automáticos - Caja:', cajaNumero);
       
-      // 3. Cargar Préstamo Agente (Acuerdo: Préstamo, Origen: Agente)
+      if (!cajaNumero) {
+        console.warn('[SUPER_CLOSING_FORM] No hay turno activo con caja asignada. No se pueden cargar valores automáticos.');
+        return;
+      }
+      
+      // 1. Cargar Adicional Casa (Acuerdo: Adicional, Origen: Casa) - Filtrado por caja
+      const montoAdicionalCasa = await getTotalAmountByAcuerdoOrigen('Adicional', 'Casa', cajaNumero);
+      
+      // 2. Cargar Adicional Agente (Acuerdo: Adicional, Origen: Agente) - Filtrado por caja
+      const montoAdicionalAgente = await getTotalAmountByAcuerdoOrigen('Adicional', 'Agente', cajaNumero);
+      
+      // 3. Cargar Préstamo Agente (Acuerdo: Préstamo, Origen: Agente) - Filtrado por caja
       // Intentar primero con tilde
-      let montoPrestamoAgente = await getTotalAmountByAcuerdoOrigen('Préstamo', 'Agente');
+      let montoPrestamoAgente = await getTotalAmountByAcuerdoOrigen('Préstamo', 'Agente', cajaNumero);
       
       // Si no hay resultados, intentar sin tilde
       if (montoPrestamoAgente === 0) {
-        montoPrestamoAgente = await getTotalAmountByAcuerdoOrigen('Prestamo', 'Agente');
+        montoPrestamoAgente = await getTotalAmountByAcuerdoOrigen('Prestamo', 'Agente', cajaNumero);
       }
       
-      // 4. Cargar Venta Saldo (suma de saldo_vendido de registros activos en tbl_flujos_saldo)
-      const montoVentaSaldo = await getSumSaldoVendido();
+      // 4. Cargar Venta Saldo (suma de saldo_vendido de registros activos en tbl_flujos_saldo) - Filtrado por caja
+      const montoVentaSaldo = await getSumSaldoVendido(cajaNumero);
       
-      // 5. Cargar Pago Productos (suma de total de registros activos de tipo Pago de Productos y forma de pago Efectivo)
-      const montoPagoProductos = await getSumPagoProductosEfectivo();
+      // 5. Cargar Pago Productos (suma de total de registros activos de tipo Pago de Productos y forma de pago Efectivo) - Filtrado por caja
+      const montoPagoProductos = await getSumPagoProductosEfectivo(cajaNumero);
       
-      // 6. Cargar Gastos (suma de total de registros activos de tipo Gasto y forma de pago Efectivo)
-      const montoGastos = await getSumGastosEfectivo();
+      // 6. Cargar Gastos (suma de total de registros activos de tipo Gasto y forma de pago Efectivo) - Filtrado por caja
+      const montoGastos = await getSumGastosEfectivo(cajaNumero);
       
       // Actualizar el formulario con los valores obtenidos
       setFormData(prevData => ({
@@ -401,13 +442,30 @@ const SuperClosingForm: React.FC = () => {
     
     try {
       if (isEditing && id) {
+        console.log('[SUPER_CLOSING_FORM] Actualizando cierre y asociando registros nuevos...');
         await updateSuperClosing(parseInt(id), formData);
+        enqueueSnackbar('Cierre actualizado correctamente. Los registros nuevos han sido asociados.', { 
+          variant: 'success',
+          autoHideDuration: 4000 
+        });
       } else {
         await createSuperClosing(formData);
+        enqueueSnackbar('Cierre creado correctamente', { variant: 'success' });
       }
       navigate('/cierres-super');
     } catch (error: any) {
-      setSubmitError(error.message || 'Error al guardar el cierre');
+      console.error('[SUPER_CLOSING_FORM] Error al guardar:', error);
+      
+      // Extraer mensaje de error del backend
+      let errorMessage = 'Error al guardar el cierre';
+      
+      if (error.response?.data?.message) {
+        errorMessage = error.response.data.message;
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
+      setSubmitError(errorMessage);
     } finally {
       setIsSubmitting(false);
     }

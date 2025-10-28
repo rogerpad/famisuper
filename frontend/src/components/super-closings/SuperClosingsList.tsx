@@ -48,10 +48,24 @@ const SuperClosingsList: React.FC = () => {
   const [closingToDelete, setClosingToDelete] = useState<number | null>(null);
   const [filters, setFilters] = useState<SuperClosingFilters>({ activo: true });
   const [finalizarTurnoDialogOpen, setFinalizarTurnoDialogOpen] = useState(false);
+  const [cierreExistenteParaTurno, setCierreExistenteParaTurno] = useState<SuperClosing | null>(null);
 
   useEffect(() => {
     filterSuperClosings(filters);
   }, [filterSuperClosings]);
+
+  // Verificar si ya existe un cierre para el turno activo
+  useEffect(() => {
+    if (turnoActual && superClosings.length > 0) {
+      // Buscar cierre que pertenezca al turno activo
+      const cierreDelTurno = superClosings.find(
+        (cierre) => cierre.usuarioId === authState.user?.id && cierre.activo
+      );
+      setCierreExistenteParaTurno(cierreDelTurno || null);
+    } else {
+      setCierreExistenteParaTurno(null);
+    }
+  }, [turnoActual, superClosings, authState.user]);
 
   const handleCreateClick = async () => {
     try {
@@ -216,21 +230,37 @@ const SuperClosingsList: React.FC = () => {
             </Button>
           )}
           {canCreateEdit && (
-            <Button
-              variant="contained"
-              color="primary"
-              startIcon={<AddIcon />}
-              onClick={handleCreateClick}
-              sx={{
-                backgroundColor: '#dc7633',
-                '&:hover': {
-                  backgroundColor: '#b35c20'
-                },
-                boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
-              }}
+            <Tooltip 
+              title={
+                cierreExistenteParaTurno 
+                  ? `Ya existe un cierre para este turno (ID: ${cierreExistenteParaTurno.id}). Solo puede editar el existente.`
+                  : 'Crear nuevo cierre de Super'
+              }
+              arrow
             >
-              Nuevo Cierre
-            </Button>
+              <span>
+                <Button
+                  variant="contained"
+                  color="primary"
+                  startIcon={<AddIcon />}
+                  onClick={handleCreateClick}
+                  disabled={!!cierreExistenteParaTurno}
+                  sx={{
+                    backgroundColor: '#dc7633',
+                    '&:hover': {
+                      backgroundColor: '#b35c20'
+                    },
+                    '&.Mui-disabled': {
+                      backgroundColor: '#cccccc',
+                      color: '#666666'
+                    },
+                    boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+                  }}
+                >
+                  Nuevo Cierre
+                </Button>
+              </span>
+            </Tooltip>
           )}
         </Box>
       </Box>

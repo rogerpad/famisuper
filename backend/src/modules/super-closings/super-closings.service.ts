@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Between, Repository } from 'typeorm';
 import { SuperClosing } from './entities/super-closing.entity';
@@ -34,6 +34,19 @@ export class SuperClosingsService {
     
     if (!cajaNumero) {
       throw new NotFoundException('El turno activo no tiene caja asignada');
+    }
+    
+    // ✅ VALIDACIÓN: Verificar si ya existe un cierre para este turno
+    const cierreExistente = await this.superClosingsRepository.findOne({
+      where: { usuarioTurnoId }
+    });
+    
+    if (cierreExistente) {
+      console.log(`[SuperClosingsService] ⚠️ Ya existe cierre para este turno - ID Cierre: ${cierreExistente.id}`);
+      throw new BadRequestException(
+        `Ya existe un cierre de Super para este turno (Cierre ID: ${cierreExistente.id}). ` +
+        `Solo puede haber un cierre por turno. Si desea modificarlo, use la opción de editar.`
+      );
     }
     
     // 1. Crear el cierre
@@ -133,9 +146,21 @@ export class SuperClosingsService {
   async update(id: number, updateSuperClosingDto: UpdateSuperClosingDto): Promise<SuperClosing> {
     const superClosing = await this.findOne(id);
     
+    console.log(`[SuperClosingsService] Actualizando cierre ID: ${id}, Caja: ${superClosing.cajaNumero}`);
+    
     Object.assign(superClosing, updateSuperClosingDto);
     
-    return this.superClosingsRepository.save(superClosing);
+    const cierreActualizado = await this.superClosingsRepository.save(superClosing);
+    
+    // ✅ ACTUALIZAR: Asociar registros nuevos (con cierre_id = NULL) al cierre
+    if (superClosing.cajaNumero && superClosing.usuarioTurnoId) {
+      console.log(`[SuperClosingsService] Asociando registros nuevos al cierre ${id}...`);
+      await this.asociarRegistrosAlCierre(id, superClosing.cajaNumero, superClosing.usuarioTurnoId);
+    } else {
+      console.warn(`[SuperClosingsService] No se pueden asociar registros: falta cajaNumero o usuarioTurnoId`);
+    }
+    
+    return cierreActualizado;
   }
 
   async remove(id: number): Promise<void> {
@@ -169,29 +194,44 @@ export class SuperClosingsService {
     });
   }
 
-  async getUltimoCierreInactivoDelDia(): Promise<{ efectivoCierreTurno: number } | null> {
+  async getUltimoCierreInactivoDelDia(cajaNumero?: number): Promise<{ efectivoCierreTurno: number } | null> {
     try {
-      console.log(`[SUPER_CLOSINGS_SERVICE] Starting search for last inactive closing of the day`);
+      console.log(`[SUPER_CLOSINGS_SERVICE] Buscando último cierre inactivo DEL DÍA - Caja: ${cajaNumero || 'No especificada'}`);
+      
+      // Obtener el inicio y fin del día actual
+      const today = new Date();
+      const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 0, 0, 0, 0);
+      const endOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 23, 59, 59, 999);
+      
+      console.log(`[SUPER_CLOSINGS_SERVICE] Rango de búsqueda: ${startOfDay.toISOString()} - ${endOfDay.toISOString()}`);
+      
+      const whereCondition: any = {
+        activo: false,
+        fechaCierre: Between(startOfDay, endOfDay), // ✅ FILTRAR POR DÍA ACTUAL
+      };
+      
+      // Si se proporciona cajaNumero, filtrar por esa caja específica
+      if (cajaNumero) {
+        whereCondition.cajaNumero = cajaNumero;
+      }
       
       const ultimoCierre = await this.superClosingsRepository.findOne({
-        where: {
-          activo: false,
-        },
+        where: whereCondition,
         order: { fechaCierre: 'DESC' },
       });
 
-      console.log(`[SUPER_CLOSINGS_SERVICE] Last inactive closing found:`, ultimoCierre);
+      console.log(`[SUPER_CLOSINGS_SERVICE] Último cierre inactivo del día encontrado:`, ultimoCierre ? `ID: ${ultimoCierre.id}, Caja: ${ultimoCierre.cajaNumero}, Fecha: ${ultimoCierre.fechaCierre}` : 'Ninguno (primer cierre del día)');
 
       if (ultimoCierre) {
         const result = { efectivoCierreTurno: Number(ultimoCierre.efectivoCierreTurno) || 0 };
-        console.log(`[SUPER_CLOSINGS_SERVICE] Returning:`, result);
+        console.log(`[SUPER_CLOSINGS_SERVICE] Retornando efectivo cierre turno: ${result.efectivoCierreTurno}`);
         return result;
       }
 
-      console.log(`[SUPER_CLOSINGS_SERVICE] No inactive closing found`);
+      console.log(`[SUPER_CLOSINGS_SERVICE] No se encontró cierre inactivo del día para la caja ${cajaNumero}. Es el primer cierre del día, debe usar 2000.`);
       return null;
     } catch (error) {
-      console.error(`[SUPER_CLOSINGS_SERVICE] Error getting last inactive closing:`, error);
+      console.error(`[SUPER_CLOSINGS_SERVICE] Error al obtener último cierre inactivo:`, error);
       console.error(`[SUPER_CLOSINGS_SERVICE] Stack trace:`, error.stack);
       throw error;
     }

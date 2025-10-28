@@ -499,11 +499,13 @@ export class SuperExpensesService {
 
   /**
    * Obtiene la suma del campo 'total' de los registros activos de tipo 'Pago de Productos'
-   * y forma de pago 'Efectivo'
+   * y forma de pago 'Efectivo' (filtrado por caja)
    * @returns Suma total de los pagos de productos en efectivo activos
    */
-  async getSumPagoProductosEfectivo(): Promise<number> {
+  async getSumPagoProductosEfectivo(cajaNumero?: number): Promise<number> {
     try {
+      console.log(`[SuperExpensesService] Calculando suma de pago productos en efectivo - Caja: ${cajaNumero || 'Todas'}`);
+      
       // Primero obtenemos el ID del tipo de egreso 'Pago de Productos'
       const tipoEgresoResult = await this.superExpenseRepository.query(
         `SELECT id FROM tbl_tipo_egresos WHERE nombre ILIKE '%pago de producto%' AND activo = true LIMIT 1`
@@ -527,14 +529,22 @@ export class SuperExpensesService {
       const formaPagoId = formaPagoResult[0].id;
       
       // Ahora realizamos la consulta para obtener la suma
-      const result = await this.superExpenseRepository.createQueryBuilder('superExpense')
+      const queryBuilder = this.superExpenseRepository.createQueryBuilder('superExpense')
         .select('SUM(superExpense.total)', 'suma')
         .where('superExpense.tipoEgresoId = :tipoEgresoId', { tipoEgresoId })
         .andWhere('superExpense.formaPagoId = :formaPagoId', { formaPagoId })
-        .andWhere('superExpense.activo = :activo', { activo: true })
-        .getRawOne();
+        .andWhere('superExpense.activo = :activo', { activo: true });
       
-      return result && result.suma ? parseFloat(result.suma) : 0;
+      // Si se proporciona cajaNumero, filtrar por esa caja específica
+      if (cajaNumero) {
+        queryBuilder.andWhere('superExpense.cajaNumero = :cajaNumero', { cajaNumero });
+      }
+      
+      const result = await queryBuilder.getRawOne();
+      
+      const total = result && result.suma ? parseFloat(result.suma) : 0;
+      console.log(`[SuperExpensesService] Suma de pago productos obtenida: ${total}`);
+      return total;
     } catch (error) {
       console.error('Error al obtener la suma de pagos de productos en efectivo:', error);
       return 0;
@@ -543,11 +553,13 @@ export class SuperExpensesService {
 
   /**
    * Obtiene la suma del campo 'total' de los registros activos de tipo 'Gasto'
-   * y forma de pago 'Efectivo'
+   * y forma de pago 'Efectivo' (filtrado por caja)
    * @returns Suma total de los gastos en efectivo activos
    */
-  async getSumGastosEfectivo(): Promise<number> {
+  async getSumGastosEfectivo(cajaNumero?: number): Promise<number> {
     try {
+      console.log(`[SuperExpensesService] Calculando suma de gastos en efectivo - Caja: ${cajaNumero || 'Todas'}`);
+      
       // Primero obtenemos el ID del tipo de egreso 'Gasto'
       const tipoEgresoResult = await this.superExpenseRepository.query(
         `SELECT id FROM tbl_tipo_egresos WHERE nombre ILIKE '%gasto%' AND activo = true LIMIT 1`
@@ -571,14 +583,22 @@ export class SuperExpensesService {
       const formaPagoId = formaPagoResult[0].id;
       
       // Ahora realizamos la consulta para obtener la suma
-      const result = await this.superExpenseRepository.createQueryBuilder('superExpense')
+      const queryBuilder = this.superExpenseRepository.createQueryBuilder('superExpense')
         .select('SUM(superExpense.total)', 'suma')
         .where('superExpense.tipoEgresoId = :tipoEgresoId', { tipoEgresoId })
         .andWhere('superExpense.formaPagoId = :formaPagoId', { formaPagoId })
-        .andWhere('superExpense.activo = :activo', { activo: true })
-        .getRawOne();
+        .andWhere('superExpense.activo = :activo', { activo: true });
       
-      return result && result.suma ? parseFloat(result.suma) : 0;
+      // Si se proporciona cajaNumero, filtrar por esa caja específica
+      if (cajaNumero) {
+        queryBuilder.andWhere('superExpense.cajaNumero = :cajaNumero', { cajaNumero });
+      }
+      
+      const result = await queryBuilder.getRawOne();
+      
+      const total = result && result.suma ? parseFloat(result.suma) : 0;
+      console.log(`[SuperExpensesService] Suma de gastos obtenida: ${total}`);
+      return total;
     } catch (error) {
       console.error('Error al obtener la suma de gastos en efectivo:', error);
       return 0;

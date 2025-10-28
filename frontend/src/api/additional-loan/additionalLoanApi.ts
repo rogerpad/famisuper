@@ -116,10 +116,15 @@ export const deleteAdditionalLoan = async (id: number): Promise<void> => {
   }
 };
 
-// Obtener adicionales y préstamos activos por acuerdo y origen
-export const getActiveAdditionalLoansByAcuerdoOrigen = async (acuerdo: string, origen: string): Promise<AdditionalLoanData[]> => {
+// Obtener adicionales y préstamos activos por acuerdo y origen (filtrado por caja)
+export const getActiveAdditionalLoansByAcuerdoOrigen = async (acuerdo: string, origen: string, cajaNumero?: number): Promise<AdditionalLoanData[]> => {
   try {
-    const response = await api.get(`${API_BASE_URL}/adicionales-prestamos?acuerdo=${acuerdo}&origen=${origen}&activo=true`);
+    let url = `${API_BASE_URL}/adicionales-prestamos?acuerdo=${acuerdo}&origen=${origen}&activo=true`;
+    if (cajaNumero) {
+      url += `&cajaNumero=${cajaNumero}`;
+    }
+    console.log(`[ADDITIONAL_LOAN_API] Obteniendo adicionales/préstamos - Acuerdo: ${acuerdo}, Origen: ${origen}, Caja: ${cajaNumero || 'Todas'}`);
+    const response = await api.get(url);
     return response.data.map(normalizeAdditionalLoanData);
   } catch (error) {
     console.error(`[ADDITIONAL_LOAN_API] Error loading active loans with acuerdo ${acuerdo} and origen ${origen}:`, error);
@@ -127,11 +132,13 @@ export const getActiveAdditionalLoansByAcuerdoOrigen = async (acuerdo: string, o
   }
 };
 
-// Obtener el monto total de adicionales o préstamos activos por acuerdo y origen
-export const getTotalAmountByAcuerdoOrigen = async (acuerdo: string, origen: string): Promise<number> => {
+// Obtener el monto total de adicionales o préstamos activos por acuerdo y origen (filtrado por caja)
+export const getTotalAmountByAcuerdoOrigen = async (acuerdo: string, origen: string, cajaNumero?: number): Promise<number> => {
   try {
-    const items = await getActiveAdditionalLoansByAcuerdoOrigen(acuerdo, origen);
-    return items.reduce((total, item) => total + ensureNumber(item.monto), 0);
+    const items = await getActiveAdditionalLoansByAcuerdoOrigen(acuerdo, origen, cajaNumero);
+    const total = items.reduce((total, item) => total + ensureNumber(item.monto), 0);
+    console.log(`[ADDITIONAL_LOAN_API] Total calculado - Acuerdo: ${acuerdo}, Origen: ${origen}, Caja: ${cajaNumero || 'Todas'}, Total: ${total}`);
+    return total;
   } catch (error) {
     console.error(`[ADDITIONAL_LOAN_API] Error calculating total amount for acuerdo ${acuerdo} and origen ${origen}:`, error);
     return 0;
