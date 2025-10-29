@@ -10,4 +10,5 @@ export class AdditionalLoanDto {
   descripcion: string;
   fecha: Date;
   activo: boolean;
+  cajaNumero?: number | null;
 }

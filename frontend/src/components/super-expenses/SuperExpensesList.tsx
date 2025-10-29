@@ -34,6 +34,7 @@ import {
 import { useSuperExpenses } from '../../api/super-expenses/superExpensesApi';
 import { SuperExpense } from '../../api/super-expenses/types';
 import { useAuth } from '../../contexts/AuthContext';
+import { useTurno } from '../../contexts/TurnoContext';
 import { formatCurrency, formatDate } from '../../utils/formatters';
 import SuperExpenseForm from './SuperExpenseForm';
 import SuperExpenseDetail from './SuperExpenseDetail';
@@ -42,6 +43,7 @@ const SuperExpensesList: React.FC = () => {
   const { superExpenses, loading: isLoading, error, fetchSuperExpenses, deleteSuperExpense } = useSuperExpenses();
   const isError = !!error;
   const { hasPermission } = useAuth();
+  const { turnosActivos } = useTurno();
   
   // Función para recargar datos incluyendo inactivos
   const refetch = () => fetchSuperExpenses(true);
@@ -112,6 +114,13 @@ const SuperExpensesList: React.FC = () => {
     handleCloseForm();
   };
 
+  // Obtener el cajaNumero del turno activo del usuario
+  const cajaNumeroActual = turnosActivos.length > 0 ? turnosActivos[0].cajaNumero : null;
+  console.log('[SuperExpensesList] Caja número del turno activo:', cajaNumeroActual);
+
+  console.log('[SuperExpensesList] Filtro status actual:', filterStatus);
+  console.log('[SuperExpensesList] Total registros antes de filtrar:', superExpenses?.length || 0);
+
   const filteredSuperExpenses = superExpenses?.filter(expense => {
     const matchesSearch = searchTerm === '' || 
       (expense.descripcionEgreso?.toLowerCase().includes(searchTerm.toLowerCase()) ?? false) ||
@@ -146,14 +155,32 @@ const SuperExpensesList: React.FC = () => {
         }
       }
       
-      console.log('[SuperExpensesList] Comparando fechas - Hoy:', todayStr, 'Egreso:', expenseDateStr, 'Activo:', expense.activo);
-      
       const isToday = expenseDateStr === todayStr;
       matchesStatus = expense.activo === false && isToday;
+      
+      if (expense.activo === false) {
+        console.log('[SuperExpensesList] Registro inactivo encontrado:', {
+          id: expense.id,
+          descripcion: expense.descripcionEgreso,
+          fecha: expenseDateStr,
+          hoy: todayStr,
+          esHoy: isToday,
+          pasaFiltro: matchesStatus
+        });
+      }
     }
     
-    return matchesSearch && matchesType && matchesDate && matchesStatus;
+    // Filtrar por caja número del turno activo (SIEMPRE, incluso para "Hoy inactivas")
+    let matchesCaja = true;
+    if (cajaNumeroActual && expense.cajaNumero) {
+      matchesCaja = expense.cajaNumero === cajaNumeroActual;
+      console.log('[SuperExpensesList] Filtro por caja - ID:', expense.id, 'Caja egreso:', expense.cajaNumero, 'Caja actual:', cajaNumeroActual, 'Coincide:', matchesCaja);
+    }
+    
+    return matchesSearch && matchesType && matchesDate && matchesStatus && matchesCaja;
   }) || [];
+
+  console.log('[SuperExpensesList] Total registros después de filtrar:', filteredSuperExpenses.length);
 
   if (isLoading) {
     return (

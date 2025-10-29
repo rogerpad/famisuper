@@ -22,6 +22,7 @@ import { useBalanceFlows } from '../../api/balance-flows/balanceFlowsApi';
 import { BalanceFlow, BalanceFlowFormData } from '../../api/balance-flows/types';
 import { format } from 'date-fns';
 import { usePhoneLines } from '../../api/phoneLines/phoneLinesApi';
+import { useTurno } from '../../contexts/TurnoContext';
 
 interface BalanceFlowFormProps {
   open: boolean;
@@ -45,8 +46,9 @@ const BalanceFlowForm: React.FC<BalanceFlowFormProps> = ({ open, balanceFlow, on
   const [submitting, setSubmitting] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   
-  const { createBalanceFlow, updateBalanceFlow } = useBalanceFlows();
+  const { createBalanceFlow, updateBalanceFlow, getLastInactiveSaldoFinal } = useBalanceFlows();
   const { phoneLines, loading: loadingPhoneLines, fetchPhoneLines } = usePhoneLines();
+  const { turnosActivos } = useTurno();
 
   // Cargar líneas telefónicas al abrir el formulario
   useEffect(() => {
@@ -92,6 +94,40 @@ const BalanceFlowForm: React.FC<BalanceFlowFormProps> = ({ open, balanceFlow, on
     }
     setErrors({});
   }, [balanceFlow, open]);
+
+  // Cargar automáticamente el saldo inicial del último flujo inactivo
+  useEffect(() => {
+    const cargarSaldoInicial = async () => {
+      // Solo cargar si:
+      // 1. Es un nuevo flujo (NO edición)
+      // 2. Se ha seleccionado una telefónica
+      // 3. Hay un turno activo con cajaNumero
+      if (!balanceFlow && formData.telefonicaId > 0 && turnosActivos.length > 0) {
+        const cajaNumero = turnosActivos[0].cajaNumero;
+        
+        if (!cajaNumero) {
+          console.log('[BalanceFlowForm] No hay cajaNumero en el turno activo');
+          return;
+        }
+
+        console.log('[BalanceFlowForm] Cargando último saldo final - Telefónica:', formData.telefonicaId, 'Caja:', cajaNumero);
+        
+        const lastSaldo = await getLastInactiveSaldoFinal(formData.telefonicaId, cajaNumero);
+        
+        if (lastSaldo !== null) {
+          console.log('[BalanceFlowForm] Saldo final obtenido:', lastSaldo, 'Tipo:', typeof lastSaldo, '- Cargando en Saldo Inicial');
+          setFormData(prev => ({
+            ...prev,
+            saldoInicial: Number(lastSaldo)
+          }));
+        } else {
+          console.log('[BalanceFlowForm] No se encontró flujo inactivo previo, Saldo Inicial permanece en 0');
+        }
+      }
+    };
+
+    cargarSaldoInicial();
+  }, [formData.telefonicaId, balanceFlow, turnosActivos, getLastInactiveSaldoFinal]);
 
   // Función para asignar el nombre según la línea telefónica seleccionada
   const asignarNombreSegunLinea = (telefonicaId: number) => {
@@ -149,15 +185,33 @@ const BalanceFlowForm: React.FC<BalanceFlowFormProps> = ({ open, balanceFlow, on
     const selectedPhoneLine = phoneLines.find(line => line.id === formData.telefonicaId);
     const isLineTigo = selectedPhoneLine?.nombre === 'Tigo';
     
+    // Convertir explícitamente a números para evitar concatenación de strings
+    const saldoInicial = Number(formData.saldoInicial);
+    const saldoComprado = Number(formData.saldoComprado);
+    const saldoVendido = Number(formData.saldoVendido);
+    
+    console.log('[BalanceFlowForm] Calculando saldo final:', {
+      saldoInicial,
+      saldoComprado,
+      saldoVendido,
+      tipos: {
+        inicial: typeof formData.saldoInicial,
+        comprado: typeof formData.saldoComprado,
+        vendido: typeof formData.saldoVendido
+      }
+    });
+    
     // Cálculo base del saldo final
-    let saldoFinal = formData.saldoInicial + formData.saldoComprado - formData.saldoVendido;
+    let saldoFinal = saldoInicial + saldoComprado - saldoVendido;
     
     // Aplicar regla especial para Tigo: adicionar 5.5% al saldo comprado
     if (isLineTigo && formData.nombre === 'Flujo Tigo') {
-      const bonificacion = formData.saldoComprado * 0.055;
+      const bonificacion = saldoComprado * 0.055;
       saldoFinal += bonificacion;
-      console.log(`[BalanceFlowForm] Aplicando bonificación Tigo: ${bonificacion.toFixed(2)} (5.5% de ${formData.saldoComprado})`);
+      console.log(`[BalanceFlowForm] Aplicando bonificación Tigo: ${bonificacion.toFixed(2)} (5.5% de ${saldoComprado})`);
     }
+    
+    console.log('[BalanceFlowForm] Saldo final calculado:', saldoFinal);
     
     setFormData(prev => ({
       ...prev,
@@ -358,10 +412,17 @@ const BalanceFlowForm: React.FC<BalanceFlowFormProps> = ({ open, balanceFlow, on
                 value={formData.saldoVendido}
                 onChange={handleNumberChange}
                 error={!!errors.saldoVendido}
-                helperText={errors.saldoVendido}
+                helperText={
+                  errors.saldoVendido || 
+                  (phoneLines.find(line => line.id === formData.telefonicaId)?.nombre === 'Tigo' 
+                    ? 'Campo bloqueado para Tigo - Se calcula automáticamente' 
+                    : '')
+                }
                 InputProps={{
-                  inputProps: { min: 0, step: 0.01 }
+                  inputProps: { min: 0, step: 0.01 },
+                  readOnly: phoneLines.find(line => line.id === formData.telefonicaId)?.nombre === 'Tigo'
                 }}
+                disabled={phoneLines.find(line => line.id === formData.telefonicaId)?.nombre === 'Tigo'}
               />
             </Grid>
             <Grid item xs={12} md={6}>

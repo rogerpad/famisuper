@@ -87,7 +87,6 @@ export class CreateSuperClosingDto {
   faltanteSobrante: number;
 
   @IsOptional()
-  @IsDate()
   @Type(() => Date)
   fechaCierre?: Date;
 

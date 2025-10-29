@@ -31,6 +31,9 @@ export class UsuarioTurno {
   @Column({ default: false })
   super: boolean;
 
+  @Column({ name: 'caja_numero', type: 'integer', nullable: true })
+  cajaNumero: number;
+
   @ManyToOne(() => User)
   @JoinColumn({ name: 'usuario_id' })
   usuario: User;

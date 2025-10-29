@@ -29,6 +29,7 @@ export interface SuperClosing {
   faltanteSobrante: number;
   fechaCierre: Date | string;
   activo: boolean;
+  cajaNumero?: number | null;
 }
 
 export interface SuperClosingFormData {

@@ -30,10 +30,17 @@ import { PaymentDocument } from '../../api/payment-documents/types';
 import { PaymentMethod } from '../../api/payment-methods/types';
 
 // Función helper para formatear fecha en zona horaria local (evita problemas de UTC)
-const formatDateToLocal = (date: Date): string => {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
+const formatDateToLocal = (date: Date | string): string => {
+  // Si es un string con formato YYYY-MM-DD, usarlo directamente
+  if (typeof date === 'string' && /^\d{4}-\d{2}-\d{2}/.test(date)) {
+    return date.split('T')[0]; // Extraer solo la parte de fecha
+  }
+  
+  // Si es Date, formatear usando métodos locales
+  const dateObj = date instanceof Date ? date : new Date(date);
+  const year = dateObj.getFullYear();
+  const month = String(dateObj.getMonth() + 1).padStart(2, '0');
+  const day = String(dateObj.getDate()).padStart(2, '0');
   return `${year}-${month}-${day}`;
 };
 
@@ -95,7 +102,8 @@ const SuperExpenseForm: React.FC<SuperExpenseFormProps> = ({
 
   useEffect(() => {
     if (superExpense) {
-      console.log('Inicializando formulario con datos:', superExpense);
+      console.log('[SUPER_EXPENSE_FORM] Inicializando formulario con datos:', superExpense);
+      console.log('[SUPER_EXPENSE_FORM] Fecha recibida del backend:', superExpense.fechaEgreso, 'Tipo:', typeof superExpense.fechaEgreso);
       
       // Función para asegurar que los valores sean números
       const ensureNumber = (value: any): number => {
@@ -114,14 +122,14 @@ const SuperExpenseForm: React.FC<SuperExpenseFormProps> = ({
         gravado: ensureNumber(superExpense.gravado),
         impuesto: ensureNumber(superExpense.impuesto),
         formaPagoId: ensureNumber(superExpense.formaPagoId),
-        fechaEgreso: superExpense.fechaEgreso instanceof Date
-          ? formatDateToLocal(superExpense.fechaEgreso)
-          : formatDateToLocal(new Date(superExpense.fechaEgreso)),
+        // Usar formatDateToLocal que ahora maneja strings directamente sin conversión UTC
+        fechaEgreso: formatDateToLocal(superExpense.fechaEgreso),
         hora: superExpense.hora || new Date().toTimeString().slice(0, 5),
         activo: superExpense.activo,
       };
       
-      console.log('Datos iniciales procesados:', initialData);
+      console.log('[SUPER_EXPENSE_FORM] Fecha formateada para el formulario:', initialData.fechaEgreso);
+      console.log('[SUPER_EXPENSE_FORM] Datos iniciales procesados:', initialData);
       
       // Calcular el total basado en los valores actuales para asegurar consistencia
       const calculatedTotal = recalculateTotal(initialData);

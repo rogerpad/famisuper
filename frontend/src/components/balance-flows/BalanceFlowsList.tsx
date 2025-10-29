@@ -25,6 +25,7 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import { useBalanceFlows } from '../../api/balance-flows/balanceFlowsApi';
 import { BalanceFlow } from '../../api/balance-flows/types';
 import { useAuth } from '../../contexts/AuthContext';
+import { useTurno } from '../../contexts/TurnoContext';
 import BalanceFlowForm from './BalanceFlowForm';
 import { format } from 'date-fns';
 
@@ -37,6 +38,7 @@ const BalanceFlowsList: React.FC = () => {
     deleteBalanceFlow 
   } = useBalanceFlows();
   const { hasPermission } = useAuth();
+  const { turnosActivos } = useTurno();
 
   const [openForm, setOpenForm] = useState(false);
   const [selectedBalanceFlow, setSelectedBalanceFlow] = useState<BalanceFlow | null>(null);
@@ -112,6 +114,21 @@ const BalanceFlowsList: React.FC = () => {
     );
   }
 
+  // Obtener el cajaNumero del turno activo del usuario
+  const cajaNumeroActual = turnosActivos.length > 0 ? turnosActivos[0].cajaNumero : null;
+  console.log('[BalanceFlowsList] Caja número del turno activo:', cajaNumeroActual);
+
+  // Filtrar por caja y estado activo
+  const filteredBalanceFlows = balanceFlows.filter(flow => {
+    // Filtrar por estado activo
+    const matchesActivo = flow.activo === true;
+    
+    // Filtrar por caja ESTRICTAMENTE: debe coincidir con el turno activo
+    const matchesCaja = !cajaNumeroActual || flow.cajaNumero === cajaNumeroActual;
+    
+    return matchesActivo && matchesCaja;
+  });
+
   return (
     <Box>
       <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
@@ -145,14 +162,14 @@ const BalanceFlowsList: React.FC = () => {
             </TableRow>
           </TableHead>
           <TableBody>
-            {balanceFlows.length === 0 ? (
+            {filteredBalanceFlows.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={10} align="center">
                   No hay flujos de saldo registrados
                 </TableCell>
               </TableRow>
             ) : (
-              balanceFlows.map((balanceFlow) => (
+              filteredBalanceFlows.map((balanceFlow) => (
                 <TableRow key={balanceFlow.id}>
                   <TableCell>{balanceFlow.id}</TableCell>
                   <TableCell>{balanceFlow.telefonica?.nombre || `ID: ${balanceFlow.telefonicaId}`}</TableCell>

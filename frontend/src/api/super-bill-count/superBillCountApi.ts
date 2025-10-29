@@ -54,6 +54,7 @@ const normalizeCountData = (count: any): SuperBillCount => {
     totalGeneral: ensureNumber(count.totalGeneral, 0),
     activo: Boolean(count.activo),
     fecha: count.fecha || new Date().toISOString(),
+    cajaNumero: count.cajaNumero,
     usuario: count.usuario ? {
       id: safeParseInt(count.usuario.id),
       nombre: count.usuario.nombre || '',
@@ -245,8 +246,8 @@ export const useSuperBillCount = () => {
     }
   }, [fetchSuperBillCounts]);
 
-  // Get last active bill count
-  const getLastActiveBillCount = useCallback(async () => {
+  // Get last active bill count (filtrado por caja)
+  const getLastActiveBillCount = useCallback(async (cajaNumero?: number) => {
     try {
       const token = localStorage.getItem('token');
       if (!token) {
@@ -254,7 +255,13 @@ export const useSuperBillCount = () => {
         return null;
       }
 
-      const response = await fetch(`${API_URL}/conteo-billetes-super/last-active`, {
+      const url = cajaNumero
+        ? `${API_URL}/conteo-billetes-super/last-active?cajaNumero=${cajaNumero}`
+        : `${API_URL}/conteo-billetes-super/last-active`;
+      
+      console.log(`[SUPER_BILL_COUNT_API] Obteniendo último conteo activo - Caja: ${cajaNumero || 'Todas'}`);
+
+      const response = await fetch(url, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
@@ -264,6 +271,7 @@ export const useSuperBillCount = () => {
       if (!response.ok) {
         if (response.status === 404) {
           // Silent 404 handling - expected when no active counts
+          console.log(`[SUPER_BILL_COUNT_API] No se encontró conteo activo para Caja ${cajaNumero || 'general'}`);
           return null;
         }
         console.error(`Error loading last active count: ${response.statusText}`);
@@ -271,6 +279,7 @@ export const useSuperBillCount = () => {
       }
 
       const data = await response.json();
+      console.log(`[SUPER_BILL_COUNT_API] Conteo activo obtenido - Total: ${data.totalGeneral}`);
       return normalizeCountData(data);
     } catch (err: any) {
       // Only log errors that aren't network/404

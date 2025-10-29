@@ -1,4 +1,5 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, HttpStatus, Query } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, HttpStatus, Query, Req } from '@nestjs/common';
+import { Request } from 'express';
 import { LoggerService } from '../../common/services/logger.service';
 import { BalanceFlowsService } from './balance-flows.service';
 import { CreateBalanceFlowDto } from './dto/create-balance-flow.dto';
@@ -17,8 +18,10 @@ export class BalanceFlowsController {
 
   @Post()
   @RequierePermiso('crear_editar_flujo')
-  create(@Body() createBalanceFlowDto: CreateBalanceFlowDto) {
-    return this.balanceFlowsService.create(createBalanceFlowDto);
+  create(@Body() createBalanceFlowDto: CreateBalanceFlowDto, @Req() req: Request) {
+    const userId = req.user ? req.user['id'] : undefined;
+    console.log('[BalanceFlowsController] userId del request:', userId);
+    return this.balanceFlowsService.create(createBalanceFlowDto, userId);
   }
 
   @Get()
@@ -36,8 +39,19 @@ export class BalanceFlowsController {
 
   @Get('sum-saldo-vendido')
   @RequierePermiso('ver_flujos_saldo')
-  getSumSaldoVendido() {
-    return this.balanceFlowsService.getSumSaldoVendidoActivos();
+  getSumSaldoVendido(@Query('cajaNumero') cajaNumero?: string) {
+    const cajaNum = cajaNumero ? parseInt(cajaNumero) : undefined;
+    console.log('[BalanceFlowsController] getSumSaldoVendido - Caja:', cajaNum);
+    return this.balanceFlowsService.getSumSaldoVendidoActivos(cajaNum);
+  }
+
+  @Get('last-inactive-saldo/:telefonicaId/:cajaNumero')
+  @RequierePermiso('ver_flujos_saldo')
+  getLastInactiveSaldoFinal(
+    @Param('telefonicaId') telefonicaId: string,
+    @Param('cajaNumero') cajaNumero: string
+  ) {
+    return this.balanceFlowsService.getLastInactiveSaldoFinal(+telefonicaId, +cajaNumero);
   }
 
   @Post('recalcular-saldos')

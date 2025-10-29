@@ -140,11 +140,11 @@ export class UsuariosTurnosService {
   async iniciarTurnoVendedor(
     usuarioId: number, 
     turnoId: number, 
-    operationType?: { agente: boolean; super: boolean }
+    operationType?: { agente: boolean; super: boolean; cajaNumero?: number }
   ): Promise<UsuarioTurno> {
     console.log(`[USUARIOS_TURNOS] Iniciando turno ID: ${turnoId} para vendedor ID: ${usuarioId}`);
     if (operationType) {
-      console.log(`[USUARIOS_TURNOS] Tipo de operación: Agente=${operationType.agente}, Super=${operationType.super}`);
+      console.log(`[USUARIOS_TURNOS] Tipo de operación: Agente=${operationType.agente}, Super=${operationType.super}, Caja=${operationType.cajaNumero || 'N/A'}`);
     }
     
     // Validar IDs
@@ -177,13 +177,29 @@ export class UsuariosTurnosService {
       }
       
       if (operationType.super) {
-        const resultadoSuper = await this.operacionEstaEnUso('super', usuarioId);
-        if (resultadoSuper.enUso) {
-          const nombreUsuario = resultadoSuper.usuario ? 
-            `${resultadoSuper.usuario.nombre} ${resultadoSuper.usuario.apellido}` : 
+        // Validar que se haya seleccionado una caja para operación de Super
+        if (!operationType.cajaNumero) {
+          throw new BadRequestException(
+            `Debe seleccionar una caja para la operación de Super.`
+          );
+        }
+        
+        // Validar que la caja específica no esté en uso
+        const cajaEnUso = await this.usuarioTurnoRepository.findOne({
+          where: {
+            activo: true,
+            super: true,
+            cajaNumero: operationType.cajaNumero
+          },
+          relations: ['usuario']
+        });
+        
+        if (cajaEnUso && cajaEnUso.usuarioId !== usuarioId) {
+          const nombreUsuario = cajaEnUso.usuario ? 
+            `${cajaEnUso.usuario.nombre} ${cajaEnUso.usuario.apellido}` : 
             'Usuario desconocido';
           throw new BadRequestException(
-            `La operación de Super ya está siendo utilizada por ${nombreUsuario}. Solo un usuario puede acceder a esta operación a la vez.`
+            `La Caja ${operationType.cajaNumero} ya está siendo utilizada por ${nombreUsuario}. Solo un usuario puede acceder a cada caja a la vez.`
           );
         }
       }
@@ -208,6 +224,8 @@ export class UsuariosTurnosService {
       if (operationType) {
         asignacion.agente = operationType.agente;
         asignacion.super = operationType.super;
+        // Asignar número de caja para operación de Super, null para Agentes
+        asignacion.cajaNumero = operationType.super ? operationType.cajaNumero : null;
       }
       
       await this.usuarioTurnoRepository.save(asignacion);
@@ -223,6 +241,8 @@ export class UsuariosTurnosService {
         // Establecer tipo de operación si se proporciona
         agente: operationType ? operationType.agente : false,
         super: operationType ? operationType.super : false,
+        // Asignar número de caja para operación de Super, null para Agentes
+        cajaNumero: operationType && operationType.super ? operationType.cajaNumero : null,
       });
       
       await this.usuarioTurnoRepository.save(asignacion);
@@ -270,90 +290,91 @@ export class UsuariosTurnosService {
 
       // 1. Actualizar la asignación del turno
       console.log(`[USUARIOS_TURNOS] === PASO 1: Actualizando asignación de turno ===`);
+      
+      // IMPORTANTE: Guardar el cajaNumero ANTES de liberarlo para usarlo en las desactivaciones
+      const cajaNumeroActual = asignacion.cajaNumero;
+      console.log(`[USUARIOS_TURNOS] Caja a desactivar: ${cajaNumeroActual}`);
+      
       // Actualizar la asignación
       asignacion.horaFinReal = currentTimeString;
       asignacion.activo = false; // Marcar como inactivo
       asignacion.super = false; // Finalizar operación super
+      asignacion.cajaNumero = null; // Liberar la caja
       
       await this.usuarioTurnoRepository.save(asignacion);
       console.log(`[USUARIOS_TURNOS] ✅ Asignación finalizada: ${asignacion.id}`);
       
-      // 2. Desactivar registros en las tablas correctas del día actual
-      console.log(`[USUARIOS_TURNOS] === PASO 2: Desactivando registros del día actual ===`);
+      // 2. Desactivar registros de la caja específica
+      console.log(`[USUARIOS_TURNOS] === PASO 2: Desactivando registros de la Caja ${cajaNumeroActual} ===`);
       
-      // Obtener fecha actual para filtrar registros del día
-      const today = new Date();
-      const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-      const endOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 23, 59, 59, 999);
-      
-      console.log(`[USUARIOS_TURNOS] Filtrando registros del ${startOfDay.toISOString()} al ${endOfDay.toISOString()}`);
-      
-      // 1. Desactivar cierres super del usuario del día actual
-      try {
-        const cierresResult = await this.usuarioTurnoRepository.manager.query(
-          'UPDATE tbl_cierres_super SET activo = false WHERE usuario_id = $1 AND activo = true AND fecha_cierre >= $2 AND fecha_cierre <= $3',
-          [usuarioId, startOfDay, endOfDay]
-        );
-        console.log(`[USUARIOS_TURNOS] ✅ Cierres super desactivados: ${cierresResult[1] || 0} registros`);
-      } catch (error) {
-        console.error(`[USUARIOS_TURNOS] ❌ Error con tbl_cierres_super:`, error.message);
-      }
-      
-      // 2. Desactivar gastos super del usuario del día actual (excluyendo forma_pago_id = 1 que es Crédito)
-      try {
-        // Para campos DATE, usar solo la fecha actual sin hora
-        const todayDate = today.toISOString().split('T')[0]; // Formato YYYY-MM-DD
-        const gastosResult = await this.usuarioTurnoRepository.manager.query(
-          'UPDATE tbl_egresos_super SET activo = false WHERE usuario_id = $1 AND activo = true AND fecha_egreso = $2 AND forma_pago_id != 1',
-          [usuarioId, todayDate]
-        );
-        console.log(`[USUARIOS_TURNOS] ✅ Gastos super desactivados (excluyendo Crédito): ${gastosResult[1] || 0} registros`);
-      } catch (error) {
-        console.error(`[USUARIOS_TURNOS] ❌ Error con tbl_egresos_super:`, error.message);
-      }
-      
-      // 3. Desactivar flujos de saldo del día actual (no tiene usuarioId)
-      try {
-        const flujosResult = await this.usuarioTurnoRepository.manager.query(
-          'UPDATE tbl_flujos_saldo SET activo = false WHERE activo = true AND fecha >= $1 AND fecha <= $2',
-          [startOfDay, endOfDay]
-        );
-        console.log(`[USUARIOS_TURNOS] ✅ Flujos de saldo desactivados: ${flujosResult[1] || 0} registros`);
-      } catch (error) {
-        console.error(`[USUARIOS_TURNOS] ❌ Error con tbl_flujos_saldo:`, error.message);
-      }
-      
-      // 4. Desactivar ventas de saldo del usuario del día actual
-      try {
-        const ventasResult = await this.usuarioTurnoRepository.manager.query(
-          'UPDATE tbl_ventas_saldo SET activo = false WHERE usuario_id = $1 AND activo = true AND fecha >= $2 AND fecha <= $3',
-          [usuarioId, startOfDay, endOfDay]
-        );
-        console.log(`[USUARIOS_TURNOS] ✅ Ventas de saldo desactivadas: ${ventasResult[1] || 0} registros`);
-      } catch (error) {
-        console.error(`[USUARIOS_TURNOS] ❌ Error con tbl_ventas_saldo:`, error.message);
-      }
-      
-      // 5. Desactivar conteos de billetes super del usuario del día actual
-      try {
-        const conteosResult = await this.usuarioTurnoRepository.manager.query(
-          'UPDATE tbl_conteo_billetes_super SET activo = false WHERE usuario_id = $1 AND activo = true AND fecha >= $2 AND fecha <= $3',
-          [usuarioId, startOfDay, endOfDay]
-        );
-        console.log(`[USUARIOS_TURNOS] ✅ Conteos de billetes super desactivados: ${conteosResult[1] || 0} registros`);
-      } catch (error) {
-        console.error(`[USUARIOS_TURNOS] ❌ Error con tbl_conteo_billetes_super:`, error.message);
-      }
-      
-      // 6. Desactivar adicionales y préstamos del usuario del día actual
-      try {
-        const adicionalesResult = await this.usuarioTurnoRepository.manager.query(
-          'UPDATE tbl_adic_prest SET activo = false WHERE usuario_id = $1 AND activo = true AND fecha >= $2 AND fecha <= $3',
-          [usuarioId, startOfDay, endOfDay]
-        );
-        console.log(`[USUARIOS_TURNOS] ✅ Adicionales y préstamos desactivados: ${adicionalesResult[1] || 0} registros`);
-      } catch (error) {
-        console.error(`[USUARIOS_TURNOS] ❌ Error con tbl_adic_prest:`, error.message);
+      if (!cajaNumeroActual) {
+        console.warn(`[USUARIOS_TURNOS] ⚠️ No se encontró número de caja en el turno. Saltando desactivación de registros.`);
+      } else {
+        // 1. Desactivar cierres super de esta caja específica
+        try {
+          const cierresResult = await this.usuarioTurnoRepository.manager.query(
+            'UPDATE tbl_cierres_super SET activo = false WHERE caja_numero = $1 AND activo = true',
+            [cajaNumeroActual]
+          );
+          console.log(`[USUARIOS_TURNOS] ✅ Cierres super de Caja ${cajaNumeroActual} desactivados: ${cierresResult[1] || 0} registros`);
+        } catch (error) {
+          console.error(`[USUARIOS_TURNOS] ❌ Error con tbl_cierres_super:`, error.message);
+        }
+        
+        // 2. Desactivar egresos super de esta caja (EXCLUYENDO forma_pago_id = 1 que son créditos)
+        try {
+          const gastosResult = await this.usuarioTurnoRepository.manager.query(
+            'UPDATE tbl_egresos_super SET activo = false WHERE caja_numero = $1 AND activo = true AND forma_pago_id != 1',
+            [cajaNumeroActual]
+          );
+          console.log(`[USUARIOS_TURNOS] ✅ Egresos super de Caja ${cajaNumeroActual} desactivados (excluyendo Créditos): ${gastosResult[1] || 0} registros`);
+        } catch (error) {
+          console.error(`[USUARIOS_TURNOS] ❌ Error con tbl_egresos_super:`, error.message);
+        }
+        
+        // 3. Desactivar flujos de saldo de esta caja
+        try {
+          const flujosResult = await this.usuarioTurnoRepository.manager.query(
+            'UPDATE tbl_flujos_saldo SET activo = false WHERE caja_numero = $1 AND activo = true',
+            [cajaNumeroActual]
+          );
+          console.log(`[USUARIOS_TURNOS] ✅ Flujos de saldo de Caja ${cajaNumeroActual} desactivados: ${flujosResult[1] || 0} registros`);
+        } catch (error) {
+          console.error(`[USUARIOS_TURNOS] ❌ Error con tbl_flujos_saldo:`, error.message);
+        }
+        
+        // 4. Desactivar ventas de saldo de esta caja
+        try {
+          const ventasResult = await this.usuarioTurnoRepository.manager.query(
+            'UPDATE tbl_ventas_saldo SET activo = false WHERE caja_numero = $1 AND activo = true',
+            [cajaNumeroActual]
+          );
+          console.log(`[USUARIOS_TURNOS] ✅ Ventas de saldo de Caja ${cajaNumeroActual} desactivadas: ${ventasResult[1] || 0} registros`);
+        } catch (error) {
+          console.error(`[USUARIOS_TURNOS] ❌ Error con tbl_ventas_saldo:`, error.message);
+        }
+        
+        // 5. Desactivar conteos de billetes super de esta caja
+        try {
+          const conteosResult = await this.usuarioTurnoRepository.manager.query(
+            'UPDATE tbl_conteo_billetes_super SET activo = false WHERE caja_numero = $1 AND activo = true',
+            [cajaNumeroActual]
+          );
+          console.log(`[USUARIOS_TURNOS] ✅ Conteos de billetes de Caja ${cajaNumeroActual} desactivados: ${conteosResult[1] || 0} registros`);
+        } catch (error) {
+          console.error(`[USUARIOS_TURNOS] ❌ Error con tbl_conteo_billetes_super:`, error.message);
+        }
+        
+        // 6. Desactivar adicionales y préstamos de esta caja
+        try {
+          const adicionalesResult = await this.usuarioTurnoRepository.manager.query(
+            'UPDATE tbl_adic_prest SET activo = false WHERE caja_numero = $1 AND activo = true',
+            [cajaNumeroActual]
+          );
+          console.log(`[USUARIOS_TURNOS] ✅ Adicionales y préstamos de Caja ${cajaNumeroActual} desactivados: ${adicionalesResult[1] || 0} registros`);
+        } catch (error) {
+          console.error(`[USUARIOS_TURNOS] ❌ Error con tbl_adic_prest:`, error.message);
+        }
       }
       
       console.log(`[USUARIOS_TURNOS] ========== FINALIZACION COMPLETADA ==========`);
@@ -627,15 +648,41 @@ export class UsuariosTurnosService {
   async getOperacionesEnUso(): Promise<{
     operacionAgente: { enUso: boolean; usuario?: User };
     operacionSuper: { enUso: boolean; usuario?: User };
+    cajas: Array<{ id: number; nombre: string; enUso: boolean; usuario?: User }>;
   }> {
     console.log(`[USUARIOS_TURNOS] Obteniendo estado de operaciones en uso`);
     
     const operacionAgente = await this.operacionEstaEnUso('agente');
     const operacionSuper = await this.operacionEstaEnUso('super');
     
+    // Importar configuración de cajas dinámicamente
+    const { CAJAS_SUPER_NUMEROS } = await import('../../config/cajas.config');
+    
+    // Obtener estado de cada caja
+    const cajas = await Promise.all(
+      CAJAS_SUPER_NUMEROS.map(async (cajaId) => {
+        const turnoActivo = await this.usuarioTurnoRepository.findOne({
+          where: {
+            activo: true,
+            super: true,
+            cajaNumero: cajaId
+          },
+          relations: ['usuario']
+        });
+        
+        return {
+          id: cajaId,
+          nombre: `Caja Super ${cajaId}`,
+          enUso: !!turnoActivo,
+          usuario: turnoActivo?.usuario
+        };
+      })
+    );
+    
     return {
       operacionAgente,
-      operacionSuper
+      operacionSuper,
+      cajas
     };
   }
 }

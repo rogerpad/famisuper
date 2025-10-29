@@ -77,12 +77,35 @@ export const useSuperClosings = () => {
     setLoading(true);
     setError(null);
     try {
-      // Filter properties that shouldn't be sent in update
-      const { id: _, usuario, ...updateData } = data as any;
+      // Filter properties that shouldn't be sent in update (campos de solo lectura o auto-generados)
+      const { id: _, usuario, cajaNumero, usuarioTurnoId, turnoId, ...updateData } = data as any;
+      
+      // Convertir fechaCierre a string ISO si es un objeto Date
+      if (updateData.fechaCierre && updateData.fechaCierre instanceof Date) {
+        updateData.fechaCierre = updateData.fechaCierre.toISOString();
+      }
+      
+      // Asegurar que todos los valores numéricos sean números, no strings
+      Object.keys(updateData).forEach(key => {
+        const value = updateData[key];
+        // Convertir strings numéricos a números
+        if (typeof value === 'string' && !isNaN(parseFloat(value)) && isFinite(value as any)) {
+          updateData[key] = parseFloat(value);
+        }
+      });
+      
+      console.log('[SUPER_CLOSINGS_API] Datos a enviar al actualizar:', updateData);
+      console.log('[SUPER_CLOSINGS_API] Tipos de datos:', {
+        efectivoInicial: typeof updateData.efectivoInicial,
+        adicionalCasa: typeof updateData.adicionalCasa,
+        ventaContado: typeof updateData.ventaContado,
+        fechaCierre: typeof updateData.fechaCierre,
+      });
       
       const response = await api.patch<SuperClosing>(`${API_BASE_URL}/cierres-super/${id}`, updateData);
       return response.data;
     } catch (err: any) {
+      console.error('[SUPER_CLOSINGS_API] Error al actualizar:', err.response?.data);
       setError(err.response?.data?.message || `Error updating closing with ID ${id}`);
       throw err;
     } finally {
@@ -172,13 +195,17 @@ export const useSuperClosings = () => {
     }
   }, []);
 
-  // Get last inactive closing of the day for initial cash
-  const getLastInactiveClosingOfDay = useCallback(async () => {
+  // Get last inactive closing of the day for initial cash (filtrado por caja)
+  const getLastInactiveClosingOfDay = useCallback(async (cajaNumero?: number) => {
     setError(null);
     try {
-      const response = await api.get<{ efectivoCierreTurno: number } | null>(
-        `${API_BASE_URL}/cierres-super/ultimo-cierre-inactivo-dia`
-      );
+      const url = cajaNumero 
+        ? `${API_BASE_URL}/cierres-super/ultimo-cierre-inactivo-dia?cajaNumero=${cajaNumero}`
+        : `${API_BASE_URL}/cierres-super/ultimo-cierre-inactivo-dia`;
+      
+      console.log('[SUPER_CLOSINGS_API] Obteniendo último cierre inactivo - Caja:', cajaNumero || 'No especificada');
+      
+      const response = await api.get<{ efectivoCierreTurno: number } | null>(url);
       return response.data;
     } catch (err: any) {
       setError(err.response?.data?.message || 'Error loading last inactive closing of day');

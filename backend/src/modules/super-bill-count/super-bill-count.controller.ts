@@ -30,8 +30,10 @@ export class SuperBillCountController {
 
   @Get('last-active')
   @RequirePermissions('ver_conteo_super')
-  findLastActive() {
-    return this.superBillCountService.findLastActive();
+  findLastActive(@Query('cajaNumero') cajaNumero?: string) {
+    const cajaNum = cajaNumero ? parseInt(cajaNumero) : undefined;
+    console.log('[SuperBillCountController] findLastActive - Caja:', cajaNum);
+    return this.superBillCountService.findLastActive(cajaNum);
   }
 
   @Get(':id')

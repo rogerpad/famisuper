@@ -31,6 +31,7 @@ export interface SuperBillCount {
   totalGeneral: number;
   activo: boolean;
   fecha: string;
+  cajaNumero?: number | null;
   usuario?: {
     id: number;
     nombre: string;

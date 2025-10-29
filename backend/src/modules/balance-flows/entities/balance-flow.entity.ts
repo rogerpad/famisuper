@@ -1,5 +1,6 @@
 import { Column, Entity, JoinColumn, ManyToOne, PrimaryGeneratedColumn } from 'typeorm';
 import { PhoneLine } from '../../phone-lines/entities/phone-line.entity';
+import { SuperClosing } from '../../super-closings/entities/super-closing.entity';
 
 @Entity({ name: 'tbl_flujos_saldo' })
 export class BalanceFlow {
@@ -33,4 +34,14 @@ export class BalanceFlow {
 
   @Column({ default: true })
   activo: boolean;
+
+  @Column({ name: 'caja_numero', nullable: true })
+  cajaNumero: number;
+
+  @Column({ name: 'cierre_id', nullable: true })
+  cierreId: number;
+
+  @ManyToOne(() => SuperClosing, { nullable: true })
+  @JoinColumn({ name: 'cierre_id' })
+  cierre: SuperClosing;
 }

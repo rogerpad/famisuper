@@ -30,6 +30,7 @@ import { useAuth } from '../../contexts/AuthContext';
 export interface OperationType {
   agente: boolean;
   super: boolean;
+  cajaNumero?: number;
 }
 
 interface OperationTypeDialogProps {
@@ -46,6 +47,8 @@ const OperationTypeDialog: React.FC<OperationTypeDialogProps> = ({
   turnoNombre
 }) => {
   const [selectedType, setSelectedType] = useState<string>('');
+  const [selectedCaja, setSelectedCaja] = useState<number | null>(null);
+  const [showCajaSelection, setShowCajaSelection] = useState<boolean>(false);
   const [validationError, setValidationError] = useState<string>('');
   const [isValidating, setIsValidating] = useState<boolean>(false);
   
@@ -62,11 +65,34 @@ const OperationTypeDialog: React.FC<OperationTypeDialogProps> = ({
   const handleChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     setSelectedType(event.target.value);
     setValidationError(''); // Limpiar error al cambiar selección
+    setShowCajaSelection(false); // Reset selección de caja
+    setSelectedCaja(null);
+  };
+
+  const handleCajaChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    setSelectedCaja(Number(event.target.value));
+    setValidationError('');
+  };
+
+  const handleNext = () => {
+    if (!selectedType) return;
+    
+    // Si seleccionó Super, mostrar selección de caja
+    if (selectedType === 'super') {
+      setShowCajaSelection(true);
+    } else {
+      // Si seleccionó Agente, confirmar directamente
+      handleConfirm();
+    }
+  };
+
+  const handleBack = () => {
+    setShowCajaSelection(false);
+    setSelectedCaja(null);
+    setValidationError('');
   };
 
   const handleConfirm = async () => {
-    if (!selectedType) return;
-
     setIsValidating(true);
     setValidationError('');
 
@@ -102,23 +128,37 @@ const OperationTypeDialog: React.FC<OperationTypeDialogProps> = ({
         return;
       }
 
-      if (selectedType === 'super' && estadoOperaciones.operacionSuper.enUso) {
-        const nombreUsuario = estadoOperaciones.operacionSuper.usuario ? 
-          `${estadoOperaciones.operacionSuper.usuario.nombre} ${estadoOperaciones.operacionSuper.usuario.apellido}` : 
-          'Usuario desconocido';
-        setValidationError(`La operación de Super ya está siendo utilizada por ${nombreUsuario}. Solo un usuario puede acceder a esta operación a la vez.`);
-        setIsValidating(false);
-        return;
+      if (selectedType === 'super') {
+        // Validar que se haya seleccionado una caja
+        if (!selectedCaja) {
+          setValidationError('Debe seleccionar una caja para la operación de Super.');
+          setIsValidating(false);
+          return;
+        }
+
+        // Validar que la caja esté disponible
+        const cajaInfo = estadoOperaciones.cajas?.find(c => c.id === selectedCaja);
+        if (cajaInfo?.enUso) {
+          const nombreUsuario = cajaInfo.usuario ? 
+            `${cajaInfo.usuario.nombre} ${cajaInfo.usuario.apellido}` : 
+            'Usuario desconocido';
+          setValidationError(`La ${cajaInfo.nombre} ya está siendo utilizada por ${nombreUsuario}. Solo un usuario puede acceder a cada caja a la vez.`);
+          setIsValidating(false);
+          return;
+        }
       }
 
       // Si llegamos aquí, la operación está disponible
       const operationType: OperationType = {
         agente: selectedType === 'agente',
-        super: selectedType === 'super'
+        super: selectedType === 'super',
+        cajaNumero: selectedType === 'super' ? selectedCaja! : undefined
       };
       
       onConfirm(operationType);
       setSelectedType(''); // Reset selection
+      setSelectedCaja(null); // Reset caja
+      setShowCajaSelection(false); // Reset vista
       setValidationError(''); // Reset error
     } catch (error: any) {
       console.error('Error al validar operación:', error);
@@ -130,6 +170,8 @@ const OperationTypeDialog: React.FC<OperationTypeDialogProps> = ({
 
   const handleCancel = () => {
     setSelectedType(''); // Reset selection
+    setSelectedCaja(null); // Reset caja
+    setShowCajaSelection(false); // Reset vista
     setValidationError(''); // Reset error
     onClose();
   };
@@ -149,7 +191,9 @@ const OperationTypeDialog: React.FC<OperationTypeDialogProps> = ({
     >
       <DialogTitle sx={{ bgcolor: 'primary.main', color: 'white', py: 2 }}>
         <Box>
-          <Typography variant="h6">Seleccionar Tipo de Operación</Typography>
+          <Typography variant="h6">
+            {showCajaSelection ? 'Seleccionar Caja' : 'Seleccionar Tipo de Operación'}
+          </Typography>
           <Typography variant="subtitle2">
             Turno: {turnoNombre}
           </Typography>
@@ -157,7 +201,9 @@ const OperationTypeDialog: React.FC<OperationTypeDialogProps> = ({
       </DialogTitle>
       <DialogContent sx={{ py: 3 }}>
         <Typography variant="body1" paragraph>
-          Seleccione el tipo de operación que realizará durante este turno:
+          {showCajaSelection 
+            ? 'Seleccione la caja que utilizará para la operación de Super:'
+            : 'Seleccione el tipo de operación que realizará durante este turno:'}
         </Typography>
 
         {/* Mostrar error de validación */}
@@ -178,13 +224,73 @@ const OperationTypeDialog: React.FC<OperationTypeDialogProps> = ({
           </Box>
         )}
         
-        <FormControl component="fieldset" sx={{ width: '100%' }}>
-          <RadioGroup
-            aria-label="operation-type"
-            name="operation-type"
-            value={selectedType}
-            onChange={handleChange}
-          >
+        {/* Vista de selecci\u00f3n de caja (Paso 2) */}
+        {showCajaSelection ? (
+          <FormControl component="fieldset" sx={{ width: '100%' }}>
+            <RadioGroup
+              aria-label="caja-selection"
+              name="caja-selection"
+              value={selectedCaja?.toString() || ''}
+              onChange={handleCajaChange}
+            >
+              {operacionesEnUso?.cajas?.map((caja) => (
+                <Box 
+                  key={caja.id}
+                  sx={{ 
+                    border: '1px solid', 
+                    borderColor: caja.enUso ? 'error.main' : 
+                               selectedCaja === caja.id ? 'primary.main' : 'divider',
+                    borderRadius: 1,
+                    p: 2,
+                    mb: 2,
+                    bgcolor: caja.enUso ? 'error.50' :
+                            selectedCaja === caja.id ? 'primary.light' : 'background.paper',
+                    opacity: caja.enUso ? 0.6 : 1,
+                    transition: 'all 0.3s',
+                    '&:hover': {
+                      borderColor: caja.enUso ? 'error.main' : 'primary.main',
+                      bgcolor: caja.enUso ? 'error.50' : 'primary.50'
+                    }
+                  }}
+                >
+                  <FormControlLabel 
+                    value={caja.id.toString()}
+                    control={<Radio disabled={caja.enUso} />} 
+                    label={
+                      <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                        <StoreIcon sx={{ 
+                          mr: 1, 
+                          color: caja.enUso ? 'error.main' : 'primary.main' 
+                        }} />
+                        <Typography variant="body1" fontWeight="bold">{caja.nombre}</Typography>
+                        {selectedCaja === caja.id && !caja.enUso && (
+                          <CheckIcon sx={{ ml: 1, color: 'success.main' }} />
+                        )}
+                        {caja.enUso && (
+                          <ErrorIcon sx={{ ml: 1, color: 'error.main' }} />
+                        )}
+                      </Box>
+                    }
+                    sx={{ width: '100%' }}
+                  />
+                  {caja.enUso && caja.usuario && (
+                    <Typography variant="body2" sx={{ ml: 4, mt: 1, color: 'error.main', fontWeight: 'bold' }}>
+                      En uso por: {caja.usuario.nombre} {caja.usuario.apellido}
+                    </Typography>
+                  )}
+                </Box>
+              ))}
+            </RadioGroup>
+          </FormControl>
+        ) : (
+          /* Vista de selecci\u00f3n de tipo de operaci\u00f3n (Paso 1) */
+          <FormControl component="fieldset" sx={{ width: '100%' }}>
+            <RadioGroup
+              aria-label="operation-type"
+              name="operation-type"
+              value={selectedType}
+              onChange={handleChange}
+            >
             <Box 
               sx={{ 
                 border: '1px solid', 
@@ -252,40 +358,32 @@ const OperationTypeDialog: React.FC<OperationTypeDialogProps> = ({
             <Box 
               sx={{ 
                 border: '1px solid', 
-                borderColor: operacionesEnUso?.operacionSuper.enUso ? 'error.main' : 
-                           !hasPermission('ver_menu_operacion_super') && hasRole('VendedorB') ? 'warning.main' :
+                borderColor: !hasPermission('ver_menu_operacion_super') && hasRole('VendedorB') ? 'warning.main' :
                            selectedType === 'super' ? 'primary.main' : 'divider',
                 borderRadius: 1,
                 p: 2,
-                bgcolor: operacionesEnUso?.operacionSuper.enUso ? 'error.50' :
-                        !hasPermission('ver_menu_operacion_super') && hasRole('VendedorB') ? 'warning.50' :
+                bgcolor: !hasPermission('ver_menu_operacion_super') && hasRole('VendedorB') ? 'warning.50' :
                         selectedType === 'super' ? 'primary.light' : 'background.paper',
-                opacity: (operacionesEnUso?.operacionSuper.enUso || (!hasPermission('ver_menu_operacion_super') && hasRole('VendedorB'))) ? 0.6 : 1,
+                opacity: (!hasPermission('ver_menu_operacion_super') && hasRole('VendedorB')) ? 0.6 : 1,
                 transition: 'all 0.3s',
                 '&:hover': {
-                  borderColor: operacionesEnUso?.operacionSuper.enUso ? 'error.main' : 
-                             !hasPermission('ver_menu_operacion_super') && hasRole('VendedorB') ? 'warning.main' : 'primary.main',
-                  bgcolor: operacionesEnUso?.operacionSuper.enUso ? 'error.50' : 
-                          !hasPermission('ver_menu_operacion_super') && hasRole('VendedorB') ? 'warning.50' : 'primary.50'
+                  borderColor: !hasPermission('ver_menu_operacion_super') && hasRole('VendedorB') ? 'warning.main' : 'primary.main',
+                  bgcolor: !hasPermission('ver_menu_operacion_super') && hasRole('VendedorB') ? 'warning.50' : 'primary.50'
                 }
               }}
             >
               <FormControlLabel 
                 value="super" 
-                control={<Radio disabled={operacionesEnUso?.operacionSuper.enUso || (!hasPermission('ver_menu_operacion_super') && hasRole('VendedorB'))} />} 
+                control={<Radio disabled={!hasPermission('ver_menu_operacion_super') && hasRole('VendedorB')} />} 
                 label={
                   <Box sx={{ display: 'flex', alignItems: 'center' }}>
                     <StoreIcon sx={{ 
                       mr: 1, 
-                      color: operacionesEnUso?.operacionSuper.enUso ? 'error.main' : 
-                             !hasPermission('ver_menu_operacion_super') && hasRole('VendedorB') ? 'warning.main' : 'primary.main' 
+                      color: !hasPermission('ver_menu_operacion_super') && hasRole('VendedorB') ? 'warning.main' : 'primary.main' 
                     }} />
                     <Typography variant="body1" fontWeight="bold">Operación de Super</Typography>
-                    {selectedType === 'super' && !operacionesEnUso?.operacionSuper.enUso && hasPermission('ver_menu_operacion_super') && (
+                    {selectedType === 'super' && hasPermission('ver_menu_operacion_super') && (
                       <CheckIcon sx={{ ml: 1, color: 'success.main' }} />
-                    )}
-                    {operacionesEnUso?.operacionSuper.enUso && (
-                      <ErrorIcon sx={{ ml: 1, color: 'error.main' }} />
                     )}
                     {!hasPermission('ver_menu_operacion_super') && hasRole('VendedorB') && (
                       <WarningIcon sx={{ ml: 1, color: 'warning.main' }} />
@@ -295,16 +393,8 @@ const OperationTypeDialog: React.FC<OperationTypeDialogProps> = ({
                 sx={{ width: '100%' }}
               />
               <Typography variant="body2" sx={{ ml: 4, mt: 1, color: 'text.secondary' }}>
-                Acceso a funciones relacionadas con la gestión del supermercado, ventas, inventario y caja.
+                Acceso a funciones relacionadas con la gestión del supermercado, ventas, inventario y caja. Seleccione una caja disponible en el siguiente paso.
               </Typography>
-              {operacionesEnUso?.operacionSuper.enUso && (
-                <Typography variant="body2" sx={{ ml: 4, mt: 1, color: 'error.main', fontWeight: 'bold' }}>
-                  En uso por: {operacionesEnUso.operacionSuper.usuario ? 
-                    `${operacionesEnUso.operacionSuper.usuario.nombre} ${operacionesEnUso.operacionSuper.usuario.apellido}` : 
-                    'Usuario desconocido'
-                  }
-                </Typography>
-              )}
               {!hasPermission('ver_menu_operacion_super') && hasRole('VendedorB') && (
                 <Typography variant="body2" sx={{ ml: 4, mt: 1, color: 'warning.main', fontWeight: 'bold' }}>
                   Sin permisos para esta operación
@@ -313,27 +403,45 @@ const OperationTypeDialog: React.FC<OperationTypeDialogProps> = ({
             </Box>
           </RadioGroup>
         </FormControl>
+        )}
         
         <Divider sx={{ my: 2 }} />
         
         <Typography variant="body2" color="text.secondary">
-          Nota: Solo podrá acceder a las funciones del tipo de operación seleccionado durante este turno.
-          Si necesita cambiar el tipo de operación, deberá finalizar el turno actual e iniciar uno nuevo.
+          {showCajaSelection 
+            ? 'Nota: La caja seleccionada será la que utilice durante todo el turno.'
+            : 'Nota: Solo podrá acceder a las funciones del tipo de operación seleccionado durante este turno. Si necesita cambiar el tipo de operación, deberá finalizar el turno actual e iniciar uno nuevo.'}
         </Typography>
       </DialogContent>
       <DialogActions sx={{ px: 3, py: 2 }}>
+        {showCajaSelection && (
+          <Button onClick={handleBack} color="inherit">
+            Atrás
+          </Button>
+        )}
         <Button onClick={handleCancel} color="inherit">
           Cancelar
         </Button>
-        <Button 
-          onClick={handleConfirm} 
-          variant="contained" 
-          color="primary"
-          disabled={!selectedType || isValidating}
-          startIcon={isValidating ? <CircularProgress size={16} /> : undefined}
-        >
-          {isValidating ? 'Validando...' : 'Confirmar e Iniciar Turno'}
-        </Button>
+        {showCajaSelection ? (
+          <Button 
+            onClick={handleConfirm} 
+            variant="contained" 
+            color="primary"
+            disabled={!selectedCaja || isValidating}
+            startIcon={isValidating ? <CircularProgress size={16} /> : undefined}
+          >
+            {isValidating ? 'Validando...' : 'Confirmar e Iniciar Turno'}
+          </Button>
+        ) : (
+          <Button 
+            onClick={handleNext} 
+            variant="contained" 
+            color="primary"
+            disabled={!selectedType}
+          >
+            {selectedType === 'super' ? 'Siguiente' : 'Confirmar e Iniciar Turno'}
+          </Button>
+        )}
       </DialogActions>
     </Dialog>
   );

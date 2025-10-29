@@ -4,30 +4,39 @@ import { Repository } from 'typeorm';
 import { AdditionalLoan } from './entities/additional-loan.entity';
 import { 
   CreateAdditionalLoanDto, 
-  UpdateAdditionalLoanDto, 
-  AdditionalLoanDto 
+  UpdateAdditionalLoanDto
 } from './dto';
+import { UsuarioTurno } from '../turnos/entities/usuario-turno.entity';
 
 @Injectable()
 export class AdditionalLoanService {
   constructor(
     @InjectRepository(AdditionalLoan)
     private additionalLoanRepository: Repository<AdditionalLoan>,
+    @InjectRepository(UsuarioTurno)
+    private usuarioTurnoRepository: Repository<UsuarioTurno>,
   ) {}
 
-  async create(createAdditionalLoanDto: CreateAdditionalLoanDto): Promise<AdditionalLoanDto> {
+  async create(createAdditionalLoanDto: CreateAdditionalLoanDto, userId?: number): Promise<AdditionalLoan> {
+    // Obtener cajaNumero del turno activo si se proporciona userId
+    let cajaNumero: number | null = null;
+    if (userId || createAdditionalLoanDto.usuarioId) {
+      const turnoActivo = await this.usuarioTurnoRepository.findOne({
+        where: { usuarioId: userId || createAdditionalLoanDto.usuarioId, activo: true }
+      });
+      cajaNumero = turnoActivo?.cajaNumero || null;
+      console.log('[AdditionalLoanService] Caja del turno activo:', cajaNumero);
+    }
+    
     const newAdditionalLoan = this.additionalLoanRepository.create({
       ...createAdditionalLoanDto,
-      fecha: new Date() // Asignar explícitamente la fecha actual
+      fecha: new Date(), // Asignar explícitamente la fecha actual
+      cajaNumero  // Asignar caja del turno activo
     });
-    const savedAdditionalLoan = await this.additionalLoanRepository.save(newAdditionalLoan);
-    
-    // Para la creación, no necesitamos cargar la relación de usuario
-    // Esto mejora el rendimiento
-    return this.mapToDto(savedAdditionalLoan);
+    return this.additionalLoanRepository.save(newAdditionalLoan);
   }
 
-  async findAll(filters?: { acuerdo?: string; origen?: string; activo?: boolean }): Promise<AdditionalLoanDto[]> {
+  async findAll(filters?: { acuerdo?: string; origen?: string; activo?: boolean }): Promise<AdditionalLoan[]> {
     // Construir el objeto de condiciones para el where
     const whereConditions: any = {};
     
@@ -45,15 +54,14 @@ export class AdditionalLoanService {
       }
     }
     
-    const additionalLoans = await this.additionalLoanRepository.find({
+    return this.additionalLoanRepository.find({
       where: whereConditions,
       relations: ['usuario'],
+      order: { fecha: 'DESC' },
     });
-    
-    return additionalLoans.map(additionalLoan => this.mapToDto(additionalLoan));
   }
 
-  async findOne(id: number): Promise<AdditionalLoanDto> {
+  async findOne(id: number): Promise<AdditionalLoan> {
     const additionalLoan = await this.additionalLoanRepository.findOne({
       where: { id },
       relations: ['usuario'],
@@ -63,10 +71,10 @@ export class AdditionalLoanService {
       throw new NotFoundException(`Additional Loan with ID ${id} not found`);
     }
     
-    return this.mapToDto(additionalLoan);
+    return additionalLoan;
   }
 
-  async update(id: number, updateAdditionalLoanDto: UpdateAdditionalLoanDto): Promise<AdditionalLoanDto> {
+  async update(id: number, updateAdditionalLoanDto: UpdateAdditionalLoanDto): Promise<AdditionalLoan> {
     const additionalLoan = await this.additionalLoanRepository.findOne({
       where: { id },
     });
@@ -76,8 +84,7 @@ export class AdditionalLoanService {
     }
     
     Object.assign(additionalLoan, updateAdditionalLoanDto);
-    const updatedAdditionalLoan = await this.additionalLoanRepository.save(additionalLoan);
-    return this.mapToDto(updatedAdditionalLoan);
+    return this.additionalLoanRepository.save(additionalLoan);
   }
 
   async remove(id: number): Promise<void> {
@@ -86,31 +93,5 @@ export class AdditionalLoanService {
     if (result.affected === 0) {
       throw new NotFoundException(`Additional Loan with ID ${id} not found`);
     }
-  }
-
-  private mapToDto(additionalLoan: AdditionalLoan): AdditionalLoanDto {
-    const dto = new AdditionalLoanDto();
-    dto.id = additionalLoan.id;
-    dto.usuarioId = additionalLoan.usuarioId;
-    dto.acuerdo = additionalLoan.acuerdo;
-    dto.origen = additionalLoan.origen;
-    dto.monto = additionalLoan.monto;
-    dto.descripcion = additionalLoan.descripcion;
-    dto.fecha = additionalLoan.fecha;
-    dto.activo = additionalLoan.activo;
-    
-    if (additionalLoan.usuario) {
-      dto.usuario = {
-        id: additionalLoan.usuario.id,
-        nombre: additionalLoan.usuario.nombre,
-        apellido: additionalLoan.usuario.apellido,
-        username: additionalLoan.usuario.username,
-        email: additionalLoan.usuario.email,
-        rol_id: additionalLoan.usuario.rol_id,
-        activo: additionalLoan.usuario.activo
-      };
-    }
-    
-    return dto;
   }
 }

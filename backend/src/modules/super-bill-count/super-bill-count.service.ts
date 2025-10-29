@@ -5,15 +5,26 @@ import { SuperBillCount } from './entities/super-bill-count.entity';
 import { CreateSuperBillCountDto } from './dto/create-super-bill-count.dto';
 import { UpdateSuperBillCountDto } from './dto/update-super-bill-count.dto';
 import { SuperBillCountDto } from './dto/super-bill-count.dto';
+import { UsuarioTurno } from '../turnos/entities/usuario-turno.entity';
 
 @Injectable()
 export class SuperBillCountService {
   constructor(
     @InjectRepository(SuperBillCount)
     private superBillCountRepository: Repository<SuperBillCount>,
+    @InjectRepository(UsuarioTurno)
+    private usuarioTurnoRepository: Repository<UsuarioTurno>,
   ) {}
 
   async create(createSuperBillCountDto: CreateSuperBillCountDto): Promise<SuperBillCountDto> {
+    // Obtener el turno activo del usuario para obtener cajaNumero
+    const turnoActivo = await this.usuarioTurnoRepository.findOne({
+      where: { usuarioId: createSuperBillCountDto.usuarioId, activo: true }
+    });
+    
+    const cajaNumero = turnoActivo?.cajaNumero || null;
+    console.log('[SuperBillCountService] Caja del turno activo:', cajaNumero);
+    
     // Calculate totals per denomination
     const count = this.calculateTotals(createSuperBillCountDto);
     
@@ -22,6 +33,9 @@ export class SuperBillCountService {
     
     // Copy all calculated count properties to the new instance
     Object.assign(newCount, count);
+    
+    // Asignar cajaNumero del turno activo
+    (newCount as SuperBillCount).cajaNumero = cajaNumero;
     
     // Ensure the date is set correctly
     (newCount as SuperBillCount).fecha = new Date();
@@ -73,17 +87,28 @@ export class SuperBillCountService {
     return counts.map((count) => this.mapToDto(count));
   }
 
-  async findLastActive(): Promise<SuperBillCountDto> {
+  async findLastActive(cajaNumero?: number): Promise<SuperBillCountDto> {
+    console.log(`[SuperBillCountService] Buscando último conteo activo - Caja: ${cajaNumero || 'Todas'}`);
+    
+    const whereCondition: any = { activo: true };
+    
+    // Si se proporciona cajaNumero, filtrar por esa caja específica
+    if (cajaNumero) {
+      whereCondition.cajaNumero = cajaNumero;
+    }
+    
     const count = await this.superBillCountRepository.findOne({
-      where: { activo: true },
+      where: whereCondition,
       relations: ['usuario'],
       order: { fecha: 'DESC' },
     });
     
     if (!count) {
+      console.log(`[SuperBillCountService] No se encontró conteo activo para Caja ${cajaNumero || 'general'}`);
       throw new NotFoundException('No active bill count found');
     }
     
+    console.log(`[SuperBillCountService] Conteo activo encontrado - ID: ${count.id}, Total: ${count.totalGeneral}`);
     return this.mapToDto(count);
   }
 
@@ -198,6 +223,7 @@ export class SuperBillCountService {
       totalGeneral: count.totalGeneral,
       activo: count.activo,
       fecha: count.fecha,
+      cajaNumero: count.cajaNumero,
     };
     
     // Add user information if available

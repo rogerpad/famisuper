@@ -33,9 +33,10 @@ export class SuperClosingsController {
 
   @Get('ultimo-cierre-inactivo-dia')
   @UseGuards(JwtAuthGuard)
-  async getUltimoCierreInactivoDelDia() {
-    console.log('[SUPER_CLOSINGS_CONTROLLER] Endpoint ultimo-cierre-inactivo-dia called');
-    const result = await this.superClosingsService.getUltimoCierreInactivoDelDia();
+  async getUltimoCierreInactivoDelDia(@Query('cajaNumero') cajaNumero?: string) {
+    const cajaNum = cajaNumero ? parseInt(cajaNumero) : undefined;
+    console.log('[SUPER_CLOSINGS_CONTROLLER] Endpoint ultimo-cierre-inactivo-dia called - Caja:', cajaNum);
+    const result = await this.superClosingsService.getUltimoCierreInactivoDelDia(cajaNum);
     console.log('[SUPER_CLOSINGS_CONTROLLER] Service result:', result);
     return result;
   }
@@ -75,6 +76,13 @@ export class SuperClosingsController {
   @UseGuards(PermissionsGuard)
   @RequirePermissions('crear_editar_cierre_super')
   update(@Param('id') id: string, @Body() updateSuperClosingDto: UpdateSuperClosingDto) {
+    console.log('[SUPER_CLOSINGS_CONTROLLER] Actualizando cierre ID:', id);
+    console.log('[SUPER_CLOSINGS_CONTROLLER] Datos recibidos:', JSON.stringify(updateSuperClosingDto, null, 2));
+    console.log('[SUPER_CLOSINGS_CONTROLLER] Tipos de datos:', {
+      efectivoInicial: typeof updateSuperClosingDto.efectivoInicial,
+      adicionalCasa: typeof updateSuperClosingDto.adicionalCasa,
+      fechaCierre: typeof updateSuperClosingDto.fechaCierre,
+    });
     return this.superClosingsService.update(+id, updateSuperClosingDto);
   }
 

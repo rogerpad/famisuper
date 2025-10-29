@@ -42,16 +42,30 @@ const SuperClosingsList: React.FC = () => {
   const navigate = useNavigate();
   const { loading, error, superClosings, fetchSuperClosings, deleteSuperClosing, filterSuperClosings, getLastInactiveClosingOfDay } = useSuperClosings();
   const { state: authState } = useAuth();
-  const { turnoActual, refetchTurno } = useTurno();
+  const { turnoActual, refetchTurno, turnosActivos } = useTurno();
   const { enqueueSnackbar } = useSnackbar();
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [closingToDelete, setClosingToDelete] = useState<number | null>(null);
   const [filters, setFilters] = useState<SuperClosingFilters>({ activo: true });
   const [finalizarTurnoDialogOpen, setFinalizarTurnoDialogOpen] = useState(false);
+  const [cierreExistenteParaTurno, setCierreExistenteParaTurno] = useState<SuperClosing | null>(null);
 
   useEffect(() => {
     filterSuperClosings(filters);
   }, [filterSuperClosings]);
+
+  // Verificar si ya existe un cierre para el turno activo
+  useEffect(() => {
+    if (turnoActual && superClosings.length > 0) {
+      // Buscar cierre que pertenezca al turno activo
+      const cierreDelTurno = superClosings.find(
+        (cierre) => cierre.usuarioId === authState.user?.id && cierre.activo
+      );
+      setCierreExistenteParaTurno(cierreDelTurno || null);
+    } else {
+      setCierreExistenteParaTurno(null);
+    }
+  }, [turnoActual, superClosings, authState.user]);
 
   const handleCreateClick = async () => {
     try {
@@ -176,6 +190,21 @@ const SuperClosingsList: React.FC = () => {
     return <Typography color="error">Error: {error}</Typography>;
   }
 
+  // Obtener el cajaNumero del turno activo del usuario
+  const cajaNumeroActual = turnosActivos.length > 0 ? turnosActivos[0].cajaNumero : null;
+  console.log('[SuperClosingsList] Caja número del turno activo:', cajaNumeroActual);
+
+  // Filtrar por caja y estado activo
+  const filteredClosings = superClosings.filter(closing => {
+    // Filtrar por estado activo
+    const matchesActivo = closing.activo === true;
+    
+    // Filtrar por caja ESTRICTAMENTE: debe coincidir con el turno activo
+    const matchesCaja = !cajaNumeroActual || closing.cajaNumero === cajaNumeroActual;
+    
+    return matchesActivo && matchesCaja;
+  });
+
   const canCreateEdit = !!authState.permissions?.['crear_editar_cierre_super'];
   const canDelete = !!authState.permissions?.['eliminar_cierre_super'];
 
@@ -201,21 +230,37 @@ const SuperClosingsList: React.FC = () => {
             </Button>
           )}
           {canCreateEdit && (
-            <Button
-              variant="contained"
-              color="primary"
-              startIcon={<AddIcon />}
-              onClick={handleCreateClick}
-              sx={{
-                backgroundColor: '#dc7633',
-                '&:hover': {
-                  backgroundColor: '#b35c20'
-                },
-                boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
-              }}
+            <Tooltip 
+              title={
+                cierreExistenteParaTurno 
+                  ? `Ya existe un cierre para este turno (ID: ${cierreExistenteParaTurno.id}). Solo puede editar el existente.`
+                  : 'Crear nuevo cierre de Super'
+              }
+              arrow
             >
-              Nuevo Cierre
-            </Button>
+              <span>
+                <Button
+                  variant="contained"
+                  color="primary"
+                  startIcon={<AddIcon />}
+                  onClick={handleCreateClick}
+                  disabled={!!cierreExistenteParaTurno}
+                  sx={{
+                    backgroundColor: '#dc7633',
+                    '&:hover': {
+                      backgroundColor: '#b35c20'
+                    },
+                    '&.Mui-disabled': {
+                      backgroundColor: '#cccccc',
+                      color: '#666666'
+                    },
+                    boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+                  }}
+                >
+                  Nuevo Cierre
+                </Button>
+              </span>
+            </Tooltip>
           )}
         </Box>
       </Box>
@@ -304,8 +349,8 @@ const SuperClosingsList: React.FC = () => {
                   Cargando cierres...
                 </TableCell>
               </TableRow>
-            ) : superClosings.length > 0 ? (
-              superClosings.map((closing: SuperClosing) => (
+            ) : filteredClosings.length > 0 ? (
+              filteredClosings.map((closing: SuperClosing) => (
                 <TableRow key={closing.id}>
                   <TableCell>{closing.id}</TableCell>
                   <TableCell>
