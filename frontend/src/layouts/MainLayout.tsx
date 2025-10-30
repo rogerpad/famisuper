@@ -127,7 +127,19 @@ const MENU_PERMISSIONS = {
   ADMIN_CIERRES_SUPER: 'crear_editar_cierre_super',
   // Permisos específicos para VendedorB
   MENU_OPERACION_AGENTE: 'ver_menu_operacion_agente',
-  MENU_OPERACION_SUPER: 'ver_menu_operacion_super'
+  MENU_OPERACION_SUPER: 'ver_menu_operacion_super',
+  // Permisos de Reportería Super
+  VER_REPORTES_SUPER: 'ver_reportes_super',
+  VER_REPORTE_CIERRES_SUPER: 'ver_reporte_cierres_super',
+  VER_REPORTE_EGRESOS_SUPER: 'ver_reporte_egresos_super',
+  VER_REPORTE_VENTAS_SALDO: 'ver_reporte_ventas_saldo',
+  EXPORTAR_REPORTES_SUPER: 'exportar_reportes_super',
+  // Permisos de Reportería Agente
+  VER_REPORTES_AGENTE: 'ver_reportes_agente',
+  VER_REPORTE_CIERRES_AGENTE: 'ver_reporte_cierres_agente',
+  VER_REPORTE_TRANSACCIONES_AGENTE: 'ver_reporte_transacciones_agente',
+  VER_REPORTE_CONSOLIDADO_AGENTE: 'ver_reporte_consolidado_agente',
+  EXPORTAR_REPORTES_AGENTE: 'exportar_reportes_agente'
 };
 
 // Definimos los permisos por rol
@@ -159,7 +171,18 @@ const ROLE_PERMISSIONS = {
     MENU_PERMISSIONS.BALANCE_FLOWS,
     MENU_PERMISSIONS.BALANCE_SALES,
     MENU_PERMISSIONS.CONTEO_BILLETES_SUPER,
-    MENU_PERMISSIONS.CIERRES_SUPER
+    MENU_PERMISSIONS.CIERRES_SUPER,
+    // Permisos de Reportería
+    MENU_PERMISSIONS.VER_REPORTES_SUPER,
+    MENU_PERMISSIONS.VER_REPORTE_CIERRES_SUPER,
+    MENU_PERMISSIONS.VER_REPORTE_EGRESOS_SUPER,
+    MENU_PERMISSIONS.VER_REPORTE_VENTAS_SALDO,
+    MENU_PERMISSIONS.EXPORTAR_REPORTES_SUPER,
+    MENU_PERMISSIONS.VER_REPORTES_AGENTE,
+    MENU_PERMISSIONS.VER_REPORTE_CIERRES_AGENTE,
+    MENU_PERMISSIONS.VER_REPORTE_TRANSACCIONES_AGENTE,
+    MENU_PERMISSIONS.VER_REPORTE_CONSOLIDADO_AGENTE,
+    MENU_PERMISSIONS.EXPORTAR_REPORTES_AGENTE
   ],
   VENDEDOR: [
     MENU_PERMISSIONS.VENDEDOR_DASHBOARD,
@@ -423,6 +446,29 @@ const menuItemsConfig: MenuItemType[] = [
         icon: <ReceiptIcon />, 
         path: '/adicionales-prestamos', 
         permissionCode: MENU_PERMISSIONS.ADICIONALES_PRESTAMOS 
+      },
+    ]
+  },
+  
+  // Grupo de Reportería
+  {
+    text: 'Reportería',
+    icon: <AssessmentIcon />,
+    isGroup: true,
+    permissionCode: null,
+    adminOnly: true,
+    children: [
+      {
+        text: 'Reportes Super',
+        icon: <AssessmentIcon />,
+        path: '/reports/super',
+        permissionCode: MENU_PERMISSIONS.VER_REPORTES_SUPER
+      },
+      {
+        text: 'Reportes Agente',
+        icon: <AssessmentIcon />,
+        path: '/reports/agent',
+        permissionCode: MENU_PERMISSIONS.VER_REPORTES_AGENTE
       },
     ]
   },
